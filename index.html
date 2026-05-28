@@ -11,7 +11,8 @@
             theme: {
                 extend: {
                     colors: {
-                        brand: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 900: '#1e3a8a' }
+                        brand: { 50: '#eff6ff', 100: '#dbeafe', 500: '#3b82f6', 600: '#2563eb', 900: '#1e3a8a' },
+                        redbrand: { 50: '#fef2f2', 100: '#fee2e2', 500: '#ef4444', 600: '#dc2626' }
                     },
                     screens: { 'print': {'raw': 'print'} }
                 }
@@ -41,11 +42,12 @@
         const { useState, useMemo, useEffect, useRef } = React;
 
         // ==========================================
-        // DATABASE TUBI E COSTANTI (Completissimo)
+        // DATABASE TUBI E COSTANTI (Centralizzato)
         // ==========================================
+        // roughness in mm, lambda in W/(m*K)
         const PIPE_CATALOG = {
             'Acciaio': {
-                roughness: 0.05,
+                roughness: 0.05, lambda: 50.0,
                 specs: {
                     '50': { 'NORM': 54.5 }, '65': { 'NORM': 70.3 }, '80': { 'NORM': 82.5 }, '100': { 'NORM': 107.1 },
                     '125': { 'NORM': 131.7 }, '150': { 'NORM': 160.3 }, '200': { 'NORM': 209.1 }, '250': { 'NORM': 261.8 },
@@ -54,7 +56,7 @@
                 }
             },
             'Cemento': {
-                roughness: 1.5,
+                roughness: 1.5, lambda: 1.5,
                 specs: {
                     '50': { 'PN3': 50.0, 'PN6': 50.0, 'PN7.5': 50.0, 'PN10': 50.0, 'PN15': 50.0 },
                     '60': { 'PN3': 60.0, 'PN6': 60.0, 'PN7.5': 60.0, 'PN10': 60.0, 'PN15': 60.0 },
@@ -81,181 +83,129 @@
                 }
             },
             'Ghisa': {
-                roughness: 0.25,
+                roughness: 0.25, lambda: 50.0,
                 specs: {
-                    '50': { 'Nriv': 54.0, 'Riv': 49.0 },
-                    '65': { 'Nriv': 70.0, 'Riv': 65.0 },
-                    '80': { 'Nriv': 86.0, 'Riv': 81.0 },
-                    '100': { 'Nriv': 105.8, 'Riv': 100.8 },
-                    '125': { 'Nriv': 131.6, 'Riv': 126.6 },
-                    '150': { 'Nriv': 157.4, 'Riv': 152.4 },
-                    '200': { 'Nriv': 209.2, 'Riv': 204.2 },
-                    '250': { 'Nriv': 260.4, 'Riv': 255.4 },
-                    '300': { 'Nriv': 311.6, 'Riv': 306.6 },
-                    '350': { 'Nriv': 362.6, 'Riv': 353.6 },
-                    '400': { 'Nriv': 412.8, 'Riv': 403.8 },
-                    '450': { 'Nriv': 462.8 },
-                    '500': { 'Nriv': 514.0, 'Riv': 505.0 },
-                    '600': { 'Nriv': 615.2, 'Riv': 606.2 },
-                    '700': { 'Nriv': 716.4, 'Riv': 707.4 },
-                    '800': { 'Nriv': 818.6, 'Riv': 809.6 },
-                    '900': { 'Nriv': 919.8, 'Riv': 910.8 },
-                    '1000': { 'Nriv': 1021.0, 'Riv': 1012.0 },
-                    '1200': { 'Nriv': 1224.4, 'Riv': 1215.4 },
-                    '1400': { 'Nriv': 1427.8, 'Riv': 1418.8 },
-                    '1600': { 'Nriv': 1630.2, 'Riv': 1621.2 },
-                    '1800': { 'Nriv': 1833.6, 'Riv': 1824.6 },
-                    '2000': { 'Nriv': 2037.0, 'Riv': 2028.0 }
+                    '50': { 'Nriv': 54.0, 'Riv': 49.0 }, '65': { 'Nriv': 70.0, 'Riv': 65.0 }, '80': { 'Nriv': 86.0, 'Riv': 81.0 },
+                    '100': { 'Nriv': 105.8, 'Riv': 100.8 }, '125': { 'Nriv': 131.6, 'Riv': 126.6 }, '150': { 'Nriv': 157.4, 'Riv': 152.4 },
+                    '200': { 'Nriv': 209.2, 'Riv': 204.2 }, '250': { 'Nriv': 260.4, 'Riv': 255.4 }, '300': { 'Nriv': 311.6, 'Riv': 306.6 },
+                    '350': { 'Nriv': 362.6, 'Riv': 353.6 }, '400': { 'Nriv': 412.8, 'Riv': 403.8 }, '450': { 'Nriv': 462.8 },
+                    '500': { 'Nriv': 514.0, 'Riv': 505.0 }, '600': { 'Nriv': 615.2, 'Riv': 606.2 }, '700': { 'Nriv': 716.4, 'Riv': 707.4 },
+                    '800': { 'Nriv': 818.6, 'Riv': 809.6 }, '900': { 'Nriv': 919.8, 'Riv': 910.8 }, '1000': { 'Nriv': 1021.0, 'Riv': 1012.0 },
+                    '1200': { 'Nriv': 1224.4, 'Riv': 1215.4 }, '1400': { 'Nriv': 1427.8, 'Riv': 1418.8 }, '1600': { 'Nriv': 1630.2, 'Riv': 1621.2 },
+                    '1800': { 'Nriv': 1833.6, 'Riv': 1824.6 }, '2000': { 'Nriv': 2037.0, 'Riv': 2028.0 }
                 }
             },
             'PE100': {
-                roughness: 0.01,
+                roughness: 0.01, lambda: 0.4,
                 specs: {
-                    '20': { 'PN16': 16.0 },
-                    '25': { 'PN16': 20.4 },
-                    '32': { 'PN10': 28.0, 'PN16': 26.0 },
-                    '40': { 'PN8': 36.0, 'PN10': 35.2, 'PN16': 32.6 },
-                    '50': { 'PN8': 45.2, 'PN10': 44.0, 'PN16': 40.8 },
-                    '63': { 'PN6': 58.4, 'PN8': 57.0, 'PN10': 55.4, 'PN16': 51.4 },
-                    '75': { 'PN6': 69.6, 'PN8': 67.8, 'PN10': 66.0, 'PN16': 61.4 },
-                    '90': { 'PN4': 85.4, 'PN6': 83.4, 'PN8': 81.4, 'PN10': 79.2, 'PN16': 73.6 },
-                    '110': { 'PN4': 104.6, 'PN6': 102.0, 'PN8': 99.4, 'PN10': 96.8, 'PN16': 90.0 },
-                    '125': { 'PN4': 118.8, 'PN6': 115.8, 'PN8': 113.0, 'PN10': 110.2, 'PN16': 102.2 },
-                    '140': { 'PN4': 133.0, 'PN6': 129.8, 'PN8': 126.6, 'PN10': 123.4, 'PN16': 114.6 },
-                    '160': { 'PN4': 152.0, 'PN6': 148.4, 'PN8': 144.6, 'PN10': 141.0, 'PN16': 130.8 },
-                    '180': { 'PN4': 171.2, 'PN6': 166.8, 'PN8': 162.8, 'PN10': 158.6, 'PN16': 147.2 },
-                    '200': { 'PN4': 190.2, 'PN6': 185.4, 'PN8': 180.8, 'PN10': 176.2, 'PN16': 163.6 },
-                    '225': { 'PN4': 214.0, 'PN6': 208.6, 'PN8': 203.4, 'PN10': 198.2, 'PN16': 184.0 },
-                    '250': { 'PN4': 237.6, 'PN6': 231.8, 'PN8': 226.2, 'PN10': 220.4, 'PN16': 204.6 },
-                    '280': { 'PN4': 266.2, 'PN6': 259.6, 'PN8': 253.2, 'PN10': 246.8, 'PN16': 229.2 },
-                    '315': { 'PN4': 299.6, 'PN6': 292.2, 'PN8': 285.0, 'PN10': 277.6, 'PN16': 257.8 },
-                    '355': { 'PN4': 337.6, 'PN6': 329.2, 'PN8': 321.2, 'PN10': 312.8, 'PN16': 290.6 },
-                    '400': { 'PN4': 380.4, 'PN6': 371.0, 'PN8': 361.8, 'PN10': 352.6, 'PN16': 327.4 },
-                    '450': { 'PN4': 428.0, 'PN6': 417.4, 'PN8': 407.0, 'PN10': 396.6, 'PN16': 368.2 },
-                    '500': { 'PN4': 475.4, 'PN6': 463.8, 'PN8': 452.2, 'PN10': 440.6, 'PN16': 409.2 },
-                    '560': { 'PN4': 532.6, 'PN6': 519.4, 'PN8': 506.6, 'PN10': 493.6 },
-                    '630': { 'PN4': 599.2, 'PN6': 584.4, 'PN8': 570.0, 'PN10': 555.2 },
-                    '710': { 'PN4': 675.2, 'PN6': 658.4, 'PN8': 642.2, 'PN10': 625.8 },
+                    '20': { 'PN16': 16.0 }, '25': { 'PN16': 20.4 }, '32': { 'PN10': 28.0, 'PN16': 26.0 },
+                    '40': { 'PN8': 36.0, 'PN10': 35.2, 'PN16': 32.6 }, '50': { 'PN8': 45.2, 'PN10': 44.0, 'PN16': 40.8 },
+                    '63': { 'PN6': 58.4, 'PN8': 57.0, 'PN10': 55.4, 'PN16': 51.4 }, '75': { 'PN6': 69.6, 'PN8': 67.8, 'PN10': 66.0, 'PN16': 61.4 },
+                    '90': { 'PN4': 85.4, 'PN6': 83.4, 'PN8': 81.4, 'PN10': 79.2, 'PN16': 73.6 }, '110': { 'PN4': 104.6, 'PN6': 102.0, 'PN8': 99.4, 'PN10': 96.8, 'PN16': 90.0 },
+                    '125': { 'PN4': 118.8, 'PN6': 115.8, 'PN8': 113.0, 'PN10': 110.2, 'PN16': 102.2 }, '140': { 'PN4': 133.0, 'PN6': 129.8, 'PN8': 126.6, 'PN10': 123.4, 'PN16': 114.6 },
+                    '160': { 'PN4': 152.0, 'PN6': 148.4, 'PN8': 144.6, 'PN10': 141.0, 'PN16': 130.8 }, '180': { 'PN4': 171.2, 'PN6': 166.8, 'PN8': 162.8, 'PN10': 158.6, 'PN16': 147.2 },
+                    '200': { 'PN4': 190.2, 'PN6': 185.4, 'PN8': 180.8, 'PN10': 176.2, 'PN16': 163.6 }, '225': { 'PN4': 214.0, 'PN6': 208.6, 'PN8': 203.4, 'PN10': 198.2, 'PN16': 184.0 },
+                    '250': { 'PN4': 237.6, 'PN6': 231.8, 'PN8': 226.2, 'PN10': 220.4, 'PN16': 204.6 }, '280': { 'PN4': 266.2, 'PN6': 259.6, 'PN8': 253.2, 'PN10': 246.8, 'PN16': 229.2 },
+                    '315': { 'PN4': 299.6, 'PN6': 292.2, 'PN8': 285.0, 'PN10': 277.6, 'PN16': 257.8 }, '355': { 'PN4': 337.6, 'PN6': 329.2, 'PN8': 321.2, 'PN10': 312.8, 'PN16': 290.6 },
+                    '400': { 'PN4': 380.4, 'PN6': 371.0, 'PN8': 361.8, 'PN10': 352.6, 'PN16': 327.4 }, '450': { 'PN4': 428.0, 'PN6': 417.4, 'PN8': 407.0, 'PN10': 396.6, 'PN16': 368.2 },
+                    '500': { 'PN4': 475.4, 'PN6': 463.8, 'PN8': 452.2, 'PN10': 440.6, 'PN16': 409.2 }, '560': { 'PN4': 532.6, 'PN6': 519.4, 'PN8': 506.6, 'PN10': 493.6 },
+                    '630': { 'PN4': 599.2, 'PN6': 584.4, 'PN8': 570.0, 'PN10': 555.2 }, '710': { 'PN4': 675.2, 'PN6': 658.4, 'PN8': 642.2, 'PN10': 625.8 },
                     '800': { 'PN4': 760.8, 'PN6': 742.0, 'PN8': 723.8, 'PN10': 705.8 }
                 }
             },
             'PEAD': {
-                roughness: 0.01,
+                roughness: 0.01, lambda: 0.4,
                 specs: {
-                    '16': { 'PN10': 12.8, 'PN16': 11.4 },
-                    '20': { 'PN10': 16.2, 'PN16': 14.4 },
-                    '25': { 'PN6': 21.8, 'PN10': 20.4, 'PN16': 18.0 },
-                    '32': { 'PN6': 28.2, 'PN10': 26.0, 'PN16': 23.0 },
-                    '40': { 'PN4': 36.8, 'PN6': 35.4, 'PN10': 32.6, 'PN16': 28.8 },
-                    '50': { 'PN4': 46.0, 'PN6': 44.2, 'PN10': 40.8, 'PN16': 36.2 },
-                    '63': { 'PN2.5': 59.8, 'PN4': 58.0, 'PN6': 55.8, 'PN10': 51.4, 'PN16': 45.6 },
-                    '75': { 'PN2.5': 71.2, 'PN4': 69.2, 'PN6': 66.4, 'PN10': 61.2, 'PN16': 54.2 },
-                    '90': { 'PN2.5': 85.6, 'PN4': 83.0, 'PN6': 79.8, 'PN10': 73.6, 'PN16': 65.2 },
-                    '110': { 'PN2.5': 104.6, 'PN3.2': 103.0, 'PN4': 101.4, 'PN6': 97.4, 'PN10': 90.0, 'PN16': 79.6 },
-                    '125': { 'PN2.5': 118.8, 'PN3.2': 117.2, 'PN4': 115.2, 'PN6': 110.8, 'PN10': 102.2, 'PN16': 90.4 },
-                    '140': { 'PN2.5': 133.0, 'PN3.2': 131.2, 'PN4': 129.2, 'PN6': 124.0, 'PN10': 114.4, 'PN16': 101.2 },
-                    '160': { 'PN2.5': 152.2, 'PN3.2': 150.0, 'PN4': 147.6, 'PN6': 141.8, 'PN10': 130.8, 'PN16': 115.8 },
-                    '180': { 'PN2.5': 171.2, 'PN3.2': 168.8, 'PN4': 166.0, 'PN6': 159.6, 'PN10': 147.2, 'PN16': 130.2 },
-                    '200': { 'PN2.5': 190.2, 'PN3.2': 187.6, 'PN4': 184.6, 'PN6': 177.2, 'PN10': 163.6, 'PN16': 144.8 },
-                    '225': { 'PN2.5': 214.0, 'PN3.2': 211.0, 'PN4': 207.6, 'PN6': 199.4, 'PN10': 184.0, 'PN16': 162.8 },
-                    '250': { 'PN2.5': 237.8, 'PN3.2': 234.4, 'PN4': 230.6, 'PN6': 221.6, 'PN10': 204.4, 'PN16': 181.0 },
-                    '280': { 'PN2.5': 266.2, 'PN3.2': 262.6, 'PN4': 258.4, 'PN6': 248.2, 'PN10': 229.0 },
-                    '315': { 'PN2.5': 299.6, 'PN3.2': 295.4, 'PN4': 290.6, 'PN6': 279.2, 'PN10': 257.6 },
-                    '355': { 'PN2.5': 337.6, 'PN3.2': 333.0, 'PN4': 327.6, 'PN6': 314.8, 'PN10': 290.4 },
-                    '400': { 'PN2.5': 380.4, 'PN3.2': 375.2, 'PN4': 369.2, 'PN6': 354.6, 'PN10': 327.2 },
-                    '450': { 'PN2.5': 428.0, 'PN3.2': 422.0, 'PN4': 415.4, 'PN6': 399.0, 'PN10': 368.0 },
-                    '500': { 'PN2.5': 475.6, 'PN3.2': 469.0, 'PN4': 461.4, 'PN6': 443.4, 'PN10': 409.0 },
-                    '560': { 'PN2.5': 532.6, 'PN3.2': 525.2, 'PN4': 516.8, 'PN6': 496.6 },
-                    '630': { 'PN2.5': 599.2, 'PN3.2': 590.8, 'PN4': 581.4, 'PN6': 558.6 },
-                    '710': { 'PN2.5': 675.2, 'PN3.2': 666.0, 'PN4': 655.4, 'PN6': 629.6 },
-                    '800': { 'PN2.5': 760.8, 'PN3.2': 750.2, 'PN4': 738.4 },
-                    '900': { 'PN2.5': 856.0, 'PN3.2': 844.0, 'PN4': 830.6 },
-                    '1000': { 'PN2.5': 951.2, 'PN3.2': 938.0, 'PN4': 923.0 },
-                    '1200': { 'PN2.5': 1141.4, 'PN3.2': 1125.6 }
+                    '16': { 'PN10': 12.8, 'PN16': 11.4 }, '20': { 'PN10': 16.2, 'PN16': 14.4 }, '25': { 'PN6': 21.8, 'PN10': 20.4, 'PN16': 18.0 },
+                    '32': { 'PN6': 28.2, 'PN10': 26.0, 'PN16': 23.0 }, '40': { 'PN4': 36.8, 'PN6': 35.4, 'PN10': 32.6, 'PN16': 28.8 },
+                    '50': { 'PN4': 46.0, 'PN6': 44.2, 'PN10': 40.8, 'PN16': 36.2 }, '63': { 'PN2.5': 59.8, 'PN4': 58.0, 'PN6': 55.8, 'PN10': 51.4, 'PN16': 45.6 },
+                    '75': { 'PN2.5': 71.2, 'PN4': 69.2, 'PN6': 66.4, 'PN10': 61.2, 'PN16': 54.2 }, '90': { 'PN2.5': 85.6, 'PN4': 83.0, 'PN6': 79.8, 'PN10': 73.6, 'PN16': 65.2 },
+                    '110': { 'PN2.5': 104.6, 'PN3.2': 103.0, 'PN4': 101.4, 'PN6': 97.4, 'PN10': 90.0, 'PN16': 79.6 }, '125': { 'PN2.5': 118.8, 'PN3.2': 117.2, 'PN4': 115.2, 'PN6': 110.8, 'PN10': 102.2, 'PN16': 90.4 },
+                    '140': { 'PN2.5': 133.0, 'PN3.2': 131.2, 'PN4': 129.2, 'PN6': 124.0, 'PN10': 114.4, 'PN16': 101.2 }, '160': { 'PN2.5': 152.2, 'PN3.2': 150.0, 'PN4': 147.6, 'PN6': 141.8, 'PN10': 130.8, 'PN16': 115.8 },
+                    '180': { 'PN2.5': 171.2, 'PN3.2': 168.8, 'PN4': 166.0, 'PN6': 159.6, 'PN10': 147.2, 'PN16': 130.2 }, '200': { 'PN2.5': 190.2, 'PN3.2': 187.6, 'PN4': 184.6, 'PN6': 177.2, 'PN10': 163.6, 'PN16': 144.8 },
+                    '225': { 'PN2.5': 214.0, 'PN3.2': 211.0, 'PN4': 207.6, 'PN6': 199.4, 'PN10': 184.0, 'PN16': 162.8 }, '250': { 'PN2.5': 237.8, 'PN3.2': 234.4, 'PN4': 230.6, 'PN6': 221.6, 'PN10': 204.4, 'PN16': 181.0 },
+                    '280': { 'PN2.5': 266.2, 'PN3.2': 262.6, 'PN4': 258.4, 'PN6': 248.2, 'PN10': 229.0 }, '315': { 'PN2.5': 299.6, 'PN3.2': 295.4, 'PN4': 290.6, 'PN6': 279.2, 'PN10': 257.6 },
+                    '355': { 'PN2.5': 337.6, 'PN3.2': 333.0, 'PN4': 327.6, 'PN6': 314.8, 'PN10': 290.4 }, '400': { 'PN2.5': 380.4, 'PN3.2': 375.2, 'PN4': 369.2, 'PN6': 354.6, 'PN10': 327.2 },
+                    '450': { 'PN2.5': 428.0, 'PN3.2': 422.0, 'PN4': 415.4, 'PN6': 399.0, 'PN10': 368.0 }, '500': { 'PN2.5': 475.6, 'PN3.2': 469.0, 'PN4': 461.4, 'PN6': 443.4, 'PN10': 409.0 },
+                    '560': { 'PN2.5': 532.6, 'PN3.2': 525.2, 'PN4': 516.8, 'PN6': 496.6 }, '630': { 'PN2.5': 599.2, 'PN3.2': 590.8, 'PN4': 581.4, 'PN6': 558.6 },
+                    '710': { 'PN2.5': 675.2, 'PN3.2': 666.0, 'PN4': 655.4, 'PN6': 629.6 }, '800': { 'PN2.5': 760.8, 'PN3.2': 750.2, 'PN4': 738.4 },
+                    '900': { 'PN2.5': 856.0, 'PN3.2': 844.0, 'PN4': 830.6 }, '1000': { 'PN2.5': 951.2, 'PN3.2': 938.0, 'PN4': 923.0 }, '1200': { 'PN2.5': 1141.4, 'PN3.2': 1125.6 }
                 }
             },
             'PRFV': {
-                roughness: 0.02,
+                roughness: 0.02, lambda: 0.25,
                 specs: {
-                    '75': { 'PN10': 75.0 },
-                    '100': { 'PN10': 100.0 },
-                    '125': { 'PN10': 125.0 },
-                    '150': { 'PN10': 150.0 },
-                    '200': { 'PN10': 200.0 },
-                    '250': { 'PN10': 250.0 },
-                    '300': { 'PN10': 300.0 },
-                    '350': { 'PN10': 350.0 },
-                    '400': { 'PN10': 400.0 },
-                    '500': { 'PN10': 500.0 },
-                    '600': { 'PN10': 600.0 },
-                    '700': { 'PN10': 700.0 },
-                    '800': { 'PN10': 800.0 },
-                    '900': { 'PN10': 900.0 },
-                    '1000': { 'PN10': 1000.0 }
+                    '75': { 'PN10': 75.0 }, '100': { 'PN10': 100.0 }, '125': { 'PN10': 125.0 }, '150': { 'PN10': 150.0 }, '200': { 'PN10': 200.0 },
+                    '250': { 'PN10': 250.0 }, '300': { 'PN10': 300.0 }, '350': { 'PN10': 350.0 }, '400': { 'PN10': 400.0 }, '500': { 'PN10': 500.0 },
+                    '600': { 'PN10': 600.0 }, '700': { 'PN10': 700.0 }, '800': { 'PN10': 800.0 }, '900': { 'PN10': 900.0 }, '1000': { 'PN10': 1000.0 }
                 }
             },
             'PVC': {
-                roughness: 0.01,
+                roughness: 0.01, lambda: 0.16,
                 specs: {
-                    '50': { 'PN6': 46.4, 'PN10': 45.2, 'PN16': 42.6 },
-                    '63': { 'PN4': 59.4, 'PN6': 59.2, 'PN10': 57.0, 'PN16': 53.6 },
-                    '75': { 'PN4': 71.4, 'PN6': 70.6, 'PN10': 67.8, 'PN16': 63.8 },
-                    '90': { 'PN4': 86.4, 'PN6': 84.6, 'PN10': 81.4, 'PN16': 76.6 },
-                    '110': { 'PN4': 105.6, 'PN6': 103.6, 'PN10': 99.4, 'PN16': 93.6 },
-                    '125': { 'PN4': 120.0, 'PN6': 117.6, 'PN10': 113.0, 'PN16': 106.4 },
-                    '140': { 'PN4': 134.4, 'PN6': 131.8, 'PN10': 126.6, 'PN16': 119.2 },
-                    '160': { 'PN4': 153.6, 'PN6': 150.6, 'PN10': 144.6, 'PN16': 136.2 },
-                    '180': { 'PN4': 172.8, 'PN6': 169.4, 'PN10': 162.8, 'PN16': 153.2 },
-                    '200': { 'PN4': 192.0, 'PN6': 188.2, 'PN10': 180.8, 'PN16': 170.2 },
-                    '225': { 'PN4': 216.0, 'PN6': 211.8, 'PN10': 203.4 },
-                    '250': { 'PN4': 240.2, 'PN6': 235.4, 'PN10': 226.2 },
-                    '280': { 'PN4': 269.0, 'PN6': 263.6, 'PN10': 253.2 },
-                    '315': { 'PN4': 302.6, 'PN6': 296.6, 'PN10': 285.0 },
-                    '355': { 'PN4': 341.0, 'PN6': 334.2 },
-                    '400': { 'PN4': 384.2, 'PN6': 376.6 },
-                    '450': { 'PN4': 432.2 },
-                    '500': { 'PN4': 480.4 },
-                    '560': { 'PN4': 538.0 },
-                    '630': { 'PN4': 605.2 }
+                    '50': { 'PN6': 46.4, 'PN10': 45.2, 'PN16': 42.6 }, '63': { 'PN4': 59.4, 'PN6': 59.2, 'PN10': 57.0, 'PN16': 53.6 },
+                    '75': { 'PN4': 71.4, 'PN6': 70.6, 'PN10': 67.8, 'PN16': 63.8 }, '90': { 'PN4': 86.4, 'PN6': 84.6, 'PN10': 81.4, 'PN16': 76.6 },
+                    '110': { 'PN4': 105.6, 'PN6': 103.6, 'PN10': 99.4, 'PN16': 93.6 }, '125': { 'PN4': 120.0, 'PN6': 117.6, 'PN10': 113.0, 'PN16': 106.4 },
+                    '140': { 'PN4': 134.4, 'PN6': 131.8, 'PN10': 126.6, 'PN16': 119.2 }, '160': { 'PN4': 153.6, 'PN6': 150.6, 'PN10': 144.6, 'PN16': 136.2 },
+                    '180': { 'PN4': 172.8, 'PN6': 169.4, 'PN10': 162.8, 'PN16': 153.2 }, '200': { 'PN4': 192.0, 'PN6': 188.2, 'PN10': 180.8, 'PN16': 170.2 },
+                    '225': { 'PN4': 216.0, 'PN6': 211.8, 'PN10': 203.4 }, '250': { 'PN4': 240.2, 'PN6': 235.4, 'PN10': 226.2 },
+                    '280': { 'PN4': 269.0, 'PN6': 263.6, 'PN10': 253.2 }, '315': { 'PN4': 302.6, 'PN6': 296.6, 'PN10': 285.0 },
+                    '355': { 'PN4': 341.0, 'PN6': 334.2 }, '400': { 'PN4': 384.2, 'PN6': 376.6 }, '450': { 'PN4': 432.2 },
+                    '500': { 'PN4': 480.4 }, '560': { 'PN4': 538.0 }, '630': { 'PN4': 605.2 }
                 }
             },
             'PVC EN': {
-                roughness: 0.01,
+                roughness: 0.01, lambda: 0.16,
                 specs: {
-                    '32': { 'PN8': 29.0, 'PN10': 28.8, 'PN16': 27.2 },
-                    '40': { 'PN6': 37.0, 'PN8': 36.8, 'PN10': 36.2, 'PN16': 34.0 },
-                    '50': { 'PN6': 46.8, 'PN8': 46.0, 'PN10': 45.2, 'PN16': 42.6 },
-                    '63': { 'PN6': 59.0, 'PN8': 58.0, 'PN10': 57.0, 'PN16': 53.6 },
-                    '75': { 'PN6': 70.4, 'PN8': 69.2, 'PN10': 67.8, 'PN16': 63.8 },
-                    '90': { 'PN6': 84.4, 'PN8': 83.0, 'PN10': 81.4, 'PN16': 76.6 },
-                    '110': { 'PN6': 104.6, 'PN8': 103.2, 'PN10': 101.6, 'PN16': 96.8 },
-                    '125': { 'PN6': 118.8, 'PN8': 117.2, 'PN10': 115.4, 'PN16': 110.2 },
-                    '140': { 'PN6': 133.0, 'PN8': 131.4, 'PN10': 129.2, 'PN16': 123.4 },
-                    '160': { 'PN6': 152.0, 'PN8': 150.2, 'PN10': 147.6, 'PN16': 141.0 },
-                    '180': { 'PN6': 171.2, 'PN8': 169.0, 'PN10': 166.2, 'PN16': 158.6 },
-                    '200': { 'PN6': 190.2, 'PN8': 187.6, 'PN10': 184.6, 'PN16': 176.2 },
-                    '225': { 'PN6': 214.0, 'PN8': 211.2, 'PN10': 207.8, 'PN16': 198.2 },
-                    '250': { 'PN6': 237.6, 'PN8': 234.6, 'PN10': 230.8, 'PN16': 220.4 },
-                    '280': { 'PN6': 266.2, 'PN8': 262.8, 'PN10': 258.6, 'PN16': 246.8 },
-                    '315': { 'PN6': 299.6, 'PN8': 295.6, 'PN10': 290.8, 'PN16': 277.6 },
-                    '355': { 'PN6': 337.6, 'PN8': 333.2, 'PN10': 327.8, 'PN16': 312.8 },
-                    '400': { 'PN6': 380.4, 'PN8': 375.4, 'PN10': 368.8, 'PN16': 352.6 },
-                    '450': { 'PN6': 428.0, 'PN8': 422.4, 'PN10': 415.6, 'PN16': 396.6 },
-                    '500': { 'PN6': 475.4, 'PN8': 469.4, 'PN10': 461.8, 'PN16': 440.6 },
-                    '560': { 'PN6': 532.6, 'PN8': 525.6, 'PN10': 517.2 },
-                    '630': { 'PN6': 599.2, 'PN8': 591.4, 'PN10': 581.8 },
-                    '710': { 'PN6': 675.2, 'PN8': 666.4, 'PN10': 655.6 },
-                    '800': { 'PN6': 760.8, 'PN8': 751.0, 'PN10': 738.8 },
-                    '900': { 'PN6': 856.0, 'PN8': 844.8 },
-                    '1000': { 'PN6': 951.0, 'PN8': 938.8 }
+                    '32': { 'PN8': 29.0, 'PN10': 28.8, 'PN16': 27.2 }, '40': { 'PN6': 37.0, 'PN8': 36.8, 'PN10': 36.2, 'PN16': 34.0 },
+                    '50': { 'PN6': 46.8, 'PN8': 46.0, 'PN10': 45.2, 'PN16': 42.6 }, '63': { 'PN6': 59.0, 'PN8': 58.0, 'PN10': 57.0, 'PN16': 53.6 },
+                    '75': { 'PN6': 70.4, 'PN8': 69.2, 'PN10': 67.8, 'PN16': 63.8 }, '90': { 'PN6': 84.4, 'PN8': 83.0, 'PN10': 81.4, 'PN16': 76.6 },
+                    '110': { 'PN6': 104.6, 'PN8': 103.2, 'PN10': 101.6, 'PN16': 96.8 }, '125': { 'PN6': 118.8, 'PN8': 117.2, 'PN10': 115.4, 'PN16': 110.2 },
+                    '140': { 'PN6': 133.0, 'PN8': 131.4, 'PN10': 129.2, 'PN16': 123.4 }, '160': { 'PN6': 152.0, 'PN8': 150.2, 'PN10': 147.6, 'PN16': 141.0 },
+                    '180': { 'PN6': 171.2, 'PN8': 169.0, 'PN10': 166.2, 'PN16': 158.6 }, '200': { 'PN6': 190.2, 'PN8': 187.6, 'PN10': 184.6, 'PN16': 176.2 },
+                    '225': { 'PN6': 214.0, 'PN8': 211.2, 'PN10': 207.8, 'PN16': 198.2 }, '250': { 'PN6': 237.6, 'PN8': 234.6, 'PN10': 230.8, 'PN16': 220.4 },
+                    '280': { 'PN6': 266.2, 'PN8': 262.8, 'PN10': 258.6, 'PN16': 246.8 }, '315': { 'PN6': 299.6, 'PN8': 295.6, 'PN10': 290.8, 'PN16': 277.6 },
+                    '355': { 'PN6': 337.6, 'PN8': 333.2, 'PN10': 327.8, 'PN16': 312.8 }, '400': { 'PN6': 380.4, 'PN8': 375.4, 'PN10': 368.8, 'PN16': 352.6 },
+                    '450': { 'PN6': 428.0, 'PN8': 422.4, 'PN10': 415.6, 'PN16': 396.6 }, '500': { 'PN6': 475.4, 'PN8': 469.4, 'PN10': 461.8, 'PN16': 440.6 },
+                    '560': { 'PN6': 532.6, 'PN8': 525.6, 'PN10': 517.2 }, '630': { 'PN6': 599.2, 'PN8': 591.4, 'PN10': 581.8 },
+                    '710': { 'PN6': 675.2, 'PN8': 666.4, 'PN10': 655.6 }, '800': { 'PN6': 760.8, 'PN8': 751.0, 'PN10': 738.8 },
+                    '900': { 'PN6': 856.0, 'PN8': 844.8 }, '1000': { 'PN6': 951.0, 'PN8': 938.8 }
                 }
             }
         };
+
+        const INSULATION_CATALOG = [
+            { id: 'pur', name: 'Poliuretano Espanso (PUR)', lambda: 0.025 },
+            { id: 'rockwool', name: 'Lana di Roccia / Vetro', lambda: 0.035 },
+            { id: 'rubber', name: 'Gomma Elastomerica', lambda: 0.038 },
+            { id: 'none', name: 'Nessun Isolamento', lambda: 0 },
+            { id: 'custom', name: 'Altro / Manuale...', lambda: 0.035 }
+        ];
 
         const K_PRESETS = [
             { label: 'Imbocco', value: 0.5 }, { label: 'Sbocco', value: 1.0 }, { label: 'Curva 90°', value: 0.9 },
             { label: 'Curva 45°', value: 0.4 }, { label: 'Saracinesca', value: 0.2 }, { label: 'Valv. Ritegno', value: 2.0 },
         ];
+
+        // Funzione per ricavare il Diametro Esterno in base al materiale
+        const getExternalDiameter = (mat, dn, d_int) => {
+            if (!mat || !dn) return 0;
+            const plasticDNs = ['PE100', 'PEAD', 'PRFV', 'PVC', 'PVC EN'];
+            if (plasticDNs.includes(mat)) return Number(dn); // Per la plastica, il DN indica il diametro esterno esatto
+            
+            if (mat === 'Acciaio') {
+                const steelOD = {
+                    '50': 60.3, '65': 76.1, '80': 88.9, '100': 114.3, '125': 139.7, '150': 168.3,
+                    '200': 219.1, '250': 273.0, '300': 323.9, '350': 355.6, '400': 406.4, '450': 457.0,
+                    '500': 508.0, '600': 610.0, '700': 711.0, '800': 813.0, '900': 914.0
+                };
+                return steelOD[dn] || (d_int + 10);
+            }
+            
+            if (mat === 'Ghisa') return d_int + 16;
+            if (mat === 'Cemento') return d_int * 1.2;
+            return d_int + 10;
+        };
 
         // ==========================================
         // ICONE SVG
@@ -272,19 +222,21 @@
         const IconHome = ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
         const IconFlame = ({ className = "w-full h-full" }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>;
         const IconCopy = ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
+        const IconThermometer = ({ className = "w-full h-full" }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" /></svg>;
 
         // ==========================================
         // COMPONENTE DATI PROGETTO (Condiviso)
         // ==========================================
-        const ProjectHeader = ({ pData, setPData, title, setAppMode }) => {
+        const ProjectHeader = ({ pData, setPData, title, setAppMode, iconColor = 'brand' }) => {
             const [logoError, setLogoError] = useState(false);
+            const iconBg = iconColor === 'brand' ? 'bg-brand-600' : (iconColor === 'orange' ? 'bg-orange-600' : 'bg-red-600');
             return (
                 <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0 print:mb-2">
                     <div className="flex justify-between items-center mb-6 print:hidden">
                         <button onClick={() => setAppMode('dashboard')} className="flex items-center text-slate-500 hover:text-brand-600 transition-colors text-sm font-medium">
                             <IconHome className="w-4 h-4 mr-1"/> Menu Principale
                         </button>
-                        <button onClick={() => window.print()} className="flex items-center px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm">
+                        <button onClick={() => window.print()} className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm">
                             <IconPrinter className="w-4 h-4 mr-2"/> Stampa Report
                         </button>
                     </div>
@@ -294,13 +246,13 @@
                             {!logoError ? (
                                 <img src="Logo.png" alt="Logo" className="h-12 w-auto object-contain print:h-12" onError={() => setLogoError(true)} />
                             ) : (
-                                <div className="bg-brand-600 p-2 rounded-lg print:bg-slate-800 w-10 h-10">
-                                    <IconDroplets />
+                                <div className={`${iconBg} p-2 rounded-lg print:bg-slate-800 w-10 h-10`}>
+                                    <IconDroplets className="text-white" />
                                 </div>
                             )}
                             <div className="flex-1">
-                                <p className="text-xs font-bold text-brand-600 uppercase tracking-wider mb-1 print:text-slate-500">{title}</p>
-                                <input type="text" value={pData.client} onChange={e => setPData({...pData, client: e.target.value})} className="text-2xl md:text-3xl font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:border-brand-500 focus:outline-none w-full max-w-xl print:border-none print:p-0" placeholder="Inserisci Titolo o Cliente..."/>
+                                <p className={`text-xs font-bold uppercase tracking-wider mb-1 print:text-slate-500 text-${iconColor}-600`}>{title}</p>
+                                <input type="text" value={pData.client} onChange={e => setPData({...pData, client: e.target.value})} className={`text-2xl md:text-3xl font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:outline-none w-full max-w-xl print:border-none print:p-0 focus:border-${iconColor}-500`} placeholder="Inserisci Titolo o Cliente..."/>
                             </div>
                         </div>
                     </div>
@@ -439,7 +391,6 @@
                 setElements(newEl);
             };
 
-            // Chart Logic Component
             const ChartIdraulico = ({ profileData, baseElev }) => {
                 const chartRef = useRef(null), chartInst = useRef(null);
                 useEffect(() => {
@@ -463,7 +414,7 @@
 
             return (
                 <div className="max-w-6xl mx-auto">
-                    <ProjectHeader pData={projectData} setPData={setProjectData} title="Profilo Idraulico" setAppMode={setAppMode} />
+                    <ProjectHeader pData={projectData} setPData={setProjectData} title="Profilo Idraulico" setAppMode={setAppMode} iconColor="brand" />
                     
                     <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0">
                         <div className="flex justify-between items-center mb-4">
@@ -596,7 +547,7 @@
         }
 
         // ==========================================
-        // APP 2: CARICHI TERMICI
+        // APP 2: CARICHI TERMICI 
         // ==========================================
         function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) {
             const [cp, setCp] = useState(4.187); // kJ/kg°C
@@ -626,12 +577,10 @@
                     
                     let realD = null, realVelocity = 0;
 
-                    // Calcolo esatto in base alla selezione manuale
                     if (load.material && load.DN && load.PN) {
                         if (PIPE_CATALOG[load.material] && PIPE_CATALOG[load.material].specs[load.DN] && PIPE_CATALOG[load.material].specs[load.DN][load.PN]) {
                             realD = PIPE_CATALOG[load.material].specs[load.DN][load.PN];
                         }
-                        
                         if (realD) {
                             const realArea = Math.PI * Math.pow(realD / 2000, 2);
                             realVelocity = flow_m3s / realArea;
@@ -654,7 +603,6 @@
                 setLoads([...loads, { ...loadToCopy, id: newId, name: loadToCopy.name + " (Copia)" }]);
             };
 
-            // Logica a cascata Esatta del Profilo Idraulico
             const updateLoad = (id, field, val) => {
                 setLoads(prev => prev.map(l => {
                     if (l.id === id) {
@@ -664,8 +612,7 @@
                             const matData = PIPE_CATALOG[val];
                             const firstDN = Object.keys(matData.specs)[0];
                             const firstPN = Object.keys(matData.specs[firstDN])[0];
-                            updated.DN = firstDN; 
-                            updated.PN = firstPN;
+                            updated.DN = firstDN; updated.PN = firstPN;
                         } 
                         else if (field === 'DN') {
                             let currentPN = updated.PN;
@@ -674,7 +621,6 @@
                             }
                             updated.PN = currentPN;
                         }
-                        
                         return updated;
                     }
                     return l;
@@ -688,22 +634,20 @@
 
             return (
                 <div className="max-w-6xl mx-auto">
-                    <ProjectHeader pData={projectData} setPData={setProjectData} title="Calcolo Carichi Termici & Reti" setAppMode={setAppMode} />
+                    <ProjectHeader pData={projectData} setPData={setProjectData} title="Calcolo Carichi Termici & Reti" setAppMode={setAppMode} iconColor="orange" />
                     
-                    {/* Dati Fluidodinamici Globali */}
                     <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0">
                         <h3 className="text-sm font-bold text-slate-700 mb-4 print:border-b print:border-slate-800 print:pb-1">Parametri Acqua / Fluido Termovettore</h3>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 print:gap-2">
                             {[{l: 'Calore Specifico (kJ/kg°C)', v: cp, set: setCp, step: "0.001"}, {l: 'Densità (kg/m³)', v: rho, set: setRho, step: "1"}, {l: '∆T Dimensionamento (°C)', v: deltaT, set: setDeltaT, step: "1"}, {l: 'Velocità Target Tubi (m/s)', v: vTarget, set: setVTarget, step: "0.1"}].map((f, i) => (
                                 <div key={i} className="bg-slate-50 p-3 rounded-lg border border-slate-200 print:bg-transparent print:border-none print:p-0">
                                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{f.l}</label>
-                                    <input type="number" step={f.step} value={f.v} onChange={e => f.set(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-transparent text-lg font-semibold text-slate-800 focus:outline-none print:text-base border-b border-slate-300 print:border-none focus:border-brand-500" />
+                                    <input type="number" step={f.step} value={f.v} onChange={e => f.set(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-transparent text-lg font-semibold text-slate-800 focus:outline-none print:text-base border-b border-slate-300 print:border-none focus:border-orange-500" />
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    {/* Utenze */}
                     <div className="space-y-4 print-hide">
                         <div className="flex justify-between items-center bg-slate-800 text-white p-3 rounded-xl shadow-sm">
                             <h2 className="font-semibold text-sm flex items-center"><IconFlame className="w-4 h-4 mr-2"/> Utenze Termiche / Frigorifere</h2>
@@ -713,36 +657,34 @@
                         {processedLoads.map((load, i) => (
                             <div key={load.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4">
                                 
-                                {/* Info Utenza Input */}
                                 <div className="flex-1 space-y-3 pr-4 border-r border-slate-100">
                                     <div className="flex items-center justify-between">
-                                        <input type="text" value={load.name} onChange={e => updateLoad(load.id, 'name', e.target.value)} className="font-bold text-lg text-slate-800 bg-transparent outline-none w-full border-b border-transparent hover:border-slate-300 focus:border-brand-500" placeholder="Nome Utenza" />
+                                        <input type="text" value={load.name} onChange={e => updateLoad(load.id, 'name', e.target.value)} className="font-bold text-lg text-slate-800 bg-transparent outline-none w-full border-b border-transparent hover:border-slate-300 focus:border-orange-500" placeholder="Nome Utenza" />
                                         <div className="flex ml-2">
-                                            <button onClick={()=>duplicateLoad(load.id)} className="p-1 text-slate-400 hover:bg-slate-100 hover:text-brand-600 rounded shrink-0 mr-1" title="Duplica Utenza"><IconCopy className="w-4 h-4"/></button>
-                                            <button onClick={()=>removeLoad(load.id)} className="p-1 text-red-400 hover:bg-red-500 hover:text-white rounded shrink-0" title="Elimina Utenza"><IconTrash className="w-4 h-4"/></button>
+                                            <button onClick={()=>duplicateLoad(load.id)} className="p-1 text-slate-400 hover:bg-slate-100 hover:text-orange-600 rounded shrink-0 mr-1" title="Duplica"><IconCopy className="w-4 h-4"/></button>
+                                            <button onClick={()=>removeLoad(load.id)} className="p-1 text-red-400 hover:bg-red-500 hover:text-white rounded shrink-0" title="Elimina"><IconTrash className="w-4 h-4"/></button>
                                         </div>
                                     </div>
                                     <div className="flex items-center bg-slate-100 p-1 rounded">
-                                        <button onClick={()=>updateLoad(load.id,'mode','power')} className={`flex-1 text-xs font-bold py-1.5 rounded ${load.mode==='power'?'bg-white shadow text-brand-600':'text-slate-500'}`}>So i kWt</button>
-                                        <button onClick={()=>updateLoad(load.id,'mode','flow')} className={`flex-1 text-xs font-bold py-1.5 rounded ${load.mode==='flow'?'bg-white shadow text-brand-600':'text-slate-500'}`}>So la Portata</button>
+                                        <button onClick={()=>updateLoad(load.id,'mode','power')} className={`flex-1 text-xs font-bold py-1.5 rounded ${load.mode==='power'?'bg-white shadow text-orange-600':'text-slate-500'}`}>So i kWt</button>
+                                        <button onClick={()=>updateLoad(load.id,'mode','flow')} className={`flex-1 text-xs font-bold py-1.5 rounded ${load.mode==='flow'?'bg-white shadow text-orange-600':'text-slate-500'}`}>So la Portata</button>
                                     </div>
                                     <div className="bg-slate-50 p-2 rounded border border-slate-200">
                                         <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Dato Noto ({load.mode === 'power' ? 'kW termici' : 'm³/h'})</label>
-                                        <input type="number" step="0.1" value={load.inputVal} onChange={e => updateLoad(load.id, 'inputVal', e.target.value===''?'' : Number(e.target.value))} className="w-full text-xl font-bold bg-transparent outline-none border-b border-slate-300 focus:border-brand-500"/>
+                                        <input type="number" step="0.1" value={load.inputVal} onChange={e => updateLoad(load.id, 'inputVal', e.target.value===''?'' : Number(e.target.value))} className="w-full text-xl font-bold bg-transparent outline-none border-b border-slate-300 focus:border-orange-500"/>
                                     </div>
                                 </div>
 
-                                {/* Calcolo Fluido */}
                                 <div className="flex-1 space-y-3 px-2">
                                     <h4 className="text-[11px] font-bold text-slate-400 uppercase">Risultato Conversione</h4>
                                     <div className="grid grid-cols-2 gap-2">
-                                        <div className="bg-brand-50 p-2 rounded border border-brand-100">
-                                            <p className="text-[10px] font-bold text-brand-600 uppercase">Portata (m³/h)</p>
-                                            <p className="font-mono font-bold text-brand-800">{load.calcFlow_m3h.toFixed(2)}</p>
+                                        <div className="bg-orange-50 p-2 rounded border border-orange-100">
+                                            <p className="text-[10px] font-bold text-orange-600 uppercase">Portata (m³/h)</p>
+                                            <p className="font-mono font-bold text-orange-800">{load.calcFlow_m3h.toFixed(2)}</p>
                                         </div>
-                                        <div className="bg-brand-50 p-2 rounded border border-brand-100">
-                                            <p className="text-[10px] font-bold text-brand-600 uppercase">Potenza (kWt)</p>
-                                            <p className="font-mono font-bold text-brand-800">{load.calcPower_kW.toFixed(1)}</p>
+                                        <div className="bg-orange-50 p-2 rounded border border-orange-100">
+                                            <p className="text-[10px] font-bold text-orange-600 uppercase">Potenza (kWt)</p>
+                                            <p className="font-mono font-bold text-orange-800">{load.calcPower_kW.toFixed(1)}</p>
                                         </div>
                                         <div className="bg-slate-50 p-2 rounded border border-slate-100 col-span-2">
                                             <p className="text-[10px] font-bold text-slate-500 uppercase">Portata Massica (kg/h)</p>
@@ -751,7 +693,6 @@
                                     </div>
                                 </div>
 
-                                {/* Scelta Tubo - TENDINE A CASCATA */}
                                 <div className="flex-1 space-y-3 pl-4 border-l border-slate-100">
                                     <div className="flex justify-between items-center"><h4 className="text-[11px] font-bold text-slate-400 uppercase">Selezione Tubazione</h4><span className="text-[10px] text-slate-400">Ø Teorico: {load.d_teorico_mm?.toFixed(1)} mm</span></div>
                                     <div className="grid grid-cols-3 gap-2">
@@ -779,11 +720,11 @@
                                         <div className="flex justify-between items-end">
                                             <div>
                                                 <p className="text-[10px] font-bold text-slate-500 uppercase">Tubo Selezionato</p>
-                                                <p className="font-bold text-brand-800 text-lg">DN {load.DN}</p>
+                                                <p className="font-bold text-orange-800 text-lg">DN {load.DN}</p>
                                             </div>
                                             <div className="text-right">
                                                 <p className="text-[10px] text-slate-500">Int: {load.realD?.toFixed(1)} mm</p>
-                                                <p className={`text-xs font-bold ${load.realVelocity > vTarget * 1.5 ? 'text-red-600' : 'text-brand-600'}`}>v = {load.realVelocity.toFixed(2)} m/s</p>
+                                                <p className={`text-xs font-bold ${load.realVelocity > vTarget * 1.5 ? 'text-red-600' : 'text-orange-600'}`}>v = {load.realVelocity.toFixed(2)} m/s</p>
                                             </div>
                                         </div>
                                     </div>
@@ -794,7 +735,6 @@
                         <button onClick={addLoad} className="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold shadow-sm flex items-center hover:bg-slate-700"><IconPlus className="w-4 h-4 mr-2"/> Aggiungi Utenza</button>
                     </div>
 
-                    {/* Report Stampa Carichi */}
                     <div className="hidden print:block mt-6">
                         <h3 className="text-sm font-bold text-slate-800 mb-2 border-b-2 border-slate-800 pb-1">Distinta Utenze e Dimensionamento Tubazioni</h3>
                         <table className="w-full text-left border-collapse text-xs mt-2">
@@ -834,7 +774,6 @@
                         </div>
                     </div>
 
-                    {/* Riepilogo Totali a schermo */}
                     <div className="mt-6 bg-slate-800 text-white p-4 rounded-xl flex justify-around items-center print-hide shadow-lg">
                         <div className="text-center">
                             <p className="text-xs text-slate-300 uppercase font-bold tracking-wide">Potenza Totale Rete</p>
@@ -852,12 +791,294 @@
         }
 
         // ==========================================
+        // APP 3: DISPERSIONE TERMIICA (NUOVO)
+        // ==========================================
+        function ToolDispersione({ projectData, setProjectData, setAppMode }) {
+            const [tAmbGlobal, setTAmbGlobal] = useState(-5); // °C
+            const [tFluidGlobal, setTFluidGlobal] = useState(55); // °C
+            const [alphaInt, setAlphaInt] = useState(1163); // W/m2K (ex 1000 kcal/hm2°C)
+            const [alphaExt, setAlphaExt] = useState(7.4); // W/m2K (ex 6.4 kcal/hm2°C)
+            const [showAdvanced, setShowAdvanced] = useState(false);
+
+            const [lines, setLines] = useState([]);
+
+            const processedLines = useMemo(() => {
+                return lines.map(line => {
+                    let calcQ_Wm = 0;
+                    let t_surf = 0;
+                    let d_ext_m = 0;
+                    let d_int_m = 0;
+
+                    // Validazione base
+                    if (line.material && line.DN && line.PN && PIPE_CATALOG[line.material] && PIPE_CATALOG[line.material].specs[line.DN]) {
+                        const d_int_mm = PIPE_CATALOG[line.material].specs[line.DN][line.PN];
+                        if (d_int_mm) {
+                            d_int_m = d_int_mm / 1000;
+                            d_ext_m = getExternalDiameter(line.material, line.DN, d_int_mm) / 1000;
+                            
+                            const lambda_pipe = PIPE_CATALOG[line.material].lambda;
+                            const lambda_iso = line.isoLambda;
+                            const s_m = line.isoThick / 1000;
+                            const d_iso_m = d_ext_m + 2 * s_m;
+
+                            // Calcolo Resistenze Termiche [m·K/W]
+                            const R_int = 1 / (alphaInt * d_int_m);
+                            const R_pipe = Math.log(d_ext_m / d_int_m) / (2 * lambda_pipe);
+                            let R_iso = 0;
+                            if (s_m > 0 && lambda_iso > 0) {
+                                R_iso = Math.log(d_iso_m / d_ext_m) / (2 * lambda_iso);
+                            }
+                            const R_ext = 1 / (alphaExt * d_iso_m);
+
+                            const R_tot = R_int + R_pipe + R_iso + R_ext;
+                            const deltaT = Math.abs(tFluidGlobal - tAmbGlobal); // Manteniamo la dispersione in valore assoluto (positiva)
+                            
+                            // Dispersione W/m = (PI * deltaT) / R_tot
+                            calcQ_Wm = (Math.PI * deltaT) / R_tot;
+                            
+                            // Temp superficie esterna
+                            if (tFluidGlobal > tAmbGlobal) {
+                                t_surf = tAmbGlobal + calcQ_Wm / (Math.PI * alphaExt * d_iso_m);
+                            } else {
+                                t_surf = tAmbGlobal - calcQ_Wm / (Math.PI * alphaExt * d_iso_m); // Se l'acqua è refrigerata
+                            }
+                        }
+                    }
+
+                    const calcQ_tot_kW = (calcQ_Wm * line.length) / 1000;
+
+                    return { ...line, calcQ_Wm, calcQ_tot_kW, t_surf, d_ext_mm: d_ext_m*1000 };
+                });
+            }, [lines, tAmbGlobal, tFluidGlobal, alphaInt, alphaExt]);
+
+            const addLine = () => {
+                const newId = lines.length > 0 ? Math.max(...lines.map(l => l.id)) + 1 : 1;
+                setLines([...lines, { id: newId, name: `Tratto ${newId}`, length: 100, material: 'Acciaio', DN: '100', PN: 'NORM', isoType: 'pur', isoLambda: 0.025, isoThick: 60 }]);
+            };
+
+            const duplicateLine = (id) => {
+                const lineToCopy = lines.find(l => l.id === id);
+                if (!lineToCopy) return;
+                const newId = lines.length > 0 ? Math.max(...lines.map(l => l.id)) + 1 : 1;
+                setLines([...lines, { ...lineToCopy, id: newId, name: lineToCopy.name + " (Copia)" }]);
+            };
+
+            const updateLine = (id, field, val) => {
+                setLines(prev => prev.map(l => {
+                    if (l.id === id) {
+                        let updated = { ...l, [field]: val };
+                        
+                        if (field === 'material') {
+                            const firstDN = Object.keys(PIPE_CATALOG[val].specs)[0];
+                            const firstPN = Object.keys(PIPE_CATALOG[val].specs[firstDN])[0];
+                            updated.DN = firstDN; updated.PN = firstPN;
+                        } 
+                        else if (field === 'DN') {
+                            let currentPN = updated.PN;
+                            if (!PIPE_CATALOG[updated.material].specs[val][currentPN]) {
+                                currentPN = Object.keys(PIPE_CATALOG[updated.material].specs[val])[0];
+                            }
+                            updated.PN = currentPN;
+                        }
+                        else if (field === 'isoType') {
+                            const isoDef = INSULATION_CATALOG.find(i => i.id === val);
+                            if (isoDef) updated.isoLambda = isoDef.lambda;
+                        }
+                        return updated;
+                    }
+                    return l;
+                }));
+            };
+
+            const removeLine = (id) => setLines(lines.filter(l => l.id !== id));
+
+            const totalLossKW = processedLines.reduce((sum, l) => sum + l.calcQ_tot_kW, 0);
+
+            return (
+                <div className="max-w-6xl mx-auto">
+                    <ProjectHeader pData={projectData} setPData={setProjectData} title="Dispersione Tubazioni" setAppMode={setAppMode} iconColor="redbrand" />
+                    
+                    <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0">
+                        <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2 print:border-slate-800">
+                            <h3 className="text-sm font-bold text-slate-700">Temperature e Fattori Ambientali</h3>
+                            <button onClick={() => setShowAdvanced(!showAdvanced)} className="text-xs text-redbrand-600 font-bold hover:underline print-hide">
+                                {showAdvanced ? 'Nascondi Avanzate' : 'Mostra Avanzate (α)'}
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 print:gap-2">
+                            {[{l: 'Temp. Fluido Interno (°C)', v: tFluidGlobal, set: setTFluidGlobal, step: "1"}, {l: 'Temp. Ambiente Esterno (°C)', v: tAmbGlobal, set: setTAmbGlobal, step: "1"}].map((f, i) => (
+                                <div key={i} className="bg-slate-50 p-3 rounded-lg border border-slate-200 print:bg-transparent print:border-none print:p-0">
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{f.l}</label>
+                                    <input type="number" step={f.step} value={f.v} onChange={e => f.set(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-transparent text-lg font-semibold text-slate-800 focus:outline-none print:text-base border-b border-slate-300 print:border-none focus:border-redbrand-500" />
+                                </div>
+                            ))}
+                            {showAdvanced && (
+                                <>
+                                    <div className="bg-orange-50 p-3 rounded-lg border border-orange-200 print-hide">
+                                        <label className="block text-[10px] font-bold text-orange-600 uppercase mb-1">Adduttanza Interna (α₁) [W/m²K]</label>
+                                        <input type="number" value={alphaInt} onChange={e => setAlphaInt(Number(e.target.value))} className="w-full bg-transparent text-lg font-semibold text-slate-800 focus:outline-none border-b border-orange-300 focus:border-orange-500" />
+                                    </div>
+                                    <div className="bg-orange-50 p-3 rounded-lg border border-orange-200 print-hide">
+                                        <label className="block text-[10px] font-bold text-orange-600 uppercase mb-1">Adduttanza Esterna (α₂) [W/m²K]</label>
+                                        <input type="number" step="0.1" value={alphaExt} onChange={e => setAlphaExt(Number(e.target.value))} className="w-full bg-transparent text-lg font-semibold text-slate-800 focus:outline-none border-b border-orange-300 focus:border-orange-500" />
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Tratti di Tubazione */}
+                    <div className="space-y-4 print-hide">
+                        <div className="flex justify-between items-center bg-slate-800 text-white p-3 rounded-xl shadow-sm">
+                            <h2 className="font-semibold text-sm flex items-center"><IconThermometer className="w-4 h-4 mr-2"/> Tratti di Rete Analizzati</h2>
+                        </div>
+                        {processedLines.length === 0 && <div className="bg-white p-8 rounded-xl border-2 border-dashed border-slate-300 text-center text-slate-500 text-sm">Nessun tratto presente. Clicca su Aggiungi.</div>}
+                        
+                        {processedLines.map((line) => (
+                            <div key={line.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4">
+                                
+                                {/* Info Linea e Geometria Base */}
+                                <div className="flex-1 space-y-3 pr-4 border-r border-slate-100">
+                                    <div className="flex items-center justify-between">
+                                        <input type="text" value={line.name} onChange={e => updateLine(line.id, 'name', e.target.value)} className="font-bold text-lg text-slate-800 bg-transparent outline-none w-full border-b border-transparent hover:border-slate-300 focus:border-redbrand-500" placeholder="Nome Tratto" />
+                                        <div className="flex ml-2">
+                                            <button onClick={()=>duplicateLine(line.id)} className="p-1 text-slate-400 hover:bg-slate-100 hover:text-redbrand-600 rounded shrink-0 mr-1" title="Duplica"><IconCopy className="w-4 h-4"/></button>
+                                            <button onClick={()=>removeLine(line.id)} className="p-1 text-red-400 hover:bg-red-500 hover:text-white rounded shrink-0" title="Elimina"><IconTrash className="w-4 h-4"/></button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-2 mt-2">
+                                        <div className="col-span-2">
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Materiale Tubo</label>
+                                            <select value={line.material} onChange={e => updateLine(line.id, 'material', e.target.value)} className="w-full text-xs p-1.5 border border-slate-300 rounded outline-none bg-slate-50 focus:border-redbrand-500">
+                                                {Object.keys(PIPE_CATALOG).map(m=><option key={m} value={m}>{m}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">DN</label>
+                                            <select value={line.DN} onChange={e => updateLine(line.id, 'DN', e.target.value)} className="w-full text-xs p-1.5 border border-slate-300 rounded outline-none bg-slate-50">
+                                                {Object.keys(PIPE_CATALOG[line.material].specs).map(dn=><option key={dn} value={dn}>{dn}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Classe</label>
+                                            <select value={line.PN} onChange={e => updateLine(line.id, 'PN', e.target.value)} className="w-full text-xs p-1.5 border border-slate-300 rounded outline-none bg-slate-50">
+                                                {Object.keys(PIPE_CATALOG[line.material].specs[line.DN]||{}).map(pn=><option key={pn} value={pn}>{pn}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="bg-slate-50 p-2 rounded border border-slate-200 mt-2">
+                                        <div className="flex justify-between text-[10px] text-slate-500">
+                                            <span>Ø Int: {PIPE_CATALOG[line.material].specs[line.DN]?.[line.PN]?.toFixed(1)} mm</span>
+                                            <span>Ø Est stimato: <strong className="text-slate-700">{line.d_ext_mm?.toFixed(1)} mm</strong></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Isolamento e Lunghezza */}
+                                <div className="flex-1 space-y-3 px-2 border-r border-slate-100">
+                                    <h4 className="text-[11px] font-bold text-slate-400 uppercase">Isolamento e Posa</h4>
+                                    
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tipo Isolante</label>
+                                        <select value={line.isoType} onChange={e => updateLine(line.id, 'isoType', e.target.value)} className="w-full text-xs p-1.5 border border-slate-300 rounded outline-none bg-slate-50 focus:border-redbrand-500">
+                                            {INSULATION_CATALOG.map(i=><option key={i.id} value={i.id}>{i.name}</option>)}
+                                        </select>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Spessore (mm)</label>
+                                            <input type="number" step="1" value={line.isoThick} onChange={e => updateLine(line.id, 'isoThick', e.target.value===''?0 : Number(e.target.value))} className="w-full text-sm font-bold bg-transparent outline-none border-b border-slate-300 focus:border-redbrand-500" disabled={line.isoType==='none'}/>
+                                        </div>
+                                        <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                                            <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">λ isolante (W/mK)</label>
+                                            <input type="number" step="0.001" value={line.isoLambda} onChange={e => updateLine(line.id, 'isoLambda', e.target.value===''?0 : Number(e.target.value))} className="w-full text-sm font-bold bg-transparent outline-none border-b border-slate-300 focus:border-redbrand-500" disabled={line.isoType!=='custom'}/>
+                                        </div>
+                                    </div>
+                                    <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Lunghezza Tratto (m)</label>
+                                        <input type="number" step="1" value={line.length} onChange={e => updateLine(line.id, 'length', e.target.value===''?0 : Number(e.target.value))} className="w-full text-lg font-bold text-slate-700 bg-transparent outline-none border-b border-slate-300 focus:border-redbrand-500"/>
+                                    </div>
+                                </div>
+
+                                {/* Risultato */}
+                                <div className="flex-1 space-y-3 pl-4">
+                                    <div className="flex justify-between items-center"><h4 className="text-[11px] font-bold text-slate-400 uppercase">Perdite Termiche</h4></div>
+                                    
+                                    <div className="bg-redbrand-50 p-3 rounded-lg border border-redbrand-200">
+                                        <p className="text-[10px] font-bold text-redbrand-600 uppercase mb-1">Dispersione Unitaria (W/m)</p>
+                                        <p className="font-mono font-black text-2xl text-redbrand-800">{line.calcQ_Wm.toFixed(2)}</p>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2 mt-2">
+                                        <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase">Totale Tratto (kW)</p>
+                                            <p className="font-mono font-bold text-slate-800">{line.calcQ_tot_kW.toFixed(2)}</p>
+                                        </div>
+                                        <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase">T. Superficie (°C)</p>
+                                            <p className="font-mono font-bold text-slate-800">{line.t_surf.toFixed(1)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                        
+                        <button onClick={addLine} className="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold shadow-sm flex items-center hover:bg-slate-700"><IconPlus className="w-4 h-4 mr-2"/> Aggiungi Tratto</button>
+                    </div>
+
+                    {/* Report Stampa */}
+                    <div className="hidden print:block mt-6">
+                        <h3 className="text-sm font-bold text-slate-800 mb-2 border-b-2 border-slate-800 pb-1">Tabella Dispersioni per Tratto</h3>
+                        <table className="w-full text-left border-collapse text-xs mt-2">
+                            <thead>
+                                <tr className="border-b border-slate-300">
+                                    <th className="py-2">Tratto</th>
+                                    <th className="py-2">Tubazione (DN)</th>
+                                    <th className="py-2">Isolante (sp. mm)</th>
+                                    <th className="py-2 text-right">Lungh. (m)</th>
+                                    <th className="py-2 text-right">Q Unit. (W/m)</th>
+                                    <th className="py-2 text-right">Q Totale (kW)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {processedLines.map(l => (
+                                    <tr key={l.id} className="border-b border-slate-100">
+                                        <td className="py-1 font-bold">{l.name}</td>
+                                        <td className="py-1">{l.material} DN{l.DN}</td>
+                                        <td className="py-1">{INSULATION_CATALOG.find(i=>i.id===l.isoType)?.name} ({l.isoThick}mm)</td>
+                                        <td className="py-1 text-right font-mono">{l.length}</td>
+                                        <td className="py-1 text-right font-mono">{l.calcQ_Wm.toFixed(1)}</td>
+                                        <td className="py-1 text-right font-mono font-bold">{l.calcQ_tot_kW.toFixed(2)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        
+                        <div className="mt-8 mx-auto max-w-sm p-4 rounded-xl border-2 border-slate-800 text-center">
+                            <p className="text-[10px] font-bold uppercase text-slate-600 mb-1">Totale Dispersione Rete</p>
+                            <p className="text-3xl font-mono font-black">{totalLossKW.toFixed(2)} kW</p>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 bg-slate-800 text-white p-4 rounded-xl flex justify-center items-center print-hide shadow-lg">
+                        <div className="text-center">
+                            <p className="text-xs text-slate-300 uppercase font-bold tracking-wide">Dispersione Termica Totale dell'Impianto</p>
+                            <p className="text-3xl font-mono font-black text-redbrand-400">{totalLossKW.toFixed(2)} <span className="text-sm font-sans font-normal text-white">kW</span></p>
+                        </div>
+                    </div>
+
+                </div>
+            );
+        }
+
+        // ==========================================
         // ROOT / ROUTER PRINCIPALE
         // ==========================================
         function App() {
             const [appMode, setAppMode] = useState('dashboard');
             
-            // Dati condivisi di progetto
             const [projectData, setProjectData] = useState({
                 client: 'Progetto Impianto',
                 author: '',
@@ -868,22 +1089,28 @@
             if (appMode === 'dashboard') {
                 return (
                     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-100">
-                        <div className="max-w-2xl w-full bg-white rounded-3xl shadow-xl p-10 text-center">
+                        <div className="max-w-3xl w-full bg-white rounded-3xl shadow-xl p-10 text-center">
                             <img src="Logo.png" alt="Logo" className="h-20 mx-auto mb-6 object-contain" onError={(e) => e.target.style.display='none'} />
                             <h1 className="text-3xl font-black text-slate-800 mb-2">Suite Ingegneria</h1>
                             <p className="text-slate-500 mb-10">Seleziona lo strumento di calcolo per avviare il dimensionamento.</p>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <button onClick={() => setAppMode('idraulico')} className="group flex flex-col items-center p-8 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-brand-500 hover:bg-brand-50 transition-all text-left">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <button onClick={() => setAppMode('idraulico')} className="group flex flex-col items-center p-6 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-brand-500 hover:bg-brand-50 transition-all text-left">
                                     <div className="w-16 h-16 bg-blue-100 text-brand-600 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconWaves /></div>
-                                    <h2 className="text-lg font-bold text-slate-800 mb-2">Profilo Idraulico</h2>
-                                    <p className="text-xs text-slate-500 text-center">Calcolo perdite di carico lineari, concentrate e salti piezometrici (gravità/mandata).</p>
+                                    <h2 className="text-lg font-bold text-slate-800 mb-2 text-center w-full">Profilo Idraulico</h2>
+                                    <p className="text-xs text-slate-500 text-center">Perdite di carico, scabrezza e salti piezometrici.</p>
                                 </button>
 
-                                <button onClick={() => setAppMode('termico')} className="group flex flex-col items-center p-8 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-orange-500 hover:bg-orange-50 transition-all text-left">
+                                <button onClick={() => setAppMode('termico')} className="group flex flex-col items-center p-6 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-orange-500 hover:bg-orange-50 transition-all text-left">
                                     <div className="w-16 h-16 bg-orange-100 text-orange-600 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconFlame /></div>
-                                    <h2 className="text-lg font-bold text-slate-800 mb-2">Carichi Termici</h2>
-                                    <p className="text-xs text-slate-500 text-center">Dimensionamento portate da potenza termica/frigo e calcolo tubazioni.</p>
+                                    <h2 className="text-lg font-bold text-slate-800 mb-2 text-center w-full">Carichi Termici</h2>
+                                    <p className="text-xs text-slate-500 text-center">Calcolo portate da kWt e ricerca auto-tubazione.</p>
+                                </button>
+
+                                <button onClick={() => setAppMode('dispersione')} className="group flex flex-col items-center p-6 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-redbrand-500 hover:bg-redbrand-50 transition-all text-left">
+                                    <div className="w-16 h-16 bg-redbrand-100 text-redbrand-600 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconThermometer /></div>
+                                    <h2 className="text-lg font-bold text-slate-800 mb-2 text-center w-full">Dispersioni</h2>
+                                    <p className="text-xs text-slate-500 text-center">Isolamento tubazioni, scambio termico e temp. superficiale.</p>
                                 </button>
                             </div>
                             <div className="mt-8 text-xs text-slate-400">Progettato per reti di distribuzione fluidi.</div>
@@ -896,6 +1123,7 @@
                 <div className="p-4 md:p-8">
                     {appMode === 'idraulico' && <ToolProfiloIdraulico projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                     {appMode === 'termico' && <ToolCarichiTermici projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
+                    {appMode === 'dispersione' && <ToolDispersione projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 </div>
             );
         }
