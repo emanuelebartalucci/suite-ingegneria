@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-500: #3b82f6;
+  --color-brand-600: #2563eb;
+  --color-brand-900: #1e3a8a;
+  
+  --color-redbrand-50: #fef2f2;
+  --color-redbrand-100: #fee2e2;
+  --color-redbrand-500: #ef4444;
+  --color-redbrand-600: #dc2626;
+
+  --breakpoint-print: print;
+}
+
+/* Regole globali e reset del layout di default di Vite */
+body {
+  margin: 0;
+  background-color: #f1f5f9; /* bg-slate-100 */
+  min-height: 100vh;
+  font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  color: #334155; /* text-slate-700 */
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  border: none;
+  box-sizing: border-box;
+}
+
+/* Stili specifici per la Stampa PDF */
+@media print {
+  body {
+    background-color: white !important;
+    font-size: 12px;
+    color: black !important;
+  }
+  
+  #root {
+    min-height: auto;
+  }
+  
+  .print-hide {
+    display: none !important;
+  }
+  
+  .print-full-width {
+    grid-column: span 3 / span 3 !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+  
+  .print-page-break {
+    page-break-inside: avoid;
+    page-break-before: auto;
+  }
+  
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

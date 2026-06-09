@@ -1,0 +1,59 @@
+import React, { useState } from 'react';
+import { IconHome, IconPrinter, IconDroplets } from './Icons';
+
+export const ProjectHeader = ({ pData, setPData, title, setAppMode, iconColor = 'brand' }) => {
+    const [logoError, setLogoError] = useState(false);
+    const iconBg = iconColor === 'brand' ? 'bg-brand-600' : (iconColor === 'orange' ? 'bg-orange-600' : 'bg-red-600');
+    
+    // Configura le classi CSS dinamiche per evitare problemi di compilazione
+    const textBrandClass = iconColor === 'brand' ? 'text-brand-600' : (iconColor === 'orange' ? 'text-orange-600' : 'text-redbrand-600');
+    const focusBorderClass = iconColor === 'brand' ? 'focus:border-brand-500' : (iconColor === 'orange' ? 'focus:border-orange-500' : 'focus:border-redbrand-500');
+
+    return (
+        <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0 print:mb-2">
+            <div className="flex justify-between items-center mb-6 print:hidden">
+                <button onClick={() => setAppMode('dashboard')} className="flex items-center text-slate-500 hover:text-brand-600 transition-colors text-sm font-medium">
+                    <IconHome className="w-4 h-4 mr-1"/> Menu Principale
+                </button>
+                <button onClick={() => window.print()} className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm">
+                    <IconPrinter className="w-4 h-4 mr-2"/> Stampa Report
+                </button>
+            </div>
+
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 print:border-b-2 print:border-slate-800 print:pb-4 print:mb-4">
+                <div className="flex items-center space-x-4 flex-1 w-full">
+                    {!logoError ? (
+                        <img src="/Logo.png" alt="Logo" className="h-12 w-auto object-contain print:h-12" onError={() => setLogoError(true)} />
+                    ) : (
+                        <div className={`${iconBg} p-2 rounded-lg print:bg-slate-800 w-10 h-10`}>
+                            <IconDroplets className="text-white" />
+                        </div>
+                    )}
+                    <div className="flex-1">
+                        <p className={`text-xs font-bold uppercase tracking-wider mb-1 print:text-slate-500 ${textBrandClass}`}>{title}</p>
+                        <input type="text" value={pData.client} onChange={e => setPData({...pData, client: e.target.value})} className={`text-2xl md:text-3xl font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:outline-none w-full max-w-xl print:border-none print:p-0 ${focusBorderClass}`} placeholder="Inserisci Titolo o Cliente..."/>
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 print:bg-transparent print:border-none print:p-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-2">
+                    <div className="flex space-x-4">
+                        <div className="flex-1">
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Progettista / Autore</label>
+                            <input type="text" value={pData.author} onChange={e => setPData({...pData, author: e.target.value})} placeholder="Tuo Nome..." className="w-full bg-transparent text-sm font-medium text-slate-700 focus:outline-none border-b border-slate-300 print:border-none" />
+                        </div>
+                        <div className="flex-1">
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data</label>
+                            <input type="date" value={pData.date} onChange={e => setPData({...pData, date: e.target.value})} className="w-full bg-transparent text-sm font-medium text-slate-700 focus:outline-none border-b border-slate-300 print:border-none" />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Note Tecniche</label>
+                        <textarea rows="2" value={pData.notes} onChange={e => setPData({...pData, notes: e.target.value})} placeholder="Inserisci note sul progetto..." className="w-full bg-transparent text-sm text-slate-600 focus:outline-none border-b border-slate-300 resize-none print:border-none print:resize-none"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
