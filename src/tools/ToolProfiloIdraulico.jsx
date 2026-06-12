@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 import { ProjectHeader } from '../components/ProjectHeader';
+import ProjectStorage from '../components/ProjectStorage';
 import { PIPE_CATALOG, K_PRESETS } from '../data/pipeCatalog';
 import { 
   IconArrowUp, 
@@ -29,27 +30,32 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
         return elements.map((el) => {
             let headLoss = 0;
             if (el.type === 'weir') {
-                if (Q_m3s > 0 && el.L > 0) {
+                if (Q_m3s > 0 && Number(el.L) > 0) {
                     if (el.weirType === 'thompson') headLoss = Math.pow(Q_m3s / ((8/15) * 0.62 * Math.sqrt(2 * g)), 2/5); 
-                    else headLoss = Math.pow(Q_m3s / ((el.weirType === 'sottile' ? 0.54 : 0.384) * el.L * Math.sqrt(2 * g)), 2 / 3);
+                    else headLoss = Math.pow(Q_m3s / ((el.weirType === 'sottile' ? 0.54 : 0.384) * Number(el.L) * Math.sqrt(2 * g)), 2 / 3);
                 }
             } else if (el.type === 'pipe') {
                 const totalK = el.localLosses ? el.localLosses.reduce((sum, loss) => sum + (Number(loss.val) || 0), 0) : 0;
-                if (Q_m3s > 0 && el.D > 0) {
-                    const D = el.D / 1000;
+                if (Q_m3s > 0 && Number(el.D) > 0) {
+                    const D = Number(el.D) / 1000;
                     const v = Q_m3s / (Math.PI * Math.pow(D / 2, 2));
                     const nu = (1.78 / (1 + 0.0337 * currentTemp + 0.000221 * Math.pow(currentTemp, 2))) * 1e-6;
                     const Re = (v * D) / nu;
                     let f = 0.02;
-                    if (Re > 4000) f = 0.25 / Math.pow(Math.log10((el.roughness/1000) / (3.7 * D) + 5.74 / Math.pow(Re, 0.9)), 2);
+                    if (Re > 4000) f = 0.25 / Math.pow(Math.log10((Number(el.roughness)/1000) / (3.7 * D) + 5.74 / Math.pow(Re, 0.9)), 2);
                     else if (Re > 0) f = 64 / Re;
-                    headLoss = (f * (el.L / D) + totalK) * ((v * v) / (2 * g));
+                    headLoss = (f * (Number(el.L) / D) + totalK) * ((v * v) / (2 * g));
                 }
-            } else if (el.type === 'channel') headLoss = el.L * el.slope;
+            } else if (el.type === 'channel') headLoss = Number(el.L) * Number(el.slope);
             else if (el.type === 'custom') headLoss = Number(el.loss) || 0;
 
             currentElevation += headLoss;
-            return { ...el, headLoss, elevation: currentElevation, totalKCalculated: el.type === 'pipe' ? (el.localLosses ? el.localLosses.reduce((sum, l) => sum + (Number(l.val) || 0), 0) : 0) : 0 };
+            return { 
+              ...el, 
+              headLoss, 
+              elevation: currentElevation, 
+              totalKCalculated: el.type === 'pipe' ? (el.localLosses ? el.localLosses.reduce((sum, l) => sum + (Number(l.val) || 0), 0) : 0) : 0 
+            };
         });
     }, [elements, flowRate, recircFactor, referenceElevation, waterTemp, altitude]);
 
@@ -144,10 +150,41 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
     const toU = (v) => displayUnit === 'cm' ? +(Number(v)*100).toFixed(4) : v;
     const frmU = (v) => displayUnit === 'cm' ? Number(v)/100 : Number(v);
 
+    // Funzione per caricare il progetto dal Cloud
+    const handleLoadCloudProject = (data) => {
+        if (!data) return;
+        if (data.flowRate !== undefined) setFlowRate(data.flowRate);
+        if (data.recircFactor !== undefined) setRecircFactor(data.recircFactor);
+        if (data.referenceElevation !== undefined) setReferenceElevation(data.referenceElevation);
+        if (data.waterTemp !== undefined) setWaterTemp(data.waterTemp);
+        if (data.altitude !== undefined) setAltitude(data.altitude);
+        if (data.elements) setElements(data.elements);
+    };
+
+    // Esporta i dati per il salvataggio
+    const getCloudSaveData = () => {
+        return {
+            flowRate,
+            recircFactor,
+            referenceElevation,
+            waterTemp,
+            altitude,
+            elements
+        };
+    };
+
     return (
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-6xl mx-auto animate-fade-in">
             <ProjectHeader pData={projectData} setPData={setProjectData} title="Profilo Idraulico" setAppMode={setAppMode} iconColor="brand" />
             
+            <ProjectStorage 
+                toolType="idraulico"
+                currentData={getCloudSaveData()}
+                onLoadProject={handleLoadCloudProject}
+                projectInfo={projectData}
+                setProjectInfo={setProjectData}
+            />
+
             <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-sm font-bold text-slate-700">Dati Idraulici Base</h3>
@@ -157,16 +194,28 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
                     </div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 print:grid-cols-5 print:gap-2">
-                    {[{l: 'Portata Base (m³/h)', v: flowRate, set: setFlowRate}, {l: 'Ricircolo Fanghi', v: recircFactor, set: setRecircFactor, sub: `Q. Calc: ${(flowRate*recircFactor).toFixed(1)} m³/h`}, {l: 'Temp. Acqua (°C)', v: waterTemp, set: setWaterTemp}, {l: 'Altitudine (m s.l.m.)', v: altitude, set: setAltitude}].map((f, i) => (
+                    {[{l: 'Portata Base (m³/h)', v: flowRate, set: setFlowRate}, {l: 'Ricircolo Fanghi', v: recircFactor, set: setRecircFactor, sub: `Q. Calc: ${((Number(flowRate) || 0) * (Number(recircFactor) || 0)).toFixed(1)} m³/h`}, {l: 'Temp. Acqua (°C)', v: waterTemp, set: setWaterTemp}, {l: 'Altitudine (m s.l.m.)', v: altitude, set: setAltitude}].map((f, i) => (
                         <div key={i} className="bg-slate-50 p-3 rounded-lg border border-slate-200 print:bg-transparent print:border-none print:p-0">
                             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{f.l}</label>
-                            <input type="number" step={f.l.includes('Ricircolo') ? "0.1" : "1"} value={f.v} onChange={e => f.set(e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-transparent text-lg font-semibold text-slate-800 focus:outline-none print:text-base border-b border-slate-300 print:border-none focus:border-brand-500" />
+                            <input 
+                                type="number" 
+                                step={f.l.includes('Ricircolo') ? "0.1" : "1"} 
+                                value={f.v === '' ? '' : f.v} 
+                                onChange={e => f.set(e.target.value === '' ? '' : Number(e.target.value))} 
+                                className="w-full bg-transparent text-lg font-semibold text-slate-800 focus:outline-none print:text-base border-b border-slate-300 print:border-none focus:border-brand-500" 
+                            />
                             {f.sub && <p className="text-[9px] text-slate-400 mt-1">{f.sub}</p>}
                         </div>
                     ))}
                     <div className="bg-brand-50 p-3 rounded-lg border border-brand-200 print:bg-transparent print:border-none print:p-0">
                         <label className="block text-[10px] font-bold text-brand-600 uppercase mb-1">Quota a Valle ({displayUnit})</label>
-                        <input type="number" step={displayUnit==='cm'?"1":"0.01"} value={toU(referenceElevation)} onChange={e => setReferenceElevation(frmU(e.target.value))} className="w-full bg-transparent text-lg font-bold text-brand-800 focus:outline-none print:text-base border-b border-brand-300 print:border-none focus:border-brand-600" />
+                        <input 
+                            type="number" 
+                            step={displayUnit==='cm'?"1":"0.01"} 
+                            value={referenceElevation === '' ? '' : toU(referenceElevation)} 
+                            onChange={e => setReferenceElevation(e.target.value === '' ? '' : frmU(e.target.value))} 
+                            className="w-full bg-transparent text-lg font-bold text-brand-800 focus:outline-none print:text-base border-b border-brand-300 print:border-none focus:border-brand-600" 
+                        />
                     </div>
                 </div>
             </div>
@@ -195,13 +244,13 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
                                 {el.type === 'weir' && (
                                     <>
                                         <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tipo Parete</label><select value={el.weirType} onChange={e => updateElement(el.id, 'weirType', e.target.value)} className="w-full p-1 bg-slate-50 border border-slate-200 rounded text-sm outline-none"><option value="sottile">Sottile</option><option value="spessa">Spessa</option><option value="thompson">Thompson (A "V")</option></select></div>
-                                        {el.weirType !== 'thompson' && <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Larghezza ({displayUnit})</label><input type="number" step={displayUnit==='cm'?"1":"0.1"} value={toU(el.L)} onChange={e => updateElement(el.id, 'L', frmU(e.target.value))} className="w-full p-1 bg-slate-50 border border-slate-200 rounded text-sm outline-none"/></div>}
+                                        {el.weirType !== 'thompson' && <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Larghezza ({displayUnit})</label><input type="number" step={displayUnit==='cm'?"1":"0.1"} value={el.L === '' ? '' : toU(el.L)} onChange={e => updateElement(el.id, 'L', e.target.value === '' ? '' : frmU(e.target.value))} className="w-full p-1 bg-slate-50 border border-slate-200 rounded text-sm outline-none"/></div>}
                                     </>
                                 )}
                                 {el.type === 'pipe' && (
                                     <div className="col-span-2 md:col-span-4 bg-slate-50 p-2 rounded border border-slate-100 space-y-2">
                                         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                                            <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Lunghezza ({displayUnit})</label><input type="number" step={displayUnit==='cm'?"1":"0.5"} value={toU(el.L)} onChange={e => updateElement(el.id, 'L', frmU(e.target.value))} className="w-full p-1 bg-white border border-slate-300 rounded text-sm outline-none"/></div>
+                                            <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Lunghezza ({displayUnit})</label><input type="number" step={displayUnit==='cm'?"1":"0.5"} value={el.L === '' ? '' : toU(el.L)} onChange={e => updateElement(el.id, 'L', e.target.value === '' ? '' : frmU(e.target.value))} className="w-full p-1 bg-white border border-slate-300 rounded text-sm outline-none"/></div>
                                             <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Materiale</label><select value={el.material} onChange={e => updateElement(el.id, 'material', e.target.value)} className="w-full p-1 bg-white border border-slate-300 rounded text-sm outline-none"><option value="manuale">Manuale...</option>{Object.keys(PIPE_CATALOG).map(m=><option key={m} value={m}>{m}</option>)}</select></div>
                                             {el.material !== 'manuale' ? (
                                                 <>
@@ -211,8 +260,8 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
                                                 </>
                                             ) : (
                                                 <>
-                                                    <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">D. Int (mm)</label><input type="number" value={el.D} onChange={e => updateElement(el.id, 'D', e.target.value === '' ? '' : Number(e.target.value))} className="w-full p-1 bg-white border border-slate-300 rounded text-sm outline-none"/></div>
-                                                    <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Scabrezza</label><input type="number" step="0.01" value={el.roughness} onChange={e => updateElement(el.id, 'roughness', e.target.value === '' ? '' : Number(e.target.value))} className="w-full p-1 bg-white border border-slate-300 rounded text-sm outline-none"/></div>
+                                                    <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">D. Int (mm)</label><input type="number" value={el.D === '' ? '' : el.D} onChange={e => updateElement(el.id, 'D', e.target.value === '' ? '' : Number(e.target.value))} className="w-full p-1 bg-white border border-slate-300 rounded text-sm outline-none"/></div>
+                                                    <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Scabrezza</label><input type="number" step="0.01" value={el.roughness === '' ? '' : el.roughness} onChange={e => updateElement(el.id, 'roughness', e.target.value === '' ? '' : Number(e.target.value))} className="w-full p-1 bg-white border border-slate-300 rounded text-sm outline-none"/></div>
                                                 </>
                                             )}
                                         </div>
@@ -225,7 +274,7 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
                                                 {(el.localLosses||[]).map(l=>(
                                                     <div key={l.id} className="flex bg-white border border-slate-300 rounded text-xs items-center">
                                                         <select value={l.type} onChange={e=>handleLocalLoss(el.id,'update',l.id,'type',e.target.value)} className="p-1 outline-none border-r border-slate-200"><option value="manuale">Manuale...</option>{K_PRESETS.map(p=><option key={p.label} value={p.value}>{p.label}</option>)}</select>
-                                                        <input type="number" step="0.1" value={l.val} onChange={e=>handleLocalLoss(el.id,'update',l.id,'val',e.target.value===''?'' : Number(e.target.value))} className="w-12 p-1 text-center outline-none"/>
+                                                        <input type="number" step="0.1" value={l.val === '' ? '' : l.val} onChange={e=>handleLocalLoss(el.id,'update',l.id,'val',e.target.value===''?'' : Number(e.target.value))} className="w-12 p-1 text-center outline-none"/>
                                                         <button onClick={()=>handleLocalLoss(el.id,'remove',l.id)} className="p-1 text-slate-400 hover:text-red-500"><IconClose className="w-3 h-3"/></button>
                                                     </div>
                                                 ))}
@@ -235,11 +284,11 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
                                 )}
                                 {el.type === 'channel' && (
                                     <>
-                                        <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Lungh. ({displayUnit})</label><input type="number" step={displayUnit==='cm'?"1":"0.5"} value={toU(el.L)} onChange={e => updateElement(el.id, 'L', frmU(e.target.value))} className="w-full p-1 bg-slate-50 border border-slate-200 rounded text-sm outline-none"/></div>
-                                        <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Pendenza</label><input type="number" step="0.001" value={el.slope} onChange={e => updateElement(el.id, 'slope', e.target.value===''?'' : Number(e.target.value))} className="w-full p-1 bg-slate-50 border border-slate-200 rounded text-sm outline-none"/></div>
+                                        <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Lungh. ({displayUnit})</label><input type="number" step={displayUnit==='cm'?"1":"0.5"} value={el.L === '' ? '' : toU(el.L)} onChange={e => updateElement(el.id, 'L', e.target.value === '' ? '' : frmU(e.target.value))} className="w-full p-1 bg-slate-50 border border-slate-200 rounded text-sm outline-none"/></div>
+                                        <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Pendenza</label><input type="number" step="0.001" value={el.slope === '' ? '' : el.slope} onChange={e => updateElement(el.id, 'slope', e.target.value === '' ? '' : Number(e.target.value))} className="w-full p-1 bg-slate-50 border border-slate-200 rounded text-sm outline-none"/></div>
                                     </>
                                 )}
-                                {el.type === 'custom' && <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Perdita ({displayUnit})</label><input type="number" step={displayUnit==='cm'?"1":"0.01"} value={toU(el.loss)} onChange={e => updateElement(el.id, 'loss', frmU(e.target.value))} className="w-full p-1 bg-slate-50 border border-slate-200 rounded text-sm outline-none"/></div>}
+                                {el.type === 'custom' && <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Perdita ({displayUnit})</label><input type="number" step={displayUnit==='cm'?"1":"0.01"} value={el.loss === '' ? '' : toU(el.loss)} onChange={e => updateElement(el.id, 'loss', e.target.value === '' ? '' : frmU(e.target.value))} className="w-full p-1 bg-slate-50 border border-slate-200 rounded text-sm outline-none"/></div>}
                             </div>
                         </div>
                     ))}

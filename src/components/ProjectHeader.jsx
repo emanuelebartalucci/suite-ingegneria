@@ -31,7 +31,8 @@ export const ProjectHeader = ({ pData, setPData, title, setAppMode, iconColor = 
                     )}
                     <div className="flex-1">
                         <p className={`text-xs font-bold uppercase tracking-wider mb-1 print:text-slate-500 ${textBrandClass}`}>{title}</p>
-                        <input type="text" value={pData.client} onChange={e => setPData({...pData, client: e.target.value})} className={`text-2xl md:text-3xl font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:outline-none w-full max-w-xl print:border-none print:p-0 ${focusBorderClass}`} placeholder="Inserisci Titolo o Cliente..."/>
+                        <span className="hidden print:block text-2xl md:text-3xl font-bold text-slate-900">{pData.client || 'Progetto Impianto'}</span>
+                        <input type="text" value={pData.client} onChange={e => setPData({...pData, client: e.target.value})} className={`text-2xl md:text-3xl font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:outline-none w-full max-w-xl print:hidden ${focusBorderClass}`} placeholder="Inserisci Titolo o Cliente..."/>
                     </div>
                 </div>
             </div>
@@ -41,16 +42,19 @@ export const ProjectHeader = ({ pData, setPData, title, setAppMode, iconColor = 
                     <div className="flex space-x-4">
                         <div className="flex-1">
                             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Progettista / Autore</label>
-                            <input type="text" value={pData.author} onChange={e => setPData({...pData, author: e.target.value})} placeholder="Tuo Nome..." className="w-full bg-transparent text-sm font-medium text-slate-700 focus:outline-none border-b border-slate-300 print:border-none" />
+                            <span className="hidden print:block text-sm font-medium text-slate-700">{pData.author || '-'}</span>
+                            <input type="text" value={pData.author} onChange={e => setPData({...pData, author: e.target.value})} placeholder="Tuo Nome..." className="w-full bg-transparent text-sm font-medium text-slate-700 focus:outline-none border-b border-slate-300 print:hidden" />
                         </div>
                         <div className="flex-1">
                             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data</label>
-                            <input type="date" value={pData.date} onChange={e => setPData({...pData, date: e.target.value})} className="w-full bg-transparent text-sm font-medium text-slate-700 focus:outline-none border-b border-slate-300 print:border-none" />
+                            <span className="hidden print:block text-sm font-medium text-slate-700">{pData.date ? new Date(pData.date).toLocaleDateString('it-IT') : '-'}</span>
+                            <input type="date" value={pData.date} onChange={e => setPData({...pData, date: e.target.value})} className="w-full bg-transparent text-sm font-medium text-slate-700 focus:outline-none border-b border-slate-300 print:hidden" />
                         </div>
                     </div>
                     <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Note Tecniche</label>
-                        <textarea rows="2" value={pData.notes} onChange={e => setPData({...pData, notes: e.target.value})} placeholder="Inserisci note sul progetto..." className="w-full bg-transparent text-sm text-slate-600 focus:outline-none border-b border-slate-300 resize-none print:border-none print:resize-none"></textarea>
+                        <p className="hidden print:block text-sm text-slate-650 whitespace-pre-wrap">{pData.notes || 'Nessuna nota.'}</p>
+                        <textarea rows="2" value={pData.notes} onChange={e => setPData({...pData, notes: e.target.value})} placeholder="Inserisci note sul progetto..." className="w-full bg-transparent text-sm text-slate-600 focus:outline-none border-b border-slate-300 resize-none print:hidden"></textarea>
                     </div>
                 </div>
             </div>
