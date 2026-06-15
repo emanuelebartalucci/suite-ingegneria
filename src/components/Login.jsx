@@ -1,26 +1,26 @@
 import React, { useState } from 'react';
 import { 
   signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
+  createUserWithEmailAndPassword, 
   sendPasswordResetEmail 
 } from 'firebase/auth';
 import { auth, db, isFirebaseMock } from '../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 import { getLocalRegistry } from '../firebase/registrySeed';
-import { IconDroplets } from './Icons';
-
+import { Mail, Lock, AlertCircle, ArrowRight } from 'lucide-react';
+import logoImg from '../assets/Logo.png';
 
 export default function Login({ onLoginDemo }) {
-  const [isRegistering, setIsRegistering] = useState(false);
+  const [isLoginMode, setIsLoginMode] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setMessage('');
@@ -30,24 +30,46 @@ export default function Login({ onLoginDemo }) {
 
     if (isFirebaseMock) {
       try {
-        const localRegistry = getLocalRegistry();
-        const member = localRegistry.find(u => u.email.toLowerCase().trim() === emailClean);
-        if (member) {
-          const du = {
-            uid: 'demo-' + emailClean,
-            email: member.email,
-            name: member.name,
-            role: member.role,
-            isSocio: member.isSocio || false,
-            isDemo: true
-          };
-          onLoginDemo?.(du);
+        if (isLoginMode) {
+          const localRegistry = getLocalRegistry();
+          const member = localRegistry.find(u => u.email.toLowerCase().trim() === emailClean);
+          if (member) {
+            const du = {
+              uid: 'demo-' + emailClean,
+              email: member.email,
+              name: member.name,
+              role: member.role,
+              isSocio: member.isSocio || false,
+              isDemo: true
+            };
+            onLoginDemo?.(du);
+          } else {
+            setError("Email non registrata nell'anagrafica. Contatta un amministratore o registrati.");
+          }
         } else {
-          setError('Email non registrata nell\'anagrafica. Contatta un amministratore o registrati.');
+          if (password.length < 6) {
+            setError("La password deve contenere almeno 6 caratteri.");
+            setLoading(false);
+            return;
+          }
+          if (password !== confirmPassword) {
+            setError("Le password inserite non coincidono.");
+            setLoading(false);
+            return;
+          }
+          const localRegistry = getLocalRegistry();
+          const found = localRegistry.find(u => u.email.toLowerCase().trim() === emailClean);
+          if (!found) {
+            setError("Questa email non è presente nell'anagrafica dipendenti autorizzata. Contatta un amministratore.");
+            setLoading(false);
+            return;
+          }
+          setMessage("Registrazione completata con successo in locale! Ora puoi accedere.");
+          setIsLoginMode(true);
         }
       } catch (err) {
         console.error(err);
-        setError('Errore durante l\'accesso in locale.');
+        setError("Errore durante l'operazione in locale.");
       } finally {
         setLoading(false);
       }
@@ -55,321 +77,251 @@ export default function Login({ onLoginDemo }) {
     }
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (err) {
-      console.error(err);
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError('Credenziali non valide. Riprova.');
+      if (isLoginMode) {
+        await signInWithEmailAndPassword(auth, email, password);
       } else {
-        setError('Errore durante l\'accesso. Controlla la connessione.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    setError('');
-    setMessage('');
-
-    const emailClean = email.toLowerCase().trim();
-
-    if (password.length < 6) {
-      setError('La password deve contenere almeno 6 caratteri.');
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError('Le password non coincidono.');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      if (isFirebaseMock) {
-        const localRegistry = getLocalRegistry();
-        const found = localRegistry.find(u => u.email.toLowerCase().trim() === emailClean);
-        if (!found) {
-          setError('Questa email non è presente nell\'anagrafica dipendenti autorizzata. Contatta un amministratore.');
+        if (password.length < 6) {
+          setError("La password deve contenere almeno 6 caratteri.");
+          setLoading(false);
+          return;
+        }
+        if (password !== confirmPassword) {
+          setError("Le password inserite non coincidono.");
           setLoading(false);
           return;
         }
         
-        setMessage('Registrazione completata con successo in locale! Ora puoi accedere.');
-        setIsRegistering(false);
-      } else {
+        // Verifica se l'email esiste nell'anagrafica
         const docRef = doc(db, "anagrafica", emailClean);
         const docSnap = await getDoc(docRef);
+        
         if (!docSnap.exists()) {
-          setError('Questa email non è presente nell\'anagrafica dipendenti autorizzata. Contatta un amministratore.');
+          setError("La tua email non risulta nell'anagrafica aziendale. Chiedi a un amministratore di inserirla.");
           setLoading(false);
           return;
         }
-
+        
         await createUserWithEmailAndPassword(auth, email, password);
-        setMessage('Registrazione completata con successo! Benvenuto.');
-        setIsRegistering(false);
+        setMessage("Registrazione completata con successo! Ora puoi accedere.");
+        setIsLoginMode(true);
       }
     } catch (err) {
       console.error(err);
-      if (err.code === 'auth/email-already-in-use') {
-        setError('Questa e-mail è già registrata.');
+      if (isLoginMode) {
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+          setError("Credenziali non valide. Riprova.");
+        } else {
+          setError("Errore durante l'accesso. Controlla la connessione.");
+        }
       } else {
-        setError('Errore durante la registrazione. Riprova più tardi.');
+        if (err.code === 'auth/email-already-in-use') {
+          setError("Questa e-mail è già registrata.");
+        } else {
+          setError("Errore durante la registrazione. Riprova più tardi.");
+        }
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleResetPassword = async (e) => {
-    e.preventDefault();
-    setError('');
-    setMessage('');
-    
+  const handleResetPassword = async () => {
     if (!email) {
-      setError('Inserisci il tuo indirizzo email.');
+      setError("Inserisci prima la tua email nel campo qui sopra.");
       return;
     }
-
-    const emailClean = email.toLowerCase().trim();
+    setError('');
+    setMessage('');
     setLoading(true);
 
+    const emailClean = email.toLowerCase().trim();
+
     if (isFirebaseMock) {
-      const localRegistry = getLocalRegistry();
-      const found = localRegistry.find(u => u.email.toLowerCase().trim() === emailClean);
-      if (!found) {
-        setError('Email non trovata nell\'anagrafica.');
+      try {
+        const localRegistry = getLocalRegistry();
+        const found = localRegistry.find(u => u.email.toLowerCase().trim() === emailClean);
+        if (!found) {
+          setError("Email non trovata nell'anagrafica.");
+          setLoading(false);
+          return;
+        }
+        setMessage(`Simulazione inviata! Email di ripristino password inviata a ${emailClean}`);
+      } catch (err) {
+        setError("Errore nella simulazione del ripristino.");
+      } finally {
         setLoading(false);
-        return;
       }
-      setMessage(`Simulazione inviata! Email di ripristino password inviata a ${emailClean}`);
-      setShowForgotPassword(false);
-      setLoading(false);
       return;
     }
 
     try {
       await sendPasswordResetEmail(auth, email);
-      setMessage('Email di ripristino password inviata! Controlla la tua casella di posta.');
-      setShowForgotPassword(false);
+      setMessage("Ti abbiamo inviato un'email per resettare la password.");
     } catch (err) {
-      console.error(err);
-      setError('Errore durante l\'invio dell\'email. Verifica che l\'indirizzo sia corretto.');
+      setError("Errore nell'invio della mail. Verifica l'indirizzo.");
     } finally {
       setLoading(false);
     }
   };
 
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4 relative overflow-hidden">
-      {/* Elementi decorativi di sfondo sfocati */}
-      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 rounded-full bg-brand-600/20 blur-[120px] pointer-events-none"></div>
-      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 rounded-full bg-redbrand-600/10 blur-[120px] pointer-events-none"></div>
-
-      <div className="w-full max-w-md bg-slate-800/80 backdrop-blur-xl border border-slate-700 rounded-3xl shadow-2xl p-8 transition-all duration-300">
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center shadow-lg shadow-brand-600/30 mb-4 animate-pulse">
-            <IconDroplets className="text-white w-10 h-10" />
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50 relative overflow-hidden font-sans">
+      {/* Elementi decorativi di sfondo */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-400/20 rounded-full blur-3xl pointer-events-none"></div>
+      
+      <div className="flex-1 flex items-center justify-center w-full relative z-10">
+        <div className="bg-white/80 backdrop-blur-xl p-8 sm:p-10 rounded-[2rem] shadow-2xl border border-white/50 w-full max-w-md">
+          {/* Logo Aziendale */}
+          <div className="flex justify-center mb-8">
+            <img src={logoImg} alt="Logo" className="h-20 object-contain drop-shadow-md" onError={(e) => {
+              e.target.style.display = 'none';
+            }} />
           </div>
-          <h1 className="text-2xl font-black text-white tracking-wide">Suite Ingegneria</h1>
-          <p className="text-slate-400 text-xs mt-1">
-            {showForgotPassword 
-              ? 'Ripristina la tua password aziendale' 
-              : isRegistering 
-                ? 'Crea un nuovo account dipendente' 
-                : 'Accedi per avviare i calcoli'}
+          
+          <h1 className="text-2xl font-extrabold text-center text-gray-900 mb-2">
+            {isLoginMode ? 'Bentornato' : 'Crea il tuo Account'}
+          </h1>
+          <p className="text-center text-gray-500 mb-8 text-sm">
+            {isLoginMode ? 'Inserisci le tue credenziali per accedere' : 'Usa l\'email aziendale per registrarti'}
           </p>
-        </div>
 
-        {isFirebaseMock && (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 mb-6 text-amber-200 text-xs space-y-2">
-            <div className="flex items-center gap-2 font-bold text-amber-400">
-              <span className="text-sm">💡</span>
-              <span>Database Cloud non configurato</span>
-            </div>
-            <p className="leading-relaxed">
-              Puoi configurare le credenziali reali nel file <code className="bg-slate-900 px-1 py-0.5 rounded font-mono text-amber-300">.env</code> del progetto, oppure provare subito l'app in locale con salvataggi nel browser:
-            </p>
-            <button
-              type="button"
-              onClick={() => onLoginDemo?.({ 
-                email: 'ebartalucci@ingegno06.it', 
-                uid: 'demo-ebartalucci', 
-                name: 'Bartalucci Emanuele', 
-                role: 'admin', 
-                isSocio: false, 
-                isDemo: true 
-              })}
-              className="w-full mt-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2 px-3 rounded-xl transition-all shadow-md text-xs cursor-pointer text-center"
-            >
-              🚀 Accedi come Demo Locale
-            </button>
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-red-500/15 border border-red-500/30 text-red-200 text-sm rounded-xl p-3 mb-6 flex items-start gap-2">
-            <span className="font-bold shrink-0">⚠️</span>
-            <p>{error}</p>
-          </div>
-        )}
-
-        {message && (
-          <div className="bg-green-500/15 border border-green-500/30 text-green-200 text-sm rounded-xl p-3 mb-6 flex items-start gap-2">
-            <span className="font-bold shrink-0">✅</span>
-            <p>{message}</p>
-          </div>
-        )}
-
-        {showForgotPassword ? (
-          <form onSubmit={handleResetPassword} className="space-y-5">
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Email Aziendale</label>
-              <input 
-                type="email" 
-                value={email} 
-                onChange={e => setEmail(e.target.value)} 
-                className="w-full bg-slate-900/50 border border-slate-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-500 transition-all font-mono"
-                placeholder="nome.cognome@ingegno.it"
-                required
-              />
-            </div>
-
-            <button 
-              type="submit" 
-              disabled={loading} 
-              className="w-full bg-brand-600 hover:bg-brand-500 disabled:bg-slate-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md shadow-brand-600/20 text-sm"
-            >
-              {loading ? 'Invio in corso...' : 'Invia Email di Ripristino'}
-            </button>
-
-            <div className="text-center pt-2">
-              <button 
-                type="button" 
-                onClick={() => { setShowForgotPassword(false); setError(''); }}
-                className="text-xs text-slate-400 hover:text-white transition-all font-semibold"
-              >
-                Torna al Login
-              </button>
-            </div>
-          </form>
-        ) : !isRegistering ? (
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Email Aziendale</label>
-              <input 
-                type="email" 
-                value={email} 
-                onChange={e => setEmail(e.target.value)} 
-                className="w-full bg-slate-900/50 border border-slate-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-500 transition-all font-mono"
-                placeholder="nome.cognome@ingegno.it"
-                required
-              />
-            </div>
-
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider">Password</label>
-                <button 
-                  type="button" 
-                  onClick={() => { setShowForgotPassword(true); setError(''); }} 
-                  className="text-[10px] text-brand-400 hover:text-brand-300 font-semibold"
-                >
-                  Password dimenticata?
-                </button>
+          {/* Box Demo Locale in stile premium chiaro */}
+          {isFirebaseMock && (
+            <div className="bg-amber-50/85 backdrop-blur-md border border-amber-200 text-amber-800 p-4 rounded-2xl text-xs mb-6 space-y-2.5">
+              <div className="flex items-center gap-2 font-bold text-amber-900">
+                <span className="text-sm">💡</span>
+                <span>Database Cloud non configurato</span>
               </div>
-              <input 
-                type="password" 
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
-                className="w-full bg-slate-900/50 border border-slate-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-500 transition-all font-mono"
-                placeholder="••••••••"
-                required
-              />
-            </div>
-
-            <button 
-              type="submit" 
-              disabled={loading} 
-              className="w-full bg-brand-600 hover:bg-brand-500 disabled:bg-slate-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md shadow-brand-600/20 text-sm"
-            >
-              {loading ? 'Accesso in corso...' : 'Accedi'}
-            </button>
-
-            <div className="text-center pt-2">
-              <span className="text-xs text-slate-500">Non hai un account? </span>
-              <button 
-                type="button" 
-                onClick={() => { setIsRegistering(true); setError(''); }} 
-                className="text-xs text-brand-400 hover:text-brand-300 transition-all font-bold"
+              <p className="leading-relaxed text-amber-700">
+                Puoi configurare le credenziali reali nel file <code className="bg-amber-100/80 px-1.5 py-0.5 rounded font-mono text-amber-950 border border-amber-200/50">.env</code>, oppure accedere subito in locale con salvataggio sul browser:
+              </p>
+              <button
+                type="button"
+                onClick={() => onLoginDemo?.({ 
+                  email: 'ebartalucci@ingegno06.it', 
+                  uid: 'demo-ebartalucci', 
+                  name: 'Bartalucci Emanuele', 
+                  role: 'admin', 
+                  isSocio: false, 
+                  isDemo: true 
+                })}
+                className="w-full bg-amber-600 hover:bg-amber-700 active:scale-[0.98] text-white font-bold py-2.5 rounded-xl transition-all shadow-sm text-xs cursor-pointer text-center"
               >
-                Registrati ora
+                🚀 Accedi come Demo Locale
               </button>
             </div>
-          </form>
-        ) : (
-          <form onSubmit={handleRegister} className="space-y-5">
+          )}
+          
+          {/* Box Errore */}
+          {error && (
+            <div className="bg-red-50/80 border border-red-100 text-red-600 p-4 rounded-xl text-sm mb-6 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+              <p>{error}</p>
+            </div>
+          )}
+
+          {/* Box Successo */}
+          {message && (
+            <div className="bg-green-50/80 border border-green-100 text-green-700 p-4 rounded-xl text-sm mb-6 flex items-start gap-3">
+              <div className="w-5 h-5 shrink-0 mt-0.5 flex items-center justify-center bg-green-200 rounded-full text-green-800 font-bold">✓</div>
+              <p>{message}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Campo Email */}
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Email Aziendale Autorizzata</label>
-              <input 
-                type="email" 
-                value={email} 
-                onChange={e => setEmail(e.target.value)} 
-                className="w-full bg-slate-900/50 border border-slate-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-500 transition-all font-mono"
-                placeholder="nome.cognome@ingegno.it"
-                required
-              />
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">Email Aziendale</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-gray-400" />
+                </div>
+                <input 
+                  type="email" 
+                  required 
+                  placeholder="nome@azienda.it" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3.5 border-none rounded-xl bg-gray-100/80 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-inner"
+                />
+              </div>
             </div>
 
+            {/* Campo Password */}
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Password (min. 6 caratteri)</label>
-              <input 
-                type="password" 
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
-                className="w-full bg-slate-900/50 border border-slate-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-500 transition-all font-mono"
-                placeholder="••••••••"
-                required
-              />
+              <div className="flex justify-between items-center mb-1.5 ml-1 pr-1">
+                <label className="block text-sm font-semibold text-gray-700">Password</label>
+                {isLoginMode && (
+                  <button type="button" onClick={handleResetPassword} className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors">
+                    Password dimenticata?
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
+                </div>
+                <input 
+                  type="password" 
+                  required 
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3.5 border-none rounded-xl bg-gray-100/80 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-inner"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Conferma Password</label>
-              <input 
-                type="password" 
-                value={confirmPassword} 
-                onChange={e => setConfirmPassword(e.target.value)} 
-                className="w-full bg-slate-900/50 border border-slate-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-brand-500 transition-all font-mono"
-                placeholder="••••••••"
-                required
-              />
-            </div>
+            {/* Conferma Password (solo registrazione) */}
+            {!isLoginMode && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5 ml-1">Conferma Password</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input 
+                    type="password" 
+                    required 
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3.5 border-none rounded-xl bg-gray-100/80 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-inner"
+                  />
+                </div>
+              </div>
+            )}
 
+            {/* Bottone Submit */}
             <button 
               type="submit" 
-              disabled={loading} 
-              className="w-full bg-brand-600 hover:bg-brand-500 disabled:bg-slate-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md shadow-brand-600/20 text-sm"
+              disabled={loading}
+              className="w-full bg-gray-900 text-white font-bold py-3.5 rounded-xl hover:bg-gray-800 transition-all shadow-lg flex items-center justify-center gap-2 group active:scale-[0.98]"
             >
-              {loading ? 'Registrazione in corso...' : 'Registrati'}
+              {loading ? 'Caricamento...' : isLoginMode ? 'Accedi' : 'Registrati'}
+              {!loading && <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />}
             </button>
-
-            <div className="text-center pt-2">
-              <span className="text-xs text-slate-500">Hai già un account? </span>
-              <button 
-                type="button" 
-                onClick={() => { setIsRegistering(false); setError(''); }} 
-                className="text-xs text-brand-400 hover:text-brand-300 transition-all font-bold"
-              >
-                Accedi
-              </button>
-            </div>
           </form>
-        )}
+
+          {/* Toggle Accedi/Registrati */}
+          <div className="mt-8 text-center">
+            <p className="text-sm text-gray-600">
+              {isLoginMode ? "Non hai ancora un account?" : "Hai già un account?"}
+              <button 
+                onClick={() => { setIsLoginMode(!isLoginMode); setError(''); setMessage(''); setConfirmPassword(''); }} 
+                className="ml-2 font-bold text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                {isLoginMode ? "Registrati ora" : "Accedi"}
+              </button>
+            </p>
+          </div>
+        </div>
       </div>
+
+      <footer className="text-center py-6 text-xs text-gray-400 opacity-40 select-none relative z-10">
+        © {new Date().getFullYear()} - Tutti i diritti riservati
+      </footer>
     </div>
   );
 }

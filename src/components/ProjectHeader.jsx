@@ -12,11 +12,8 @@ export const ProjectHeader = ({ pData, setPData, title, setAppMode, iconColor = 
 
     return (
         <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0 print:mb-2">
-            <div className="flex justify-between items-center mb-6 print:hidden">
-                <button onClick={() => setAppMode('dashboard')} className="flex items-center text-slate-500 hover:text-brand-600 transition-colors text-sm font-medium">
-                    <IconHome className="w-4 h-4 mr-1"/> Menu Principale
-                </button>
-                <button onClick={() => window.print()} className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm">
+            <div className="flex justify-end items-center mb-6 print:hidden">
+                <button onClick={() => window.print()} className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm cursor-pointer">
                     <IconPrinter className="w-4 h-4 mr-2"/> Stampa Report
                 </button>
             </div>

@@ -203,7 +203,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
                             onChange={e => setFluidType(e.target.value)} 
                             className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-semibold focus:border-orange-500 cursor-pointer"
                         >
-                            <option value="automatico">Calcolo Automatico (Acqua)</option>
+                            <option value="automatico">Automatico (Acqua)</option>
                             <option value="manuale">Manuale...</option>
                         </select>
                     </div>
