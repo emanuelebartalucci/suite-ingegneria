@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { IconHome, IconPrinter, IconDroplets } from './Icons';
+import logoImg from '../assets/Logo.png';
 
 export const ProjectHeader = ({ pData, setPData, title, setAppMode, iconColor = 'brand' }) => {
     const [logoError, setLogoError] = useState(false);
@@ -23,7 +24,7 @@ export const ProjectHeader = ({ pData, setPData, title, setAppMode, iconColor = 
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 print:border-b-2 print:border-slate-800 print:pb-4 print:mb-4">
                 <div className="flex items-center space-x-4 flex-1 w-full">
                     {!logoError ? (
-                        <img src="/Logo.png" alt="Logo" className="h-12 w-auto object-contain print:h-12" onError={() => setLogoError(true)} />
+                        <img src={logoImg} alt="Logo" className="h-12 w-auto object-contain print:h-12" onError={() => setLogoError(true)} />
                     ) : (
                         <div className={`${iconBg} p-2 rounded-lg print:bg-slate-800 w-10 h-10`}>
                             <IconDroplets className="text-white" />

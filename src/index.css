@@ -62,6 +62,38 @@ body {
   #root {
     min-height: auto;
   }
+
+  /* Rimuove lo sfondo grigio di pagina e il padding dal contenitore principale */
+  .min-h-screen {
+    min-height: auto !important;
+    background-color: white !important;
+    background: white !important;
+    padding: 0 !important;
+  }
+
+  /* Forza sfondi bianchi o trasparenti su tutti i componenti per evitare sfondi grigi e spezzati */
+  .bg-slate-100,
+  .bg-slate-50,
+  .bg-white,
+  .bg-brand-50,
+  .bg-orange-50,
+  .bg-redbrand-50,
+  .bg-emerald-50 {
+    background-color: white !important;
+    background: white !important;
+  }
+
+  /* Rimuove ombre su tutti gli elementi */
+  .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl, .shadow, [class*="shadow-"] {
+    box-shadow: none !important;
+  }
+
+  /* Rimuove l'evidenziazione e il bordo sinistro del tratto attivo in stampa */
+  tr {
+    background-color: transparent !important;
+    background: transparent !important;
+    border-left: none !important;
+  }
   
   .print-hide {
     display: none !important;

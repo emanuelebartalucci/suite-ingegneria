@@ -9,6 +9,7 @@ import { ToolCarichiTermici } from './tools/ToolCarichiTermici';
 import { ToolDispersione } from './tools/ToolDispersione';
 import { ToolVerificaLinee } from './tools/ToolVerificaLinee';
 import { IconWaves, IconFlame, IconThermometer, IconArrowUp } from './components/Icons';
+import logoImg from './assets/Logo.png';
 
 
 export default function App() {
@@ -343,7 +344,7 @@ export default function App() {
                         <div className="absolute top-0 right-0 w-32 h-32 bg-brand-50/5 rounded-full blur-2xl pointer-events-none"></div>
                         <div className="absolute bottom-0 left-0 w-32 h-32 bg-orange-50/5 rounded-full blur-2xl pointer-events-none"></div>
 
-                        <img src="/Logo.png" alt="Logo" className="h-16 mx-auto mb-4 object-contain" onError={(e) => e.target.style.display='none'} />
+                        <img src={logoImg} alt="Logo" className="h-16 mx-auto mb-4 object-contain" onError={(e) => e.target.style.display='none'} />
                         <h1 className="text-3xl font-black text-slate-800 mb-2">Suite Ingegneria</h1>
                         <p className="text-slate-500 mb-10 text-sm max-w-lg mx-auto">
                             Strumenti professionali di dimensionamento e calcolo per reti idrauliche e termotecniche aziendali.
@@ -389,8 +390,8 @@ export default function App() {
             </div>
 
             {/* Footer con firma discreta, invisibile in stampa */}
-            <footer className="mt-8 mb-4 text-center text-[12px] text-slate-400 font-medium tracking-wide print:hidden select-none">
-                Sviluppato da E. Bartalucci
+            <footer className="mt-8 mb-4 text-center text-[12px] text-slate-400 opacity-50 font-medium tracking-wide print:hidden select-none">
+                Sviluppato da Emanuele Bartalucci
             </footer>
 
             {/* ADMIN MODAL */}

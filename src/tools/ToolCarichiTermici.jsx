@@ -10,9 +10,10 @@ import {
 } from '../components/Icons';
 
 export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) {
-    const [fluidType, setFluidType] = useState('acqua');
+    const [fluidType, setFluidType] = useState('automatico');
     const [fluidTemp, setFluidTemp] = useState(55); // °C
-    const [glycolPercent, setGlycolPercent] = useState(0); // %
+    const [glycolEtPercent, setGlycolEtPercent] = useState(0); // %
+    const [glycolPrPercent, setGlycolPrPercent] = useState(0); // %
     const [manualCp, setManualCp] = useState(4.187); // kJ/kg°C
     const [manualRho, setManualRho] = useState(1000); // kg/m³
     const [deltaT, setDeltaT] = useState(5); // °C
@@ -22,24 +23,26 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
     // Calcolo automatico delle proprietà del fluido in base a tipo, temperatura e glicole
     const fluidProps = useMemo(() => {
         const T = Number(fluidTemp) || 55;
-        const x = (Number(glycolPercent) || 0) / 100;
+        const xEt = (Number(glycolEtPercent) || 0) / 100;
+        const xPr = (Number(glycolPrPercent) || 0) / 100;
 
-        if (fluidType === 'acqua') {
-            const rho = 1000 - 0.22 * T - 0.003 * Math.pow(T, 2);
-            const cp = 4.186 + 0.0009 * T;
-            return { rho: Number(rho.toFixed(1)), cp: Number(cp.toFixed(3)) };
-        } else if (fluidType === 'etilenico') {
-            const rho = (1000 - 0.22 * T - 0.003 * Math.pow(T, 2)) + x * (160 - 0.35 * T) + Math.pow(x, 2) * 30;
-            const cp = (4.186 + 0.0009 * T) - x * (2.1 - 0.004 * T) + Math.pow(x, 2) * 0.5;
-            return { rho: Number(rho.toFixed(1)), cp: Number(cp.toFixed(3)) };
-        } else if (fluidType === 'propilenico') {
-            const rho = (1000 - 0.22 * T - 0.003 * Math.pow(T, 2)) + x * (105 - 0.4 * T) + Math.pow(x, 2) * 20;
-            const cp = (4.186 + 0.0009 * T) - x * (1.8 - 0.005 * T) + Math.pow(x, 2) * 0.4;
+        if (fluidType === 'automatico') {
+            const rho_water = 1000 - 0.22 * T - 0.003 * Math.pow(T, 2);
+            const cp_water = 4.186 + 0.0009 * T;
+
+            const delta_rho_et = xEt * (160 - 0.35 * T) + Math.pow(xEt, 2) * 30;
+            const delta_rho_pr = xPr * (105 - 0.4 * T) + Math.pow(xPr, 2) * 20;
+            const rho = rho_water + delta_rho_et + delta_rho_pr;
+
+            const delta_cp_et = -xEt * (2.1 - 0.004 * T) + Math.pow(xEt, 2) * 0.5;
+            const delta_cp_pr = -xPr * (1.8 - 0.005 * T) + Math.pow(xPr, 2) * 0.4;
+            const cp = cp_water + delta_cp_et + delta_cp_pr;
+
             return { rho: Number(rho.toFixed(1)), cp: Number(cp.toFixed(3)) };
         }
         // Per tipo 'manuale' usiamo i valori inseriti manualmente
         return { rho: Number(manualRho) || 1000, cp: Number(manualCp) || 4.187 };
-    }, [fluidType, fluidTemp, glycolPercent, manualCp, manualRho]);
+    }, [fluidType, fluidTemp, glycolEtPercent, glycolPrPercent, manualCp, manualRho]);
 
     const activeCp = fluidProps.cp;
     const activeRho = fluidProps.rho;
@@ -123,9 +126,33 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
     // Funzione per caricare il progetto dal Cloud
     const handleLoadCloudProject = (data) => {
         if (!data) return;
-        if (data.fluidType) setFluidType(data.fluidType);
+        if (data.fluidType) {
+            // Retrocompatibilità: se era acqua, etilenico o propilenico lo mappiamo su 'automatico'
+            if (data.fluidType === 'acqua' || data.fluidType === 'etilenico' || data.fluidType === 'propilenico') {
+                setFluidType('automatico');
+            } else {
+                setFluidType(data.fluidType);
+            }
+        }
         if (data.fluidTemp !== undefined) setFluidTemp(data.fluidTemp);
-        if (data.glycolPercent !== undefined) setGlycolPercent(data.glycolPercent);
+        
+        // Retrocompatibilità per percentuali di glicole salvate
+        if (data.glycolEtPercent !== undefined) {
+            setGlycolEtPercent(data.glycolEtPercent);
+        } else if (data.glycolPercent !== undefined && data.fluidType === 'etilenico') {
+            setGlycolEtPercent(data.glycolPercent);
+        } else {
+            setGlycolEtPercent(0);
+        }
+
+        if (data.glycolPrPercent !== undefined) {
+            setGlycolPrPercent(data.glycolPrPercent);
+        } else if (data.glycolPercent !== undefined && data.fluidType === 'propilenico') {
+            setGlycolPrPercent(data.glycolPercent);
+        } else {
+            setGlycolPrPercent(0);
+        }
+
         if (data.manualCp !== undefined) setManualCp(data.manualCp);
         if (data.manualRho !== undefined) setManualRho(data.manualRho);
         if (data.deltaT !== undefined) setDeltaT(data.deltaT);
@@ -138,7 +165,8 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
         return {
             fluidType,
             fluidTemp,
-            glycolPercent,
+            glycolEtPercent,
+            glycolPrPercent,
             manualCp,
             manualRho,
             deltaT,
@@ -161,20 +189,21 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
 
             {/* Pannello Fluidi Dinamico (Glicole) */}
             <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0">
-                <h3 className="text-sm font-bold text-slate-700 mb-4 border-b border-slate-100 pb-2 print:border-b print:border-slate-800 print:pb-1">
+                <h3 className="text-sm font-bold text-slate-700 mb-2 border-b border-slate-100 pb-2 print:border-b print:border-slate-800 print:pb-1">
                   Parametri Fluido & Variazione di Temperatura (Glicole)
                 </h3>
+                <p className="text-xs text-slate-500 mb-4 print:hidden">
+                  Il fluido di base è l'<strong>acqua</strong>. Le proprietà fisiche vengono ricalcolate automaticamente all'aumentare delle percentuali di glicole.
+                </p>
                 <div className="grid grid-cols-2 md:grid-cols-6 gap-4 print:grid-cols-4 print:gap-2">
                     <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tipo Fluido</label>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tipo Calcolo</label>
                         <select 
                             value={fluidType} 
                             onChange={e => setFluidType(e.target.value)} 
-                            className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-semibold focus:border-orange-500"
+                            className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg outline-none font-semibold focus:border-orange-500 cursor-pointer"
                         >
-                            <option value="acqua">Acqua Pura</option>
-                            <option value="etilenico">Glicole Etilenico</option>
-                            <option value="propilenico">Glicole Propilenico</option>
+                            <option value="automatico">Calcolo Automatico (Acqua)</option>
                             <option value="manuale">Manuale...</option>
                         </select>
                     </div>
@@ -185,21 +214,40 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
                             type="number" 
                             value={fluidTemp === '' ? '' : fluidTemp} 
                             onChange={e => setFluidTemp(e.target.value === '' ? '' : Number(e.target.value))} 
-                            className="w-full bg-slate-50 text-sm font-semibold text-slate-800 p-2 rounded-lg border border-slate-200 focus:outline-none focus:border-orange-500"
+                            className="w-full bg-slate-50 text-sm font-semibold text-slate-800 p-2 rounded-lg border border-slate-200 focus:outline-none focus:border-orange-500 font-mono"
                             disabled={fluidType === 'manuale'}
                         />
                     </div>
 
                     <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Glicole (%)</label>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Glicole Etilenico (%)</label>
                         <input 
                             type="number" 
                             min="0" 
-                            max="50" 
-                            value={glycolPercent === '' ? '' : glycolPercent} 
-                            onChange={e => setGlycolPercent(e.target.value === '' ? '' : Number(e.target.value))} 
-                            className="w-full bg-slate-50 text-sm font-semibold text-slate-800 p-2 rounded-lg border border-slate-200 focus:outline-none focus:border-orange-500"
-                            disabled={fluidType === 'acqua' || fluidType === 'manuale'}
+                            max="100" 
+                            value={glycolEtPercent === '' ? '' : glycolEtPercent} 
+                            onChange={e => {
+                                const val = e.target.value === '' ? '' : Math.max(0, Math.min(100, Number(e.target.value)));
+                                setGlycolEtPercent(val);
+                            }} 
+                            className="w-full bg-slate-50 text-sm font-semibold text-slate-800 p-2 rounded-lg border border-slate-200 focus:outline-none focus:border-orange-500 font-mono"
+                            disabled={fluidType === 'manuale'}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Glicole Propilenico (%)</label>
+                        <input 
+                            type="number" 
+                            min="0" 
+                            max="100" 
+                            value={glycolPrPercent === '' ? '' : glycolPrPercent} 
+                            onChange={e => {
+                                const val = e.target.value === '' ? '' : Math.max(0, Math.min(100, Number(e.target.value)));
+                                setGlycolPrPercent(val);
+                            }} 
+                            className="w-full bg-slate-50 text-sm font-semibold text-slate-800 p-2 rounded-lg border border-slate-200 focus:outline-none focus:border-orange-500 font-mono"
+                            disabled={fluidType === 'manuale'}
                         />
                     </div>
 
@@ -209,7 +257,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
                             type="number" 
                             value={deltaT === '' ? '' : deltaT} 
                             onChange={e => setDeltaT(e.target.value === '' ? '' : Number(e.target.value))} 
-                            className="w-full bg-slate-50 text-sm font-semibold text-slate-800 p-2 rounded-lg border border-slate-200 focus:outline-none focus:border-orange-500" 
+                            className="w-full bg-slate-50 text-sm font-semibold text-slate-800 p-2 rounded-lg border border-slate-200 focus:outline-none focus:border-orange-500 font-mono" 
                         />
                     </div>
 
@@ -220,7 +268,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
                             step="0.1" 
                             value={vTarget === '' ? '' : vTarget} 
                             onChange={e => setVTarget(e.target.value === '' ? '' : Number(e.target.value))} 
-                            className="w-full bg-slate-50 text-sm font-semibold text-slate-800 p-2 rounded-lg border border-slate-200 focus:outline-none focus:border-orange-500" 
+                            className="w-full bg-slate-50 text-sm font-semibold text-slate-800 p-2 rounded-lg border border-slate-200 focus:outline-none focus:border-orange-500 font-mono" 
                         />
                     </div>
 
@@ -233,7 +281,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
                                     step="0.001" 
                                     value={manualCp === '' ? '' : manualCp} 
                                     onChange={e => setManualCp(e.target.value === '' ? '' : Number(e.target.value))} 
-                                    className="w-full bg-orange-50/50 text-sm font-semibold text-slate-800 p-2 rounded-lg border border-orange-200 focus:outline-none focus:border-orange-500" 
+                                    className="w-full bg-orange-50/50 text-sm font-semibold text-slate-800 p-2 rounded-lg border border-orange-200 focus:outline-none focus:border-orange-500 font-mono" 
                                 />
                             </div>
                             <div>
@@ -242,7 +290,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
                                     type="number" 
                                     value={manualRho === '' ? '' : manualRho} 
                                     onChange={e => setManualRho(e.target.value === '' ? '' : Number(e.target.value))} 
-                                    className="w-full bg-orange-50/50 text-sm font-semibold text-slate-800 p-2 rounded-lg border border-orange-200 focus:outline-none focus:border-orange-500" 
+                                    className="w-full bg-orange-50/50 text-sm font-semibold text-slate-800 p-2 rounded-lg border border-orange-200 focus:outline-none focus:border-orange-500 font-mono" 
                                 />
                             </div>
                         </>
@@ -399,7 +447,21 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
             <div className="hidden print:block mt-6">
                 <h3 className="text-sm font-bold text-slate-800 mb-2 border-b-2 border-slate-800 pb-1">Distinta Utenze e Dimensionamento Tubazioni</h3>
                 <div className="mb-4 text-xs bg-slate-50 p-2 rounded-lg print:p-0 print:bg-transparent">
-                  <p><strong>Fluido Termovettore:</strong> {fluidType.toUpperCase()} {fluidType!=='acqua'&&`(${glycolPercent}%)`} a {fluidTemp}°C (ρ: {activeRho} kg/m³, c_p: {activeCp} kJ/kg°C) | <strong>∆T:</strong> {deltaT}°C</p>
+                  <p>
+                    <strong>Fluido Termovettore:</strong>{' '}
+                    {fluidType === 'manuale' ? (
+                        `Manuale (ρ: ${activeRho} kg/m³, c_p: ${activeCp} kJ/kg°C)`
+                    ) : (
+                        `Acqua ${
+                            glycolEtPercent > 0 || glycolPrPercent > 0
+                                ? `+ Glicole ${glycolEtPercent > 0 ? `Etilenico (${glycolEtPercent}%)` : ''}${
+                                      glycolEtPercent > 0 && glycolPrPercent > 0 ? ' / ' : ''
+                                  }${glycolPrPercent > 0 ? `Propilenico (${glycolPrPercent}%)` : ''}`
+                                : 'Pura'
+                        } a ${fluidTemp}°C (ρ: ${activeRho} kg/m³, c_p: ${activeCp} kJ/kg°C)`
+                    )}
+                    {' '}| <strong>∆T:</strong> {deltaT}°C
+                  </p>
                 </div>
                 <table className="w-full text-left border-collapse text-xs mt-2">
                     <thead>
