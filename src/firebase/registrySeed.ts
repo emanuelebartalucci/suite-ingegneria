@@ -1,6 +1,13 @@
-import { collection, getDocs, doc, writeBatch, limit, query } from "firebase/firestore";
+import { collection, getDocs, doc, writeBatch, limit, query, Firestore } from "firebase/firestore";
 
-export const INITIAL_REGISTRY = [
+export interface RegistryUser {
+  email: string;
+  name: string;
+  role: 'admin' | 'user';
+  isSocio: boolean;
+}
+
+export const INITIAL_REGISTRY: RegistryUser[] = [
   // Soci (Admin e non cancellabili)
   { email: "mcorbellini@ingegno06.it", name: "Corbellini Matteo", role: "admin", isSocio: true },
   { email: "aprofeti@ingegno06.it", name: "Profeti Andrea", role: "admin", isSocio: true },
@@ -52,7 +59,7 @@ export const INITIAL_REGISTRY = [
   { email: "fvotino@ingegno06.it", name: "Votino Federica", role: "user", isSocio: false }
 ];
 
-export async function seedRegistryIfEmpty(db) {
+export async function seedRegistryIfEmpty(db: Firestore): Promise<void> {
   try {
     const q = query(collection(db, "anagrafica"), limit(1));
     const snapshot = await getDocs(q);
@@ -71,21 +78,20 @@ export async function seedRegistryIfEmpty(db) {
   }
 }
 
-export function getLocalRegistry() {
+export function getLocalRegistry(): RegistryUser[] {
   const data = localStorage.getItem("demo_anagrafica");
   if (!data) {
     localStorage.setItem("demo_anagrafica", JSON.stringify(INITIAL_REGISTRY));
     return INITIAL_REGISTRY;
   }
   try {
-    return JSON.parse(data);
+    return JSON.parse(data) as RegistryUser[];
   } catch (e) {
     localStorage.setItem("demo_anagrafica", JSON.stringify(INITIAL_REGISTRY));
     return INITIAL_REGISTRY;
   }
 }
 
-export function saveLocalRegistry(registry) {
+export function saveLocalRegistry(registry: RegistryUser[]): void {
   localStorage.setItem("demo_anagrafica", JSON.stringify(registry));
 }
-

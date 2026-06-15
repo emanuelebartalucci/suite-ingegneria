@@ -1,10 +1,31 @@
 import React, { useState } from 'react';
-import { IconHome, IconPrinter, IconDroplets } from './Icons';
+import { IconPrinter, IconDroplets } from './Icons';
 import logoImg from '../assets/Logo.png';
 
-export const ProjectHeader = ({ pData, setPData, title, setAppMode, iconColor = 'brand' }) => {
-    const [logoError, setLogoError] = useState(false);
-    const iconBg = iconColor === 'brand' ? 'bg-brand-600' : (iconColor === 'orange' ? 'bg-orange-600' : 'bg-red-600');
+export interface ProjectData {
+  client: string;
+  author: string;
+  date: string;
+  notes: string;
+}
+
+interface ProjectHeaderProps {
+  pData: ProjectData;
+  setPData: (data: any) => void;
+  title: string;
+  setAppMode: (mode: string) => void;
+  iconColor?: 'brand' | 'orange' | 'red' | 'redbrand';
+}
+
+export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ 
+  pData, 
+  setPData, 
+  title, 
+  setAppMode, 
+  iconColor = 'brand' 
+}) => {
+    const [logoError, setLogoError] = useState<boolean>(false);
+    const iconBg = iconColor === 'brand' ? 'bg-brand-600' : (iconColor === 'orange' ? 'bg-orange-600' : (iconColor === 'redbrand' ? 'bg-redbrand-600' : 'bg-red-600'));
     
     // Configura le classi CSS dinamiche per evitare problemi di compilazione
     const textBrandClass = iconColor === 'brand' ? 'text-brand-600' : (iconColor === 'orange' ? 'text-orange-600' : 'text-redbrand-600');
@@ -51,8 +72,8 @@ export const ProjectHeader = ({ pData, setPData, title, setAppMode, iconColor = 
                     </div>
                     <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Note Tecniche</label>
-                        <p className="hidden print:block text-sm text-slate-650 whitespace-pre-wrap">{pData.notes || 'Nessuna nota.'}</p>
-                        <textarea rows="2" value={pData.notes} onChange={e => setPData({...pData, notes: e.target.value})} placeholder="Inserisci note sul progetto..." className="w-full bg-transparent text-sm text-slate-600 focus:outline-none border-b border-slate-300 resize-none print:hidden"></textarea>
+                        <p className="hidden print:block text-sm text-slate-600 whitespace-pre-wrap">{pData.notes || 'Nessuna nota.'}</p>
+                        <textarea rows={2} value={pData.notes} onChange={e => setPData({...pData, notes: e.target.value})} placeholder="Inserisci note sul progetto..." className="w-full bg-transparent text-sm text-slate-600 focus:outline-none border-b border-slate-300 resize-none print:hidden"></textarea>
                     </div>
                 </div>
             </div>

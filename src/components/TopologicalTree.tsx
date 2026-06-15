@@ -1,17 +1,59 @@
 import React, { useMemo } from 'react';
 
-export default function TopologicalTree({ tratti }) {
+export interface TrattoNode {
+  tag: string;
+  parentId: string | null;
+  hierarchy: string;
+  length: number | string;
+  name: string;
+  velocity?: number;
+  loss_tot_mbar?: number;
+  children?: TrattoNode[];
+}
+
+interface TopologicalTreeProps {
+  tratti: TrattoNode[];
+}
+
+interface MapNode extends TrattoNode {
+  children: MapNode[];
+}
+
+interface VisualLine {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  thickness: number;
+  color: string;
+  tag: string;
+  name: string;
+  velocity?: number;
+  loss?: number;
+  length: number | string;
+  dir: 'H' | 'V';
+}
+
+interface VisualLabel {
+  x: number;
+  y: number;
+  text: string;
+  title: string;
+  dir: 'H' | 'V';
+}
+
+export default function TopologicalTree({ tratti }: TopologicalTreeProps) {
   const svgData = useMemo(() => {
     if (!tratti || tratti.length === 0) return null;
 
     // 1. Costruiamo una mappa dei tratti indicizzata per il TAG
-    const trattiMap = {};
+    const trattiMap: Record<string, MapNode> = {};
     tratti.forEach(t => {
-      trattiMap[t.tag] = { ...t, children: [] };
+      trattiMap[t.tag] = { ...t, children: [] } as MapNode;
     });
 
     // 2. Colleghiamo i figli ai genitori
-    const roots = [];
+    const roots: MapNode[] = [];
     tratti.forEach(t => {
       const parentTag = t.parentId;
       if (parentTag && trattiMap[parentTag]) {
@@ -22,16 +64,24 @@ export default function TopologicalTree({ tratti }) {
     });
 
     // Scala compressa per le lunghezze grafiche
-    const getVisualLength = (l) => {
+    const getVisualLength = (l: number | string): number => {
       const len = Number(l) || 0;
       return 45 + Math.sqrt(len) * 15;
     };
 
-    const lines = [];
-    const labels = [];
+    const lines: VisualLine[] = [];
+    const labels: VisualLabel[] = [];
 
     // Algoritmo ricorsivo per posizionare i nodi in modo ortogonale perpendicolare
-    const layoutNode = (node, parentStartX, parentStartY, parentEndX, parentEndY, parentDir, childIndex) => {
+    const layoutNode = (
+      node: MapNode, 
+      parentStartX: number, 
+      parentStartY: number, 
+      parentEndX: number, 
+      parentEndY: number, 
+      parentDir: 'H' | 'V', 
+      childIndex: number
+    ): void => {
       const visualLen = getVisualLength(node.length);
       const startX = parentEndX;
       const startY = parentEndY;
@@ -41,7 +91,7 @@ export default function TopologicalTree({ tratti }) {
       // - secondaria -> V (Verticale)
       // - terziaria -> H (Orizzontale)
       // - utenza -> V (Verticale)
-      let dir = 'H';
+      let dir: 'H' | 'V' = 'H';
       if (node.hierarchy === 'dorsale_principale') {
         dir = 'H';
       } else if (node.hierarchy === 'dorsale_secondaria') {
@@ -137,7 +187,7 @@ export default function TopologicalTree({ tratti }) {
       let vCount = 0;
 
       sortedChildren.forEach(child => {
-        let childDir = 'H';
+        let childDir: 'H' | 'V' = 'H';
         if (child.hierarchy === 'dorsale_secondaria' || child.hierarchy === 'utenza') {
           childDir = 'V';
         }

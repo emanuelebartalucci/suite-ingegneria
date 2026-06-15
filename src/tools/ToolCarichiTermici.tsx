@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { ProjectHeader } from '../components/ProjectHeader';
+import React, { useState, useMemo } from 'react';
+import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
 import { PIPE_CATALOG } from '../data/pipeCatalog';
 import { 
@@ -9,16 +9,38 @@ import {
   IconPlus 
 } from '../components/Icons';
 
-export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) {
-    const [fluidType, setFluidType] = useState('automatico');
-    const [fluidTemp, setFluidTemp] = useState(55); // °C
-    const [glycolEtPercent, setGlycolEtPercent] = useState(0); // %
-    const [glycolPrPercent, setGlycolPrPercent] = useState(0); // %
-    const [manualCp, setManualCp] = useState(4.187); // kJ/kg°C
-    const [manualRho, setManualRho] = useState(1000); // kg/m³
-    const [deltaT, setDeltaT] = useState(5); // °C
-    const [vTarget, setVTarget] = useState(1.0); // m/s
-    const [loads, setLoads] = useState([]);
+interface ToolCarichiTermiciProps {
+  projectData: ProjectData;
+  setProjectData: (data: any) => void;
+  setAppMode: (mode: string) => void;
+}
+
+interface LoadItem {
+  id: number;
+  name: string;
+  mode: 'power' | 'flow';
+  inputVal: number | string;
+  material: string;
+  DN: string;
+  PN: string;
+  calcPower_kW?: number;
+  calcFlow_m3h?: number;
+  calcFlow_kgh?: number;
+  d_teorico_mm?: number;
+  realD?: number | null;
+  realVelocity?: number;
+}
+
+export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: ToolCarichiTermiciProps) {
+    const [fluidType, setFluidType] = useState<string>('automatico');
+    const [fluidTemp, setFluidTemp] = useState<number | ''>(55); // °C
+    const [glycolEtPercent, setGlycolEtPercent] = useState<number | ''>(0); // %
+    const [glycolPrPercent, setGlycolPrPercent] = useState<number | ''>(0); // %
+    const [manualCp, setManualCp] = useState<number | ''>(4.187); // kJ/kg°C
+    const [manualRho, setManualRho] = useState<number | ''>(1000); // kg/m³
+    const [deltaT, setDeltaT] = useState<number | ''>(5); // °C
+    const [vTarget, setVTarget] = useState<number | ''>(1.0); // m/s
+    const [loads, setLoads] = useState<LoadItem[]>([]);
 
     // Calcolo automatico delle proprietà del fluido in base a tipo, temperatura e glicole
     const fluidProps = useMemo(() => {
@@ -66,7 +88,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
             const area_m2 = flow_m3s / (Number(vTarget) || 1.0);
             const d_teorico_mm = Math.sqrt((4 * area_m2) / Math.PI) * 1000;
             
-            let realD = null, realVelocity = 0;
+            let realD: number | null = null, realVelocity = 0;
 
             if (load.material && load.DN && load.PN) {
                 if (PIPE_CATALOG[load.material] && PIPE_CATALOG[load.material].specs[load.DN] && PIPE_CATALOG[load.material].specs[load.DN][load.PN]) {
@@ -87,17 +109,17 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
         setLoads([...loads, { id: newId, name: `Utenza ${newId}`, mode: 'power', inputVal: 300, material: 'Acciaio', DN: '50', PN: 'NORM' }]);
     };
 
-    const duplicateLoad = (id) => {
+    const duplicateLoad = (id: number) => {
         const loadToCopy = loads.find(l => l.id === id);
         if (!loadToCopy) return;
         const newId = loads.length > 0 ? Math.max(...loads.map(l => l.id)) + 1 : 1;
         setLoads([...loads, { ...loadToCopy, id: newId, name: loadToCopy.name + " (Copia)" }]);
     };
 
-    const updateLoad = (id, field, val) => {
+    const updateLoad = (id: number, field: keyof LoadItem, val: any) => {
         setLoads(prev => prev.map(l => {
             if (l.id === id) {
-                let updated = { ...l, [field]: val };
+                let updated = { ...l, [field]: val } as LoadItem;
                 
                 if (field === 'material') {
                     const matData = PIPE_CATALOG[val];
@@ -118,13 +140,13 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
         }));
     };
 
-    const removeLoad = (id) => setLoads(loads.filter(l => l.id !== id));
+    const removeLoad = (id: number) => setLoads(loads.filter(l => l.id !== id));
 
-    const totalKW = processedLoads.reduce((s, l) => s + l.calcPower_kW, 0);
-    const totalM3H = processedLoads.reduce((s, l) => s + l.calcFlow_m3h, 0);
+    const totalKW = processedLoads.reduce((s, l) => s + (l.calcPower_kW || 0), 0);
+    const totalM3H = processedLoads.reduce((s, l) => s + (l.calcFlow_m3h || 0), 0);
 
     // Funzione per caricare il progetto dal Cloud
-    const handleLoadCloudProject = (data) => {
+    const handleLoadCloudProject = (data: any) => {
         if (!data) return;
         if (data.fluidType) {
             // Retrocompatibilità: se era acqua, etilenico o propilenico lo mappiamo su 'automatico'
@@ -362,6 +384,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
                                     value={load.inputVal === '' ? '' : load.inputVal} 
                                     onChange={e => updateLoad(load.id, 'inputVal', e.target.value === '' ? '' : Number(e.target.value))} 
                                     className="w-full text-xl font-bold bg-transparent outline-none border-b border-slate-300 focus:border-orange-500"
+                                    required
                                 />
                             </div>
                         </div>
@@ -372,15 +395,15 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
                             <div className="grid grid-cols-2 gap-2">
                                 <div className="bg-orange-50 p-2 rounded-lg border border-orange-100">
                                     <p className="text-[9px] font-bold text-orange-600 uppercase">Portata Fluido</p>
-                                    <p className="font-mono font-bold text-orange-800 text-base">{load.calcFlow_m3h.toFixed(2)} m³/h</p>
+                                    <p className="font-mono font-bold text-orange-800 text-base">{(load.calcFlow_m3h || 0).toFixed(2)} m³/h</p>
                                 </div>
                                 <div className="bg-orange-50 p-2 rounded-lg border border-orange-100">
                                     <p className="text-[9px] font-bold text-orange-600 uppercase">Potenza Termica</p>
-                                    <p className="font-mono font-bold text-orange-800 text-base">{load.calcPower_kW.toFixed(1)} kWt</p>
+                                    <p className="font-mono font-bold text-orange-800 text-base">{(load.calcPower_kW || 0).toFixed(1)} kWt</p>
                                 </div>
                                 <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 col-span-2">
                                     <p className="text-[9px] font-bold text-slate-500 uppercase">Portata Massica Equivalente</p>
-                                    <p className="font-mono font-bold text-slate-700 text-sm">{load.calcFlow_kgh.toFixed(1)} kg/h</p>
+                                    <p className="font-mono font-bold text-slate-700 text-sm">{(load.calcFlow_kgh || 0).toFixed(1)} kg/h</p>
                                 </div>
                             </div>
                         </div>
@@ -424,7 +447,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
                                 </div>
                             </div>
                             
-                            <div className={`p-2 rounded-lg border ${load.realVelocity <= Number(vTarget) + 0.2 && load.realVelocity >= Number(vTarget) - 0.5 ? 'bg-green-50 border-green-200 text-green-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <div className={`p-2 rounded-lg border ${(load.realVelocity || 0) <= Number(vTarget) + 0.2 && (load.realVelocity || 0) >= Number(vTarget) - 0.5 ? 'bg-green-50 border-green-200 text-green-800' : 'bg-slate-50 border-slate-200'}`}>
                                 <div className="flex justify-between items-end">
                                     <div>
                                         <p className="text-[9px] font-bold text-slate-500 uppercase">Selezionato</p>
@@ -432,7 +455,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
                                     </div>
                                     <div className="text-right">
                                         <p className="text-[9px] text-slate-500 font-mono">Ø Int: {load.realD?.toFixed(1)} mm</p>
-                                        <p className={`text-xs font-bold ${load.realVelocity > Number(vTarget) * 1.4 ? 'text-red-650' : 'text-orange-650'}`}>v = {load.realVelocity.toFixed(2)} m/s</p>
+                                        <p className={`text-xs font-bold ${(load.realVelocity || 0) > Number(vTarget) * 1.4 ? 'text-red-600' : 'text-orange-600'}`}>v = {(load.realVelocity || 0).toFixed(2)} m/s</p>
                                     </div>
                                 </div>
                             </div>
@@ -453,10 +476,10 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
                         `Manuale (ρ: ${activeRho} kg/m³, c_p: ${activeCp} kJ/kg°C)`
                     ) : (
                         `Acqua ${
-                            glycolEtPercent > 0 || glycolPrPercent > 0
-                                ? `+ Glicole ${glycolEtPercent > 0 ? `Etilenico (${glycolEtPercent}%)` : ''}${
-                                      glycolEtPercent > 0 && glycolPrPercent > 0 ? ' / ' : ''
-                                  }${glycolPrPercent > 0 ? `Propilenico (${glycolPrPercent}%)` : ''}`
+                            (Number(glycolEtPercent) || 0) > 0 || (Number(glycolPrPercent) || 0) > 0
+                                ? `+ Glicole ${(Number(glycolEtPercent) || 0) > 0 ? `Etilenico (${glycolEtPercent}%)` : ''}${
+                                      (Number(glycolEtPercent) || 0) > 0 && (Number(glycolPrPercent) || 0) > 0 ? ' / ' : ''
+                                  }${(Number(glycolPrPercent) || 0) > 0 ? `Propilenico (${glycolPrPercent}%)` : ''}`
                                 : 'Pura'
                         } a ${fluidTemp}°C (ρ: ${activeRho} kg/m³, c_p: ${activeCp} kJ/kg°C)`
                     )}
@@ -479,12 +502,12 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
                         {processedLoads.map(l => (
                             <tr key={l.id} className="border-b border-slate-100">
                                 <td className="py-1 font-bold">{l.name}</td>
-                                <td className="py-1 font-mono">{l.calcPower_kW.toFixed(1)}</td>
-                                <td className="py-1 font-mono">{l.calcFlow_m3h.toFixed(2)}</td>
+                                <td className="py-1 font-mono">{(l.calcPower_kW || 0).toFixed(1)}</td>
+                                <td className="py-1 font-mono">{(l.calcFlow_m3h || 0).toFixed(2)}</td>
                                 <td className="py-1">{l.material}</td>
                                 <td className="py-1 font-bold">DN {l.DN} - {l.PN}</td>
                                 <td className="py-1 font-mono">{l.realD?.toFixed(1)}</td>
-                                <td className="py-1 text-right font-mono">{l.realVelocity.toFixed(2)}</td>
+                                <td className="py-1 text-right font-mono">{(l.realVelocity || 0).toFixed(2)}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -492,11 +515,11 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }) 
                 
                 <div className="flex gap-4 mt-8 mx-auto max-w-lg">
                     <div className="flex-1 p-3 rounded-lg border-2 border-slate-800 text-center">
-                        <p className="text-[10px] font-bold uppercase text-slate-600 mb-1">Totale Potenza Termica</p>
+                        <p className="text-[10px] font-bold uppercase text-slate-650 mb-1">Totale Potenza Termica</p>
                         <p className="text-2xl font-mono font-black">{totalKW.toFixed(1)} kW</p>
                     </div>
                     <div className="flex-1 p-3 rounded-lg border-2 border-slate-800 text-center">
-                        <p className="text-[10px] font-bold uppercase text-slate-600 mb-1">Totale Portata Flusso</p>
+                        <p className="text-[10px] font-bold uppercase text-slate-650 mb-1">Totale Portata Flusso</p>
                         <p className="text-2xl font-mono font-black">{totalM3H.toFixed(1)} m³/h</p>
                     </div>
                 </div>

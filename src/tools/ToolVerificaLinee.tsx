@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { ProjectHeader } from '../components/ProjectHeader';
+import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
-import TopologicalTree from '../components/TopologicalTree';
+import TopologicalTree, { TrattoNode } from '../components/TopologicalTree';
 import { PIPE_CATALOG, INSULATION_CATALOG, getExternalDiameter } from '../data/pipeCatalog';
 import { getEquivalentLength } from '../data/equivalentLengths';
 import { 
@@ -11,15 +11,65 @@ import {
   IconCopy 
 } from '../components/Icons';
 
+interface ToolVerificaLineeProps {
+  projectData: ProjectData;
+  setProjectData: (data: any) => void;
+  setAppMode: (mode: string) => void;
+}
+
+interface TrattoLine {
+  id: number;
+  tag: string;
+  name: string;
+  portata: number | string;
+  material: string;
+  DN: string;
+  PN: string;
+  length: number | string;
+  n_valvole: number | string;
+  n_riduzioni: number | string;
+  n_curve: number | string;
+  n_tee: number | string;
+  hierarchy: string;
+  parentId: string;
+  isoType: string;
+  isoThick: number | string;
+  isoLambda: number | string;
+  tAmb: number | string;
+  D?: number | string;
+  roughness?: number | string;
+  
+  // Calcolati
+  d_int?: number;
+  d_ext?: number;
+  t_surf?: number;
+  t_pipe_ext?: number;
+  area_m2?: number;
+  velocity?: number;
+  Re?: number;
+  roughnessRel?: number;
+  lambda?: number;
+  leq_valvola?: number;
+  leq_riduzione?: number;
+  leq_curva?: number;
+  leq_tee?: number;
+  leq_tot?: number;
+  loss_dist_Pa?: number;
+  loss_conc_Pa?: number;
+  loss_tot_Pa?: number;
+  loss_tot_mbar?: number;
+  loss_tot_mH2O?: number;
+}
+
 // Helper per la formattazione e conversione della pressione
-const formatPressureVal = (valPa, unit) => {
+const formatPressureVal = (valPa: number, unit: string): string => {
   if (unit === 'Pa') return Math.round(valPa).toLocaleString('it-IT');
   if (unit === 'kPa') return (valPa / 1000).toFixed(2);
   if (unit === 'mH2O') return (valPa / 9806.65).toFixed(3);
   return (valPa / 100).toFixed(1);
 };
 
-const getPressureUnitLabel = (unit) => {
+const getPressureUnitLabel = (unit: string): string => {
   if (unit === 'Pa') return 'Pa';
   if (unit === 'kPa') return 'kPa';
   if (unit === 'mH2O') return 'm.c.a.';
@@ -27,7 +77,7 @@ const getPressureUnitLabel = (unit) => {
 };
 
 // Risolutore iterativo Colebrook-White
-function solveColebrookWhite(Re, roughnessRel) {
+function solveColebrookWhite(Re: number, roughnessRel: number): number {
   if (Re <= 0) return 0;
   if (Re <= 2300) {
     return 64 / Re;
@@ -51,7 +101,12 @@ function solveColebrookWhite(Re, roughnessRel) {
 }
 
 // Componente per disegnare la sezione geometrica del tubo sovrapposta al grafico del gradiente termico radiale
-function SVGGradienteSovrapposto({ tratto, fluidTemp }) {
+interface SVGGradienteSovrappostoProps {
+  tratto: TrattoLine;
+  fluidTemp: number | string;
+}
+
+function SVGGradienteSovrapposto({ tratto, fluidTemp }: SVGGradienteSovrappostoProps) {
   if (!tratto || !tratto.d_int) return null;
 
   const ri = tratto.d_int / 2; // Raggio interno in mm
@@ -70,13 +125,13 @@ function SVGGradienteSovrapposto({ tratto, fluidTemp }) {
   const graphWidth = 220;
   const graphHeight = 120;
 
-  const getX = (r) => {
+  const getX = (r: number) => {
     return originX + (r / riso) * graphWidth;
   };
 
   const tMin = Math.min(tf, ta) - 5;
   const tMax = Math.max(tf, ta) + 5;
-  const getY = (temp) => {
+  const getY = (temp: number) => {
     const range = tMax - tMin || 1;
     return originY - ((temp - tMin) / range) * graphHeight;
   };
@@ -200,13 +255,13 @@ function SVGGradienteSovrapposto({ tratto, fluidTemp }) {
   );
 }
 
-export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }) {
-    const [fluidTemp, setFluidTemp] = useState(55); // °C
-    const [glycolEtPercent, setGlycolEtPercent] = useState(0); // %
-    const [glycolPrPercent, setGlycolPrPercent] = useState(0); // %
-    const [tratti, setTratti] = useState([]);
-    const [selectedTrattoId, setSelectedTrattoId] = useState(null);
-    const [pressureUnit, setPressureUnit] = useState('mbar');
+export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: ToolVerificaLineeProps) {
+    const [fluidTemp, setFluidTemp] = useState<number | ''>(55); // °C
+    const [glycolEtPercent, setGlycolEtPercent] = useState<number | ''>(0); // %
+    const [glycolPrPercent, setGlycolPrPercent] = useState<number | ''>(0); // %
+    const [tratti, setTratti] = useState<TrattoLine[]>([]);
+    const [selectedTrattoId, setSelectedTrattoId] = useState<number | null>(null);
+    const [pressureUnit, setPressureUnit] = useState<string>('mbar');
 
     // Calcolo densità e viscosità dinamica globali basati sulle percentuali di glicole in acqua
     const fluidProps = useMemo(() => {
@@ -285,11 +340,11 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }) {
             const leq_tee = getEquivalentLength('innesto_t', t.DN);
 
             // Lunghezza equivalente totale dei pezzi speciali (m)
-            const leq_tot_valvole = (Number(t.n_valvole) || 0) * leq_valvola;
+            const leq_tot_valvale = (Number(t.n_valvole) || 0) * leq_valvola;
             const leq_tot_riduzioni = (Number(t.n_riduzioni) || 0) * leq_riduzione;
             const leq_tot_curve = (Number(t.n_curve) || 0) * leq_curva;
             const leq_tot_tee = (Number(t.n_tee) || 0) * leq_tee;
-            const leq_tot = leq_tot_valvole + leq_tot_riduzioni + leq_tot_curve + leq_tot_tee;
+            const leq_tot = leq_tot_valvale + leq_tot_riduzioni + leq_tot_curve + leq_tot_tee;
 
             // 7. Calcolo perdite distribuite (Pa)
             const loss_dist_Pa = d_int_m > 0 ? (lambda * (length / d_int_m) * (Math.pow(velocity, 2) / 2) * activeRho) : 0;
@@ -311,7 +366,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }) {
                     d_ext = getExternalDiameter(t.material, t.DN, d_int_mm);
                 }
             } else if (t.D) {
-                d_ext = t.D + 10;
+                d_ext = Number(t.D) + 10;
             }
 
             const r_int_m = d_int_m / 2;
@@ -370,7 +425,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }) {
                 loss_tot_Pa,
                 loss_tot_mbar,
                 loss_tot_mH2O
-            };
+            } as TrattoLine;
         });
     }, [tratti, activeRho, activeVisc, fluidTemp]);
 
@@ -401,17 +456,17 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }) {
         ]);
     };
 
-    const duplicateTratto = (id) => {
+    const duplicateTratto = (id: number) => {
         const t = tratti.find(x => x.id === id);
         if (!t) return;
         const newId = tratti.length > 0 ? Math.max(...tratti.map(x => x.id)) + 1 : 1;
         setTratti([...tratti, { ...t, id: newId, tag: t.tag + "-bis", name: t.name + " (Copia)" }]);
     };
 
-    const updateTratto = (id, field, val) => {
+    const updateTratto = (id: number, field: keyof TrattoLine, val: any) => {
         setTratti(prev => prev.map(t => {
             if (t.id === id) {
-                let updated = { ...t, [field]: val };
+                let updated = { ...t, [field]: val } as TrattoLine;
                 
                 if (field === 'material' && val !== 'manuale') {
                     const firstDN = Object.keys(PIPE_CATALOG[val].specs)[0];
@@ -431,18 +486,18 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }) {
         }));
     };
 
-    const removeTratto = (id) => {
+    const removeTratto = (id: number) => {
         setTratti(tratti.filter(t => t.id !== id));
         if (selectedTrattoId === id) setSelectedTrattoId(null);
     };
 
-    const totalLossDistPa = processedTratti.reduce((s, t) => s + t.loss_dist_Pa, 0);
-    const totalLossConcPa = processedTratti.reduce((s, t) => s + t.loss_conc_Pa, 0);
+    const totalLossDistPa = processedTratti.reduce((s, t) => s + (t.loss_dist_Pa || 0), 0);
+    const totalLossConcPa = processedTratti.reduce((s, t) => s + (t.loss_conc_Pa || 0), 0);
     const totalLossPa = totalLossDistPa + totalLossConcPa;
 
     const activeTratto = processedTratti.find(x => x.id === selectedTrattoId) || processedTratti[0];
 
-    const handleLoadCloudProject = (data) => {
+    const handleLoadCloudProject = (data: any) => {
         if (!data) return;
         if (data.fluidTemp !== undefined) setFluidTemp(data.fluidTemp);
         if (data.pressureUnit !== undefined) setPressureUnit(data.pressureUnit);
@@ -476,6 +531,9 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }) {
             pressureUnit
         };
     };
+
+    // Cast per compatibilità del TopologicalTree che usa TrattoNode[]
+    const trattiNodesForTree = processedTratti as unknown as TrattoNode[];
 
     return (
         <div className="max-w-7xl mx-auto animate-fade-in text-slate-800">
@@ -574,9 +632,9 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }) {
                         <p className="text-[9px] font-bold text-slate-500 uppercase">Fluido Pompato</p>
                         <p className="font-semibold text-slate-800 leading-tight">
                             {glycolEtPercent === 0 && glycolPrPercent === 0 ? "Acqua Pura" : ""}
-                            {glycolEtPercent > 0 && glycolPrPercent === 0 ? `Acqua + Glicole Etilenico (${glycolEtPercent}%)` : ""}
-                            {glycolPrPercent > 0 && glycolEtPercent === 0 ? `Acqua + Glicole Propilenico (${glycolPrPercent}%)` : ""}
-                            {glycolEtPercent > 0 && glycolPrPercent > 0 ? `Acqua + Glicole Et. (${glycolEtPercent}%) + Prop. (${glycolPrPercent}%)` : ""}
+                            {(Number(glycolEtPercent) || 0) > 0 && glycolPrPercent === 0 ? `Acqua + Glicole Etilenico (${glycolEtPercent}%)` : ""}
+                            {(Number(glycolPrPercent) || 0) > 0 && glycolEtPercent === 0 ? `Acqua + Glicole Propilenico (${glycolPrPercent}%)` : ""}
+                            {(Number(glycolEtPercent) || 0) > 0 && (Number(glycolPrPercent) || 0) > 0 ? `Acqua + Glicole Et. (${glycolEtPercent}%) + Prop. (${glycolPrPercent}%)` : ""}
                         </p>
                     </div>
                     <div>
@@ -649,7 +707,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }) {
                                             )}
                                         </div>
                                     </td>
-
+                                    
                                     {/* Lunghezza */}
                                     <td className="py-2.5 px-2 print:p-1">
                                         <span className="font-bold font-mono text-xs text-slate-800">{t.length} <span className="text-[9px] text-slate-400 font-sans font-normal">m</span></span>
@@ -657,45 +715,45 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }) {
 
                                     {/* Pezzi Speciali */}
                                     <td className="py-2.5 px-2 print:p-1 space-y-0.5 text-[9px] font-mono text-slate-600">
-                                        { (t.n_valvole > 0 || t.n_riduzioni > 0 || t.n_curve > 0 || t.n_tee > 0) ? (
+                                        { (Number(t.n_valvole) > 0 || Number(t.n_riduzioni) > 0 || Number(t.n_curve) > 0 || Number(t.n_tee) > 0) ? (
                                             <div className="grid grid-cols-2 gap-x-2 text-[8px] leading-tight">
-                                                {t.n_valvole > 0 && <span>Valv: {t.n_valvole}</span>}
-                                                {t.n_riduzioni > 0 && <span>Rid: {t.n_riduzioni}</span>}
-                                                {t.n_curve > 0 && <span>Curv: {t.n_curve}</span>}
-                                                {t.n_tee > 0 && <span>Tee: {t.n_tee}</span>}
+                                                {Number(t.n_valvole) > 0 && <span>Valv: {t.n_valvole}</span>}
+                                                {Number(t.n_riduzioni) > 0 && <span>Rid: {t.n_riduzioni}</span>}
+                                                {Number(t.n_curve) > 0 && <span>Curv: {t.n_curve}</span>}
+                                                {Number(t.n_tee) > 0 && <span>Tee: {t.n_tee}</span>}
                                             </div>
                                         ) : <span className="text-slate-400">-</span> }
-                                        {t.leq_tot > 0 && (
+                                        {t.leq_tot && t.leq_tot > 0 ? (
                                             <div className="text-[8px] text-brand-600 font-bold mt-0.5">
                                               L_eq = +{t.leq_tot.toFixed(1)} m
                                             </div>
-                                        )}
+                                        ) : null}
                                     </td>
 
                                     {/* Velocità */}
                                     <td className="py-2.5 px-2 print:p-1 font-mono text-[11px] font-bold">
-                                        {t.velocity.toFixed(2)} m/s
+                                        {(t.velocity || 0).toFixed(2)} m/s
                                     </td>
 
                                     {/* Reynolds e Lambda */}
                                     <td className="py-2.5 px-2 print:p-1 font-mono text-[10px] space-y-0.5">
-                                        <div>Re: {Math.round(t.Re).toLocaleString()}</div>
-                                        <div className="font-bold text-brand-600">λ: {t.lambda.toFixed(4)}</div>
+                                        <div>Re: {Math.round(t.Re || 0).toLocaleString()}</div>
+                                        <div className="font-bold text-brand-600">λ: {(t.lambda || 0).toFixed(4)}</div>
                                     </td>
 
                                     {/* Perdite Distrib. */}
                                     <td className="py-2.5 px-2 print:p-1 font-mono text-right text-slate-500">
-                                        {formatPressureVal(t.loss_dist_Pa, pressureUnit)}
+                                        {formatPressureVal(t.loss_dist_Pa || 0, pressureUnit)}
                                     </td>
 
                                     {/* Perdite Conc. */}
                                     <td className="py-2.5 px-2 print:p-1 font-mono text-right text-slate-500">
-                                        {formatPressureVal(t.loss_conc_Pa, pressureUnit)}
+                                        {formatPressureVal(t.loss_conc_Pa || 0, pressureUnit)}
                                     </td>
 
                                     {/* Perdite Totali */}
                                     <td className="py-2.5 px-2 print:p-1 font-mono text-right font-black text-slate-800 text-[11px]">
-                                        {formatPressureVal(t.loss_tot_Pa, pressureUnit)}
+                                        {formatPressureVal(t.loss_tot_Pa || 0, pressureUnit)}
                                     </td>
 
                                     {/* Azioni */}
@@ -851,7 +909,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }) {
                                         <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/60 space-y-3">
                                             <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-wider flex justify-between items-center">
                                                 <span>2. Pezzi Speciali & Accessori (K)</span>
-                                                {t.leq_tot > 0 && <span className="text-[8px] text-brand-600 font-bold font-mono">L_eq = +{t.leq_tot.toFixed(1)} m</span>}
+                                                {t.leq_tot && t.leq_tot > 0 ? <span className="text-[8px] text-brand-600 font-bold font-mono">L_eq = +{t.leq_tot.toFixed(1)} m</span> : null}
                                             </h5>
                                             <div className="grid grid-cols-4 gap-2">
                                                 <div>
@@ -971,9 +1029,9 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }) {
                                                 <h6 className="text-[9px] font-black text-slate-400 uppercase tracking-wider font-sans mb-1">Riepilogo Calcoli</h6>
                                                 <div>Øi / Øe: <strong>{t.d_int?.toFixed(1)} / {t.d_ext?.toFixed(1)} mm</strong></div>
                                                 <div>Velocità: <strong>{t.velocity?.toFixed(2)} m/s</strong></div>
-                                                <div>Reynolds: <strong>{Math.round(t.Re).toLocaleString()}</strong></div>
-                                                <div className="text-red-650 font-bold">T. Sup. Est.: {t.t_surf?.toFixed(1)} °C</div>
-                                                <div className="font-bold text-brand-600 border-t border-slate-200/80 pt-1 mt-1">∆P: {formatPressureVal(t.loss_tot_Pa, pressureUnit)} {getPressureUnitLabel(pressureUnit)}</div>
+                                                <div>Reynolds: <strong>{Math.round(t.Re || 0).toLocaleString()}</strong></div>
+                                                <div className="text-red-600 font-bold">T. Sup. Est.: {t.t_surf?.toFixed(1)} °C</div>
+                                                <div className="font-bold text-brand-600 border-t border-slate-200/80 pt-1 mt-1">∆P: {formatPressureVal(t.loss_tot_Pa || 0, pressureUnit)} {getPressureUnitLabel(pressureUnit)}</div>
                                             </div>
                                             <div>
                                                 <SVGGradienteSovrapposto tratto={t} fluidTemp={fluidTemp} />
@@ -993,7 +1051,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }) {
                             Rappresentazione Topologica della Rete (Albero di Distribuzione)
                         </h3>
                         <div className="flex-1 flex items-center justify-center min-h-[200px]">
-                            <TopologicalTree tratti={processedTratti} />
+                            <TopologicalTree tratti={trattiNodesForTree} />
                         </div>
                     </div>
                 </div>
@@ -1023,7 +1081,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }) {
                         Topologia Rete (Albero di Distribuzione)
                     </h3>
                     <div className="w-full flex items-center justify-center p-2 print:max-h-[170px] overflow-hidden">
-                        <TopologicalTree tratti={processedTratti} />
+                        <TopologicalTree tratti={trattiNodesForTree} />
                     </div>
                 </div>
 

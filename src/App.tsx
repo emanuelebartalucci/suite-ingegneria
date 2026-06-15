@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { User } from 'firebase/auth';
 import { auth, db, isFirebaseMock } from './firebase/config';
 import { seedRegistryIfEmpty, getLocalRegistry, saveLocalRegistry } from './firebase/registrySeed';
 import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
@@ -11,19 +12,71 @@ import { ToolVerificaLinee } from './tools/ToolVerificaLinee';
 import { IconWaves, IconFlame, IconThermometer, IconArrowUp } from './components/Icons';
 import logoImg from './assets/Logo.png';
 
+export interface ProjectData {
+    client: string;
+    author: string;
+    date: string;
+    notes: string;
+}
+
+export interface RegistryMember {
+    name: string;
+    email: string;
+    role: 'admin' | 'user';
+    isSocio: boolean;
+}
+
+export interface UserProfile {
+    uid: string;
+    email: string | null;
+    name: string;
+    role: 'admin' | 'user';
+    isSocio: boolean;
+    isDemo: boolean;
+}
+
+export interface ToastItem {
+    id: number;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+}
+
+export interface ConfirmModalState {
+    visible: boolean;
+    message: string;
+    title: string;
+    resolve: ((value: boolean) => void) | null;
+}
+
+export interface AlertModalState {
+    visible: boolean;
+    message: string;
+    title: string;
+    resolve: (() => void) | null;
+}
+
+declare global {
+    interface Window {
+        suiteUI?: {
+            toast: (message: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
+            confirm: (message: string, title?: string) => Promise<boolean>;
+            alert: (message: string, title?: string) => Promise<void>;
+        };
+    }
+}
 
 export default function App() {
-    const [user, setUser] = useState(null);
-    const [demoUser, setDemoUser] = useState(() => {
+    const [user, setUser] = useState<User | null>(null);
+    const [demoUser, setDemoUser] = useState<UserProfile | null>(() => {
         const demo = sessionStorage.getItem('demo_user');
         return demo ? JSON.parse(demo) : null;
     });
-    const [userProfile, setUserProfile] = useState(null);
-    const [authLoading, setAuthLoading] = useState(true);
-    const [appMode, setAppMode] = useState('dashboard');
-    const [prevMode, setPrevMode] = useState('dashboard');
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+    const [authLoading, setAuthLoading] = useState<boolean>(true);
+    const [appMode, setAppMode] = useState<string>('dashboard');
+    const [prevMode, setPrevMode] = useState<string>('dashboard');
     
-    const [projectData, setProjectData] = useState({
+    const [projectData, setProjectData] = useState<ProjectData>({
         client: 'Progetto Impianto',
         author: '',
         date: new Date().toISOString().split('T')[0],
@@ -31,19 +84,19 @@ export default function App() {
     });
 
     // Stato Gestione Anagrafica (Admin)
-    const [showAdminModal, setShowAdminModal] = useState(false);
-    const [registryList, setRegistryList] = useState([]);
-    const [registryLoading, setRegistryLoading] = useState(false);
-    const [newMemberName, setNewMemberName] = useState('');
-    const [newMemberEmail, setNewMemberEmail] = useState('');
-    const [newMemberIsAdmin, setNewMemberIsAdmin] = useState(false);
-    const [adminError, setAdminError] = useState('');
-    const [adminSuccess, setAdminSuccess] = useState('');
+    const [showAdminModal, setShowAdminModal] = useState<boolean>(false);
+    const [registryList, setRegistryList] = useState<RegistryMember[]>([]);
+    const [registryLoading, setRegistryLoading] = useState<boolean>(false);
+    const [newMemberName, setNewMemberName] = useState<string>('');
+    const [newMemberEmail, setNewMemberEmail] = useState<string>('');
+    const [newMemberIsAdmin, setNewMemberIsAdmin] = useState<boolean>(false);
+    const [adminError, setAdminError] = useState<string>('');
+    const [adminSuccess, setAdminSuccess] = useState<string>('');
 
     // Stati per notifiche e pop-up moderni
-    const [toasts, setToasts] = useState([]);
-    const [confirmModal, setConfirmModal] = useState({ visible: false, message: '', title: '', resolve: null });
-    const [alertModal, setAlertModal] = useState({ visible: false, message: '', title: '', resolve: null });
+    const [toasts, setToasts] = useState<ToastItem[]>([]);
+    const [confirmModal, setConfirmModal] = useState<ConfirmModalState>({ visible: false, message: '', title: '', resolve: null });
+    const [alertModal, setAlertModal] = useState<AlertModalState>({ visible: false, message: '', title: '', resolve: null });
 
     // Seed automatico dell'anagrafica al mount
     useEffect(() => {
@@ -55,20 +108,20 @@ export default function App() {
     // Registrazione delle funzioni globali di notifica e popup
     useEffect(() => {
         window.suiteUI = {
-            toast: (message, type = 'info') => {
+            toast: (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
                 const id = Date.now() + Math.random();
                 setToasts(prev => [...prev, { id, message, type }]);
                 setTimeout(() => {
                     setToasts(prev => prev.filter(t => t.id !== id));
                 }, 3500);
             },
-            confirm: (message, title = 'Conferma') => {
-                return new Promise((resolve) => {
+            confirm: (message: string, title = 'Conferma') => {
+                return new Promise<boolean>((resolve) => {
                     setConfirmModal({ visible: true, message, title, resolve });
                 });
             },
-            alert: (message, title = 'Attenzione') => {
-                return new Promise((resolve) => {
+            alert: (message: string, title = 'Attenzione') => {
+                return new Promise<void>((resolve) => {
                     setAlertModal({ visible: true, message, title, resolve });
                 });
             }
@@ -85,7 +138,7 @@ export default function App() {
             if (currentUser) {
                 setAuthLoading(true);
                 try {
-                    const emailClean = currentUser.email.toLowerCase().trim();
+                    const emailClean = (currentUser.email || '').toLowerCase().trim();
                     const docRef = doc(db, "anagrafica", emailClean);
                     const docSnap = await getDoc(docRef);
                     if (docSnap.exists()) {
@@ -94,7 +147,7 @@ export default function App() {
                             uid: currentUser.uid,
                             email: currentUser.email,
                             name: data.name,
-                            role: data.role,
+                            role: data.role as 'admin' | 'user',
                             isSocio: data.isSocio || false,
                             isDemo: false
                         });
@@ -102,7 +155,7 @@ export default function App() {
                         setUserProfile({
                             uid: currentUser.uid,
                             email: currentUser.email,
-                            name: currentUser.email.split('@')[0],
+                            name: currentUser.email ? currentUser.email.split('@')[0] : 'user',
                             role: 'user',
                             isSocio: false,
                             isDemo: false
@@ -113,7 +166,7 @@ export default function App() {
                     setUserProfile({
                         uid: currentUser.uid,
                         email: currentUser.email,
-                        name: currentUser.email.split('@')[0],
+                        name: currentUser.email ? currentUser.email.split('@')[0] : 'user',
                         role: 'user',
                         isSocio: false,
                         isDemo: false
@@ -124,7 +177,7 @@ export default function App() {
             } else {
                 const demo = sessionStorage.getItem('demo_user');
                 if (demo) {
-                    const du = JSON.parse(demo);
+                    const du = JSON.parse(demo) as UserProfile;
                     setDemoUser(du);
                     setUserProfile(du);
                 } else {
@@ -170,14 +223,14 @@ export default function App() {
         try {
             const isDemoMode = isFirebaseMock || (userProfile && userProfile.isDemo);
             if (isDemoMode) {
-                const list = getLocalRegistry();
+                const list = getLocalRegistry() as RegistryMember[];
                 list.sort((a, b) => a.name.localeCompare(b.name));
                 setRegistryList(list);
             } else {
                 const snapshot = await getDocs(collection(db, "anagrafica"));
-                const list = [];
+                const list: RegistryMember[] = [];
                 snapshot.forEach(docSnap => {
-                    list.push(docSnap.data());
+                    list.push(docSnap.data() as RegistryMember);
                 });
                 list.sort((a, b) => a.name.localeCompare(b.name));
                 setRegistryList(list);
@@ -200,7 +253,7 @@ export default function App() {
     }, [showAdminModal]);
 
     // Inserimento nuovo dipendente
-    const handleAddMember = async (e) => {
+    const handleAddMember = async (e: React.FormEvent) => {
         e.preventDefault();
         setAdminError('');
         setAdminSuccess('');
@@ -219,7 +272,7 @@ export default function App() {
             return;
         }
 
-        const newMember = {
+        const newMember: RegistryMember = {
             name,
             email: emailVal,
             role: newMemberIsAdmin ? 'admin' : 'user',
@@ -248,7 +301,8 @@ export default function App() {
     };
 
     // Eliminazione dipendente con Socio Guard
-    const handleDeleteMember = async (member) => {
+    const handleDeleteMember = async (member: RegistryMember) => {
+        if (!window.suiteUI) return;
         if (member.isSocio || member.email === "mcorbellini@ingegno06.it" || member.email === "aprofeti@ingegno06.it") {
             await window.suiteUI.alert("Impossibile eliminare un socio fondatore.", "Operazione non consentita");
             return;
@@ -281,7 +335,8 @@ export default function App() {
     };
 
     // Cambio ruolo dipendente (Toggle Admin/User) con Socio Guard
-    const handleToggleRole = async (member) => {
+    const handleToggleRole = async (member: RegistryMember) => {
+        if (!window.suiteUI) return;
         if (member.isSocio || member.email === "mcorbellini@ingegno06.it" || member.email === "aprofeti@ingegno06.it") {
             await window.suiteUI.alert("Il ruolo dei soci fondatori non può essere modificato.", "Operazione non consentita");
             return;
@@ -300,7 +355,7 @@ export default function App() {
                     }
                     return u;
                 });
-                saveLocalRegistry(updated);
+                saveLocalRegistry(updated as any);
                 setAdminSuccess(`Ruolo di ${member.name} aggiornato con successo in locale.`);
                 await fetchRegistry();
             } else {
@@ -315,7 +370,6 @@ export default function App() {
             setAdminError("Impossibile aggiornare il ruolo del dipendente.");
         }
     };
-
 
     if (authLoading) {
         return (
@@ -360,7 +414,7 @@ export default function App() {
                 {/* Destra: Utente e pulsanti di gestione/logout */}
                 <div className="flex items-center gap-3">
                     <div>
-                        Utente: <strong className="text-slate-700">{userProfile?.name || currentUser.email}</strong> {userProfile?.role === 'admin' ? <span className="text-[10px] bg-rose-500/10 text-rose-700 px-2 py-0.5 rounded-full font-bold ml-1">Admin</span> : <span className="text-[10px] bg-slate-500/10 text-slate-650 px-2 py-0.5 rounded-full font-bold ml-1">Utente</span>} {currentUser.isDemo && <span className="ml-1 text-[9px] bg-amber-500/20 text-amber-700 px-1.5 py-0.5 rounded font-bold">DEMO</span>}
+                        Utente: <strong className="text-slate-700">{userProfile?.name || currentUser.email}</strong> {userProfile?.role === 'admin' ? <span className="text-[10px] bg-rose-500/10 text-rose-700 px-2 py-0.5 rounded-full font-bold ml-1">Admin</span> : <span className="text-[10px] bg-slate-500/10 text-slate-650 px-2 py-0.5 rounded-full font-bold ml-1">Utente</span>} {userProfile?.isDemo && <span className="ml-1 text-[9px] bg-amber-500/20 text-amber-700 px-1.5 py-0.5 rounded font-bold">DEMO</span>}
                     </div>
                     {userProfile?.role === 'admin' && (
                         <button
@@ -373,6 +427,7 @@ export default function App() {
                     )}
                     <button 
                         onClick={async () => {
+                            if (!window.suiteUI) return;
                             const confirmed = await window.suiteUI.confirm("Desideri disconnetterti dalla Suite?", "Disconnessione");
                             if (confirmed) {
                                 sessionStorage.removeItem('demo_user');
@@ -395,7 +450,7 @@ export default function App() {
                         <div className="absolute top-0 right-0 w-32 h-32 bg-brand-50/5 rounded-full blur-2xl pointer-events-none"></div>
                         <div className="absolute bottom-0 left-0 w-32 h-32 bg-orange-50/5 rounded-full blur-2xl pointer-events-none"></div>
 
-                        <img src={logoImg} alt="Logo" className="h-16 mx-auto mb-4 object-contain" onError={(e) => e.target.style.display='none'} />
+                        <img src={logoImg} alt="Logo" className="h-16 mx-auto mb-4 object-contain" onError={(e) => { (e.target as HTMLElement).style.display='none' }} />
                         <h1 className="text-3xl font-black text-slate-800 mb-2">Suite Ingegneria</h1>
                         <p className="text-slate-500 mb-10 text-sm max-w-lg mx-auto">
                             Strumenti professionali di dimensionamento e calcolo per reti idrauliche e termotecniche aziendali.
@@ -606,7 +661,7 @@ export default function App() {
                             className={`pointer-events-auto shadow-lg rounded-2xl border p-4 bg-white/95 backdrop-blur-md flex items-start gap-3 transition-all duration-350 animate-slide-in ${
                                 t.type === 'success' ? 'bg-emerald-50/90 border-emerald-200 text-emerald-800' :
                                 t.type === 'error' ? 'bg-rose-50/90 border-rose-200 text-rose-800' :
-                                t.type === 'warning' ? 'bg-amber-50/90 border-amber-200 text-amber-800' :
+                                t.type === 'warning' ? 'bg-amber-50/90 border-amber-200 text-amber-850' :
                                 'bg-sky-50/90 border-sky-200 text-sky-850'
                             }`}
                         >
@@ -648,7 +703,7 @@ export default function App() {
             )}
 
             {/* CUSTOM CONFIRM MODAL */}
-            {confirmModal.visible && createPortal(
+            {confirmModal.visible && confirmModal.resolve && createPortal(
                 <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-all">
                     <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-sm p-6 animate-scale-up text-left font-sans">
                         <h3 className="font-black text-base text-slate-800 flex items-center gap-2">
@@ -660,7 +715,7 @@ export default function App() {
                         <div className="flex justify-end gap-2.5 mt-6">
                             <button 
                                 onClick={() => {
-                                    confirmModal.resolve(false);
+                                    if (confirmModal.resolve) confirmModal.resolve(false);
                                     setConfirmModal({ visible: false, message: '', title: '', resolve: null });
                                 }}
                                 className="px-3.5 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 transition-all cursor-pointer"
@@ -669,7 +724,7 @@ export default function App() {
                             </button>
                             <button 
                                 onClick={() => {
-                                    confirmModal.resolve(true);
+                                    if (confirmModal.resolve) confirmModal.resolve(true);
                                     setConfirmModal({ visible: false, message: '', title: '', resolve: null });
                                 }}
                                 className="px-4 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-xl shadow transition-all cursor-pointer"
@@ -683,7 +738,7 @@ export default function App() {
             )}
 
             {/* CUSTOM ALERT MODAL */}
-            {alertModal.visible && createPortal(
+            {alertModal.visible && alertModal.resolve && createPortal(
                 <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-all">
                     <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-sm p-6 animate-scale-up text-left font-sans">
                         <h3 className="font-black text-base text-slate-800 flex items-center gap-2">
@@ -695,7 +750,7 @@ export default function App() {
                         <div className="flex justify-end mt-6">
                             <button 
                                 onClick={() => {
-                                    alertModal.resolve();
+                                    if (alertModal.resolve) alertModal.resolve();
                                     setAlertModal({ visible: false, message: '', title: '', resolve: null });
                                 }}
                                 className="px-4 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 rounded-xl shadow transition-all cursor-pointer"

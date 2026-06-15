@@ -1,16 +1,16 @@
 // Domini email aziendali autorizzati alla registrazione
-export const ALLOWED_DOMAINS = [
+export const ALLOWED_DOMAINS: string[] = [
     "ingegno.it",
     "ingegno.org"
 ];
 
 // Singole email specifiche autorizzate alla registrazione (es. collaboratori o test)
-export const ALLOWED_EMAILS = [
+export const ALLOWED_EMAILS: string[] = [
     "e.bartalucci@ingegno.it"
 ];
 
 // Funzione di verifica per controllare se un indirizzo email è autorizzato alla registrazione
-export function isEmailAuthorized(email) {
+export function isEmailAuthorized(email: string): boolean {
     if (!email) return false;
     const emailLower = email.toLowerCase().trim();
     

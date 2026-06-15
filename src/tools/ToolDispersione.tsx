@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ProjectHeader } from '../components/ProjectHeader';
+import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
 import { 
   PIPE_CATALOG, 
@@ -13,15 +13,40 @@ import {
   IconPlus 
 } from '../components/Icons';
 
-export function ToolDispersione({ projectData, setProjectData, setAppMode }) {
-    const [tAmbGlobal, setTAmbGlobal] = useState(-5); // °C
-    const [tFluidGlobal, setTFluidGlobal] = useState(55); // °C
-    const [alphaInt, setAlphaInt] = useState(1163); // W/m2K (ex 1000 kcal/hm2°C)
-    const [alphaExt, setAlphaExt] = useState(7.4); // W/m2K (ex 6.4 kcal/hm2°C)
-    const [showAdvanced, setShowAdvanced] = useState(false);
-    const [selectedLineId, setSelectedLineId] = useState(null);
+interface ToolDispersioneProps {
+  projectData: ProjectData;
+  setProjectData: (data: any) => void;
+  setAppMode: (mode: string) => void;
+}
 
-    const [lines, setLines] = useState([]);
+interface DispersioneLine {
+  id: number;
+  name: string;
+  length: number | string;
+  material: string;
+  DN: string;
+  PN: string;
+  isoType: string;
+  isoLambda: number | string;
+  isoThick: number | string;
+  calcQ_Wm?: number;
+  calcQ_tot_kW?: number;
+  t_surf?: number;
+  t_pipe_ext?: number;
+  d_int_mm?: number;
+  d_ext_mm?: number;
+  d_iso_mm?: number;
+}
+
+export function ToolDispersione({ projectData, setProjectData, setAppMode }: ToolDispersioneProps) {
+    const [tAmbGlobal, setTAmbGlobal] = useState<number | ''>(-5); // °C
+    const [tFluidGlobal, setTFluidGlobal] = useState<number | ''>(55); // °C
+    const [alphaInt, setAlphaInt] = useState<number | ''>(1163); // W/m2K
+    const [alphaExt, setAlphaExt] = useState<number | ''>(7.4); // W/m2K
+    const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+    const [selectedLineId, setSelectedLineId] = useState<number | null>(null);
+
+    const [lines, setLines] = useState<DispersioneLine[]>([]);
 
     const processedLines = useMemo(() => {
         return lines.map(line => {
@@ -48,13 +73,13 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }) {
                     d_iso_m = d_ext_m + 2 * s_m;
 
                     // Calcolo Resistenze Termiche [m·K/W]
-                    const R_int = 1 / (Number(alphaInt) * d_int_m);
+                    const R_int = 1 / ((Number(alphaInt) || 1163) * d_int_m);
                     const R_pipe = Math.log(d_ext_m / d_int_m) / (2 * lambda_pipe);
                     let R_iso = 0;
                     if (s_m > 0 && lambda_iso > 0) {
                         R_iso = Math.log(d_iso_m / d_ext_m) / (2 * lambda_iso);
                     }
-                    const R_ext = 1 / (Number(alphaExt) * d_iso_m);
+                    const R_ext = 1 / ((Number(alphaExt) || 7.4) * d_iso_m);
 
                     const R_tot = R_int + R_pipe + R_iso + R_ext;
                     const deltaT = Math.abs(tFluid - tAmb);
@@ -65,10 +90,10 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }) {
                     // Temp superficie esterna isolante e superficie esterna tubo
                     if (tFluid > tAmb) {
                         t_pipe_ext = tFluid - (calcQ_Wm / Math.PI) * (R_int + R_pipe);
-                        t_surf = tAmb + calcQ_Wm / (Math.PI * Number(alphaExt) * d_iso_m);
+                        t_surf = tAmb + calcQ_Wm / (Math.PI * (Number(alphaExt) || 7.4) * d_iso_m);
                     } else {
                         t_pipe_ext = tFluid + (calcQ_Wm / Math.PI) * (R_int + R_pipe);
-                        t_surf = tAmb - calcQ_Wm / (Math.PI * Number(alphaExt) * d_iso_m); // Se l'acqua è refrigerata
+                        t_surf = tAmb - calcQ_Wm / (Math.PI * (Number(alphaExt) || 7.4) * d_iso_m); // Se l'acqua è refrigerata
                     }
                 }
             }
@@ -95,7 +120,7 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }) {
         setSelectedLineId(newId);
     };
 
-    const duplicateLine = (id) => {
+    const duplicateLine = (id: number) => {
         const lineToCopy = lines.find(l => l.id === id);
         if (!lineToCopy) return;
         const newId = lines.length > 0 ? Math.max(...lines.map(l => l.id)) + 1 : 1;
@@ -103,10 +128,10 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }) {
         setSelectedLineId(newId);
     };
 
-    const updateLine = (id, field, val) => {
+    const updateLine = (id: number, field: keyof DispersioneLine, val: any) => {
         setLines(prev => prev.map(l => {
             if (l.id === id) {
-                let updated = { ...l, [field]: val };
+                let updated = { ...l, [field]: val } as DispersioneLine;
                 
                 if (field === 'material') {
                     const firstDN = Object.keys(PIPE_CATALOG[val].specs)[0];
@@ -130,17 +155,17 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }) {
         }));
     };
 
-    const removeLine = (id) => {
+    const removeLine = (id: number) => {
         setLines(lines.filter(l => l.id !== id));
         if (selectedLineId === id) setSelectedLineId(null);
     };
 
-    const totalLossKW = processedLines.reduce((sum, l) => sum + l.calcQ_tot_kW, 0);
+    const totalLossKW = processedLines.reduce((sum, l) => sum + (l.calcQ_tot_kW || 0), 0);
 
     const activeLine = processedLines.find(l => l.id === selectedLineId) || processedLines[0];
 
     // Componente per disegnare la Sezione Tubo 2D SVG
-    const SVGSezioneTubo = ({ line }) => {
+    const SVGSezioneTubo = ({ line }: { line: any }) => {
         if (!line || !line.d_int_mm) return null;
 
         const ri = line.d_int_mm / 2;
@@ -188,7 +213,7 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }) {
     };
 
     // Componente per tracciare il Grafico del Gradiente Termico Radiale SVG
-    const SVGGradienteTermico = ({ line }) => {
+    const SVGGradienteTermico = ({ line }: { line: any }) => {
         if (!line || !line.d_int_mm) return null;
 
         const ri = line.d_int_mm / 2;
@@ -198,20 +223,20 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }) {
 
         const tf = Number(tFluidGlobal) || 0;
         const ta = Number(tAmbGlobal) || 0;
-        const t_ext_tubo = line.t_pipe_ext;
-        const t_s = line.t_surf;
+        const t_ext_tubo = line.t_pipe_ext || 0;
+        const t_s = line.t_surf || 0;
 
         // Coordinate X del grafico (Raggio da 0 a R_iso)
         // Larghezza del grafico: 220px (da x=40 a x=260)
         // Altezza del grafico: 110px (da y=20 a y=130)
-        const getX = (r) => {
+        const getX = (r: number) => {
             return 40 + (r / riso) * 210;
         };
 
         // Coordinate Y del grafico (Temperatura da tMin a tMax)
         const tMin = Math.min(tf, ta) - 5;
         const tMax = Math.max(tf, ta) + 5;
-        const getY = (temp) => {
+        const getY = (temp: number) => {
             const range = tMax - tMin || 1;
             return 130 - ((temp - tMin) / range) * 100;
         };
@@ -289,7 +314,7 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }) {
         );
     };
 
-    const handleLoadCloudProject = (data) => {
+    const handleLoadCloudProject = (data: any) => {
         if (!data) return;
         if (data.tAmbGlobal !== undefined) setTAmbGlobal(data.tAmbGlobal);
         if (data.tFluidGlobal !== undefined) setTFluidGlobal(data.tFluidGlobal);
@@ -467,7 +492,7 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }) {
                                 </div>
                                 <div className="bg-redbrand-50/50 border border-redbrand-100 p-1.5 rounded-lg flex flex-col justify-center text-center">
                                     <p className="text-[8px] font-bold text-redbrand-600 uppercase">Q unitario</p>
-                                    <p className="font-mono font-black text-xs text-redbrand-800">{line.calcQ_Wm.toFixed(2)} W/m</p>
+                                    <p className="font-mono font-black text-xs text-redbrand-800">{(line.calcQ_Wm || 0).toFixed(2)} W/m</p>
                                 </div>
                             </div>
                         </div>
@@ -492,7 +517,7 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }) {
                                         <div>Ø Int: {activeLine.d_int_mm?.toFixed(1)} mm</div>
                                         <div>Ø Est: {activeLine.d_ext_mm?.toFixed(1)} mm</div>
                                         <div>Isolante: {activeLine.isoThick} mm</div>
-                                        <div className="text-red-650 font-bold">T. Sup: {activeLine.t_surf?.toFixed(1)}°C</div>
+                                        <div className="text-red-600 font-bold">T. Sup: {activeLine.t_surf?.toFixed(1)}°C</div>
                                     </div>
                                 </div>
 
@@ -537,9 +562,9 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }) {
                                 <td className="py-1 font-mono">{l.d_int_mm?.toFixed(1)} / {l.d_ext_mm?.toFixed(1)}</td>
                                 <td className="py-1">{INSULATION_CATALOG.find(i=>i.id===l.isoType)?.name} ({l.isoThick}mm)</td>
                                 <td className="py-1 text-right font-mono">{l.length}</td>
-                                <td className="py-1 text-right font-mono">{l.calcQ_Wm.toFixed(1)}</td>
-                                <td className="py-1 text-right font-mono font-bold text-red-650">{l.t_surf.toFixed(1)}</td>
-                                <td className="py-1 text-right font-mono font-bold">{l.calcQ_tot_kW.toFixed(2)}</td>
+                                <td className="py-1 text-right font-mono">{(l.calcQ_Wm || 0).toFixed(1)}</td>
+                                <td className="py-1 text-right font-mono font-bold text-red-600">{(l.t_surf || 0).toFixed(1)}</td>
+                                <td className="py-1 text-right font-mono font-bold">{(l.calcQ_tot_kW || 0).toFixed(2)}</td>
                             </tr>
                         ))}
                     </tbody>

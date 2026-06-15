@@ -1,5 +1,16 @@
 // Roughness in mm, lambda in W/(m*K)
-export const PIPE_CATALOG = {
+
+export interface PipeSpec {
+    [pn: string]: number;
+}
+
+export interface PipeMaterial {
+    roughness: number;
+    lambda: number;
+    specs: Record<string, PipeSpec>;
+}
+
+export const PIPE_CATALOG: Record<string, PipeMaterial> = {
     'Acciaio': {
         roughness: 0.05, lambda: 50.0,
         specs: {
@@ -128,7 +139,13 @@ export const PIPE_CATALOG = {
     }
 };
 
-export const INSULATION_CATALOG = [
+export interface InsulationItem {
+    id: string;
+    name: string;
+    lambda: number;
+}
+
+export const INSULATION_CATALOG: InsulationItem[] = [
     { id: 'pur', name: 'Poliuretano Espanso (PUR)', lambda: 0.025 },
     { id: 'rockwool', name: 'Lana di Roccia / Vetro', lambda: 0.035 },
     { id: 'rubber', name: 'Gomma Elastomerica', lambda: 0.038 },
@@ -136,24 +153,30 @@ export const INSULATION_CATALOG = [
     { id: 'custom', name: 'Altro / Manuale...', lambda: 0.035 }
 ];
 
-export const K_PRESETS = [
+export interface KPresetItem {
+    label: string;
+    value: number;
+}
+
+export const K_PRESETS: KPresetItem[] = [
     { label: 'Imbocco', value: 0.5 }, { label: 'Sbocco', value: 1.0 }, { label: 'Curva 90°', value: 0.9 },
     { label: 'Curva 45°', value: 0.4 }, { label: 'Saracinesca', value: 0.2 }, { label: 'Valv. Ritegno', value: 2.0 },
 ];
 
 // Funzione per ricavare il Diametro Esterno in base al materiale
-export const getExternalDiameter = (mat, dn, d_int) => {
+export const getExternalDiameter = (mat: string, dn: string | number, d_int: number): number => {
     if (!mat || !dn) return 0;
     const plasticDNs = ['PE100', 'PEAD', 'PRFV', 'PVC', 'PVC EN'];
     if (plasticDNs.includes(mat)) return Number(dn); // Per la plastica, il DN indica il diametro esterno esatto
     
     if (mat === 'Acciaio') {
-        const steelOD = {
+        const steelOD: Record<string, number> = {
             '50': 60.3, '65': 76.1, '80': 88.9, '100': 114.3, '125': 139.7, '150': 168.3,
             '200': 219.1, '250': 273.0, '300': 323.9, '350': 355.6, '400': 406.4, '450': 457.0,
             '500': 508.0, '600': 610.0, '700': 711.0, '800': 813.0, '900': 914.0
         };
-        return steelOD[dn] || (d_int + 10);
+        const dnStr = String(dn);
+        return steelOD[dnStr] || (d_int + 10);
     }
     
     if (mat === 'Ghisa') return d_int + 16;

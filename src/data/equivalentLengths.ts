@@ -1,8 +1,14 @@
 // Tabella delle lunghezze equivalenti in metri di tubo in base al diametro nominale (mm)
 // Ispirata alla scheda 'Lunghezze equivalenti' del foglio di calcolo aziendale.
-export const DN_LIST = [15, 20, 25, 32, 40, 50, 65, 80, 100, 125, 150];
+export const DN_LIST: number[] = [15, 20, 25, 32, 40, 50, 65, 80, 100, 125, 150];
 
-export const EQUIVALENT_LENGTHS_TABLE = {
+export interface EquivalentLengthPiece {
+  label: string;
+  values: Record<number, number>;
+  formula?: (dn: number) => number;
+}
+
+export const EQUIVALENT_LENGTHS_TABLE: Record<string, EquivalentLengthPiece> = {
   // Valvola a flusso avviato
   valvola_flusso: {
     label: "Valvola a flusso avviato",
@@ -12,7 +18,7 @@ export const EQUIVALENT_LENGTHS_TABLE = {
   valvola_diaframma: {
     label: "Valvola a diaframma",
     values: { 15: 0.5, 20: 0.8, 25: 1.2, 32: 1.5, 40: 2, 50: 3, 65: 3.5, 80: 4.5, 100: 6, 125: 8, 150: 10 },
-    formula: (dn) => 0.069 * dn - 0.6766
+    formula: (dn: number) => 0.069 * dn - 0.6766
   },
   // Saracinesca
   saracinesca: {
@@ -28,7 +34,7 @@ export const EQUIVALENT_LENGTHS_TABLE = {
   curva_d: {
     label: "Curva R=d",
     values: { 15: 0.1, 20: 0.2, 25: 0.3, 32: 0.4, 40: 0.5, 50: 0.6, 65: 0.8, 80: 1, 100: 1.5, 125: 2, 150: 2.5 },
-    formula: (dn) => 0.0173 * dn - 0.2022
+    formula: (dn: number) => 0.0173 * dn - 0.2022
   },
   // Curva R=2d
   curva_2d: {
@@ -39,23 +45,23 @@ export const EQUIVALENT_LENGTHS_TABLE = {
   innesto_t: {
     label: "Innesto a T",
     values: { 15: 0.5, 20: 1, 25: 2, 32: 2.5, 40: 3, 50: 4, 65: 5.5, 80: 7, 100: 10, 125: 15, 150: 20 },
-    formula: (dn) => 0.1363 * dn - 2.2915
+    formula: (dn: number) => 0.1363 * dn - 2.2915
   },
   // Riduzione
   riduzione: {
     label: "Riduzione",
     values: { 15: 0.1, 20: 0.3, 25: 0.5, 32: 0.6, 40: 0.7, 50: 1, 65: 1.5, 80: 2, 100: 2.5, 125: 3.5, 150: 4 },
-    formula: (dn) => 0.0293 * dn - 0.3547
+    formula: (dn: number) => 0.0293 * dn - 0.3547
   }
 };
 
 /**
  * Calcola la lunghezza equivalente in metri per un dato pezzo speciale e un dato DN.
  * @param {string} type - Tipo di pezzo speciale (es. 'valvola_diaframma')
- * @param {number} dn - Diametro nominale (o indicatore) in mm
+ * @param {number|string} dn - Diametro nominale (o indicatore) in mm
  * @returns {number} Lunghezza equivalente in metri
  */
-export function getEquivalentLength(type, dn) {
+export function getEquivalentLength(type: string, dn: number | string): number {
   const piece = EQUIVALENT_LENGTHS_TABLE[type];
   if (!piece) return 0;
 

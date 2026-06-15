@@ -13,15 +13,42 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { IconCopy } from './Icons';
+import { ProjectData } from './ProjectHeader';
 
-export default function ProjectStorage({ toolType, currentData, onLoadProject, projectInfo, setProjectInfo }) {
-  const [projects, setProjects] = useState([]);
-  const [currentProjectId, setCurrentProjectId] = useState(null);
-  const [currentProjectName, setCurrentProjectName] = useState('');
-  const [saveName, setSaveName] = useState('');
-  const [showModal, setShowModal] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState(null);
+interface Project {
+  id: string;
+  name: string;
+  toolType: string;
+  client: string;
+  author: string;
+  date: string;
+  notes: string;
+  data: any;
+  updatedAt: string;
+}
+
+interface ProjectStorageProps {
+  toolType: string;
+  currentData: any;
+  onLoadProject: (data: any) => void;
+  projectInfo: ProjectData;
+  setProjectInfo: (info: any) => void;
+}
+
+export default function ProjectStorage({ 
+  toolType, 
+  currentData, 
+  onLoadProject, 
+  projectInfo, 
+  setProjectInfo 
+}: ProjectStorageProps) {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [currentProjectName, setCurrentProjectName] = useState<string>('');
+  const [saveName, setSaveName] = useState<string>('');
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
     // Sottoscrizione allo stato dell'utente
@@ -44,7 +71,7 @@ export default function ProjectStorage({ toolType, currentData, onLoadProject, p
     return unsubscribe;
   }, [toolType]);
 
-  const fetchProjects = async (u) => {
+  const fetchProjects = async (u: any) => {
     if (!u) return;
     setLoading(true);
     try {
@@ -59,9 +86,9 @@ export default function ProjectStorage({ toolType, currentData, onLoadProject, p
           orderBy("updatedAt", "desc")
         );
         const querySnapshot = await getDocs(q);
-        const list = [];
-        querySnapshot.forEach((doc) => {
-          list.push({ id: doc.id, ...doc.data() });
+        const list: Project[] = [];
+        querySnapshot.forEach((docSnapshot) => {
+          list.push({ id: docSnapshot.id, ...docSnapshot.data() } as Project);
         });
         setProjects(list);
       }
@@ -72,13 +99,13 @@ export default function ProjectStorage({ toolType, currentData, onLoadProject, p
     }
   };
 
-  const handleSaveNew = async (e) => {
+  const handleSaveNew = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !saveName.trim()) return;
 
     setLoading(true);
     try {
-      const newProject = {
+      const newProject: Partial<Project> = {
         name: saveName.trim(),
         toolType,
         client: projectInfo.client || '',
@@ -100,18 +127,18 @@ export default function ProjectStorage({ toolType, currentData, onLoadProject, p
         setCurrentProjectName(saveName.trim());
         setSaveName('');
         setProjects(localProjects);
-        window.suiteUI.toast("Progetto salvato in locale (Modalità Demo)!", "success");
+        (window as any).suiteUI?.toast("Progetto salvato in locale (Modalità Demo)!", "success");
       } else {
         const docRef = await addDoc(collection(db, `users/${user.uid}/projects`), newProject);
         setCurrentProjectId(docRef.id);
         setCurrentProjectName(saveName.trim());
         setSaveName('');
         await fetchProjects(user);
-        window.suiteUI.toast("Progetto salvato con successo nel Cloud!", "success");
+        (window as any).suiteUI?.toast("Progetto salvato con successo nel Cloud!", "success");
       }
     } catch (err) {
       console.error("Errore durante il salvataggio:", err);
-      window.suiteUI.toast("Errore durante il salvataggio del progetto.", "error");
+      (window as any).suiteUI?.toast("Errore durante il salvataggio del progetto.", "error");
     } finally {
       setLoading(false);
     }
@@ -125,7 +152,7 @@ export default function ProjectStorage({ toolType, currentData, onLoadProject, p
       if (user.isDemo) {
         const localProjectsStr = localStorage.getItem(`demo_projects_${toolType}`);
         const localProjects = localProjectsStr ? JSON.parse(localProjectsStr) : [];
-        const updatedProjects = localProjects.map(p => {
+        const updatedProjects = localProjects.map((p: Project) => {
           if (p.id === currentProjectId) {
             return {
               ...p,
@@ -141,7 +168,7 @@ export default function ProjectStorage({ toolType, currentData, onLoadProject, p
         });
         localStorage.setItem(`demo_projects_${toolType}`, JSON.stringify(updatedProjects));
         setProjects(updatedProjects);
-        window.suiteUI.toast(`Progetto "${currentProjectName}" aggiornato in locale!`, "success");
+        (window as any).suiteUI?.toast(`Progetto "${currentProjectName}" aggiornato in locale!`, "success");
       } else {
         const docRef = doc(db, `users/${user.uid}/projects`, currentProjectId);
         await updateDoc(docRef, {
@@ -153,17 +180,17 @@ export default function ProjectStorage({ toolType, currentData, onLoadProject, p
           updatedAt: new Date().toISOString()
         });
         await fetchProjects(user);
-        window.suiteUI.toast(`Progetto "${currentProjectName}" aggiornato con successo!`, "success");
+        (window as any).suiteUI?.toast(`Progetto "${currentProjectName}" aggiornato con successo!`, "success");
       }
     } catch (err) {
       console.error("Errore durante l'aggiornamento:", err);
-      window.suiteUI.toast("Errore durante l'aggiornamento del progetto.", "error");
+      (window as any).suiteUI?.toast("Errore durante l'aggiornamento del progetto.", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLoad = (p) => {
+  const handleLoad = (p: Project) => {
     setCurrentProjectId(p.id);
     setCurrentProjectName(p.name);
     
@@ -181,8 +208,8 @@ export default function ProjectStorage({ toolType, currentData, onLoadProject, p
     setShowModal(false);
   };
 
-  const handleDelete = async (projectId, name) => {
-    const confirmed = await window.suiteUI.confirm(`Sei sicuro di voler eliminare definitivamente il progetto "${name}"?`, "Elimina progetto");
+  const handleDelete = async (projectId: string, name: string) => {
+    const confirmed = await (window as any).suiteUI?.confirm(`Sei sicuro di voler eliminare definitivamente il progetto "${name}"?`, "Elimina progetto");
     if (!user || !confirmed) return;
 
     setLoading(true);
@@ -190,7 +217,7 @@ export default function ProjectStorage({ toolType, currentData, onLoadProject, p
       if (user.isDemo) {
         const localProjectsStr = localStorage.getItem(`demo_projects_${toolType}`);
         const localProjects = localProjectsStr ? JSON.parse(localProjectsStr) : [];
-        const filtered = localProjects.filter(p => p.id !== projectId);
+        const filtered = localProjects.filter((p: Project) => p.id !== projectId);
         localStorage.setItem(`demo_projects_${toolType}`, JSON.stringify(filtered));
         
         if (currentProjectId === projectId) {
@@ -208,13 +235,13 @@ export default function ProjectStorage({ toolType, currentData, onLoadProject, p
       }
     } catch (err) {
       console.error("Errore durante l'eliminazione:", err);
-      window.suiteUI.toast("Impossibile eliminare il progetto.", "error");
+      (window as any).suiteUI?.toast("Impossibile eliminare il progetto.", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUseAsModel = (p) => {
+  const handleUseAsModel = (p: Project) => {
     // Carica i dati ma imposta projectId a null per forzare un nuovo salvataggio
     setCurrentProjectId(null);
     setCurrentProjectName('');
@@ -229,16 +256,7 @@ export default function ProjectStorage({ toolType, currentData, onLoadProject, p
     });
     
     setShowModal(false);
-    window.suiteUI.toast("Progetto caricato come modello! Puoi modificarlo e salvarlo con un nuovo nome.", "info");
-  };
-
-  const handleLogout = async () => {
-    const confirmed = await window.suiteUI.confirm("Desideri disconnetterti dalla Suite?", "Disconnessione");
-    if (confirmed) {
-      sessionStorage.removeItem('demo_user');
-      auth.signOut();
-      window.location.reload();
-    }
+    (window as any).suiteUI?.toast("Progetto caricato come modello! Puoi modificarlo e salvarlo con un nuovo nome.", "info");
   };
 
   return (

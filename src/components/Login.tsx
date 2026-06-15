@@ -10,17 +10,28 @@ import { getLocalRegistry } from '../firebase/registrySeed';
 import { Mail, Lock, AlertCircle, ArrowRight } from 'lucide-react';
 import logoImg from '../assets/Logo.png';
 
-export default function Login({ onLoginDemo }) {
-  const [isLoginMode, setIsLoginMode] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(false);
+interface LoginProps {
+  onLoginDemo?: (user: {
+    email: string;
+    uid: string;
+    name: string;
+    role: 'admin' | 'user';
+    isSocio: boolean;
+    isDemo: boolean;
+  }) => void;
+}
 
-  const handleSubmit = async (e) => {
+export default function Login({ onLoginDemo }: LoginProps) {
+  const [isLoginMode, setIsLoginMode] = useState<boolean>(true);
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
+  
+  const [error, setError] = useState<string>('');
+  const [message, setMessage] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setMessage('');
@@ -105,7 +116,7 @@ export default function Login({ onLoginDemo }) {
         setMessage("Registrazione completata con successo! Ora puoi accedere.");
         setIsLoginMode(true);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       if (isLoginMode) {
         if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
@@ -175,7 +186,7 @@ export default function Login({ onLoginDemo }) {
           {/* Logo Aziendale */}
           <div className="flex justify-center mb-8">
             <img src={logoImg} alt="Logo" className="h-20 object-contain drop-shadow-md" onError={(e) => {
-              e.target.style.display = 'none';
+              (e.target as HTMLImageElement).style.display = 'none';
             }} />
           </div>
           
