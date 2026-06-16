@@ -193,11 +193,15 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
 
         // Coordinate interne allargate per viewBox="0 0 1000 240"
         const chartHeight = 160; 
-        const chartWidth = 870;  
-        const paddingLeft = 85;  
+        const chartWidth = 820;  
+        const paddingLeft = 90;  
         const paddingTop = 35;   
+        const plotPaddingX = 75; // Distacco orizzontale dei punti dai bordi per evitare sovrapposizioni delle etichette con quota
 
-        const getX = (idx: number) => paddingLeft + (idx / (dataPoints.length - 1)) * chartWidth;
+        const getX = (idx: number) => {
+            if (dataPoints.length <= 1) return paddingLeft + plotPaddingX;
+            return paddingLeft + plotPaddingX + (idx / (dataPoints.length - 1)) * (chartWidth - 2 * plotPaddingX);
+        };
         const getY = (val: number) => paddingTop + chartHeight - ((val - yMin) / yRange) * chartHeight;
 
         // Costruzione Path (Stepped Line "Before")
@@ -297,13 +301,43 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
                     {dataPoints.map((p, idx) => {
                         const x = getX(idx);
                         const y = getY(p.val);
+
+                        const isStart = idx === dataPoints.length - 1;
+                        const isEnd = idx === 0; // Monte / arrivo è il primo nel disegno (sinistra)
+                        
+                        let labelText = p.label;
+                        let textColor = "#475569";
+                        let circleFill = "#2563eb";
+                        let circleRadius = "3.5";
+
+                        if (isEnd) {
+                            // Tronchiamo il nome se è troppo lungo prima di aggiungere la quota
+                            const shortLabel = p.label.length > 15 ? p.label.substring(0, 12) + '...' : p.label;
+                            labelText = `${shortLabel} (${format(p.val)})`;
+                            textColor = "#10b981"; // Emerald green per Monte (Arrivo)
+                            circleFill = "#10b981";
+                            circleRadius = "4.5";
+                        } else if (isStart) {
+                            // Tronchiamo il nome se è troppo lungo prima di aggiungere la quota
+                            const shortLabel = p.label.length > 15 ? p.label.substring(0, 12) + '...' : p.label;
+                            labelText = `${shortLabel} (${format(p.val)})`;
+                            textColor = "#ea580c"; // Orange-red per Valle (Partenza)
+                            circleFill = "#ea580c";
+                            circleRadius = "4.5";
+                        } else {
+                            // Per i punti intermedi, troncamento classico del nome
+                            if (labelText.length > 20) {
+                                labelText = labelText.substring(0, 17) + '...';
+                            }
+                        }
+
                         return (
                             <g key={idx}>
                                 <circle 
                                     cx={x} 
                                     cy={y} 
-                                    r="3.5" 
-                                    fill="#2563eb" 
+                                    r={circleRadius} 
+                                    fill={circleFill} 
                                     stroke="#ffffff" 
                                     strokeWidth="1.5"
                                 />
@@ -313,9 +347,9 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
                                     textAnchor="middle" 
                                     fontSize="11" 
                                     fontWeight="bold" 
-                                    fill="#475569"
+                                    fill={textColor}
                                 >
-                                    {p.label.length > 20 ? p.label.substring(0, 17) + '...' : p.label}
+                                    {labelText}
                                 </text>
                             </g>
                         );
