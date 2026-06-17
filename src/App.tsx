@@ -9,7 +9,9 @@ import { ToolProfiloIdraulico } from './tools/ToolProfiloIdraulico';
 import { ToolCarichiTermici } from './tools/ToolCarichiTermici';
 import { ToolDispersione } from './tools/ToolDispersione';
 import { ToolVerificaLinee } from './tools/ToolVerificaLinee';
-import { IconWaves, IconFlame, IconThermometer, IconArrowUp } from './components/Icons';
+import { ToolDimensionamentoGas } from './tools/ToolDimensionamentoGas';
+import { IconWaves, IconFlame, IconThermometer, IconArrowUp, IconWind } from './components/Icons';
+
 import logoImg from './assets/Logo.png';
 
 export interface ProjectData {
@@ -456,7 +458,7 @@ export default function App() {
                             Strumenti professionali di dimensionamento e calcolo per reti idrauliche e termotecniche aziendali.
                         </p>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
                             {/* 1. Profilo Idraulico */}
                             <button onClick={() => setAppMode('idraulico')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-brand-500 hover:bg-brand-50 transition-all text-left cursor-pointer">
                                 <div className="w-14 h-14 bg-blue-100 text-brand-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconWaves /></div>
@@ -484,6 +486,13 @@ export default function App() {
                                 <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Verifica Perdita Linee</h2>
                                 <p className="text-[11px] text-slate-500 text-center leading-relaxed">Calcolo delle perdite di carico delle condutture, con accessori e albero di distribuzione.</p>
                             </button>
+
+                            {/* 5. Dimensionamento Gas */}
+                            <button onClick={() => setAppMode('gas')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-purple-500 hover:bg-purple-50 transition-all text-left cursor-pointer">
+                                <div className="w-14 h-14 bg-purple-100 text-purple-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconWind /></div>
+                                <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Dimensionamento Gas</h2>
+                                <p className="text-[11px] text-slate-500 text-center leading-relaxed">Dimensionamento reti gas metano, azoto o ossigeno, con dislivelli geodetici ed accessori.</p>
+                            </button>
                         </div>
                     </div>
                 )}
@@ -492,6 +501,8 @@ export default function App() {
                 {appMode === 'termico' && <ToolCarichiTermici projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 {appMode === 'dispersione' && <ToolDispersione projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 {appMode === 'verifica_linee' && <ToolVerificaLinee projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
+                {appMode === 'gas' && <ToolDimensionamentoGas projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
+
             </div>
 
             {/* Footer con firma discreta, invisibile in stampa */}

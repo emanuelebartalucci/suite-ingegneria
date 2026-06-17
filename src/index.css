@@ -88,13 +88,23 @@ body {
     box-shadow: none !important;
   }
 
-  /* Rimuove l'evidenziazione e il bordo sinistro del tratto attivo in stampa */
+  /* Rimuove l'evidenziazione e il bordo sinistro del tratto attivo in stampa, ed evita tagli a metà */
   tr {
     background-color: transparent !important;
     background: transparent !important;
     border-left: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
   
+  /* Ripete l'intestazione delle tabelle su tutte le pagine */
+  thead {
+    display: table-header-group !important;
+  }
+  tfoot {
+    display: table-footer-group !important;
+  }
+
   .print-hide {
     display: none !important;
   }
@@ -106,9 +116,23 @@ body {
     padding: 0 !important;
   }
   
-  .print-page-break {
-    page-break-inside: avoid;
-    page-break-before: auto;
+  /* Evita tagli all'interno di grafici, immagini, schede o elementi significativi */
+  .break-inside-avoid,
+  .print-page-break,
+  svg,
+  canvas,
+  img,
+  figure,
+  .bg-white:not(body):not(#root):not(.min-h-screen),
+  .card {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Evita che i titoli rimangano isolati in fondo alla pagina (orphans) */
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
   }
 
   /* Rimuove scorrimenti e barre grigie in stampa */
@@ -123,6 +147,8 @@ body {
     table-layout: auto !important;
     width: 100% !important;
     min-width: 100% !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
   }
   
   /* Riduce margini e padding per far stare tutto in meno pagine */

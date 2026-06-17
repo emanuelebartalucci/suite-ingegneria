@@ -14,7 +14,7 @@ interface ProjectHeaderProps {
   setPData: (data: any) => void;
   title: string;
   setAppMode: (mode: string) => void;
-  iconColor?: 'brand' | 'orange' | 'red' | 'redbrand';
+  iconColor?: 'brand' | 'orange' | 'red' | 'redbrand' | 'purple';
 }
 
 export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ 
@@ -25,11 +25,33 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   iconColor = 'brand' 
 }) => {
     const [logoError, setLogoError] = useState<boolean>(false);
-    const iconBg = iconColor === 'brand' ? 'bg-brand-600' : (iconColor === 'orange' ? 'bg-orange-600' : (iconColor === 'redbrand' ? 'bg-redbrand-600' : 'bg-red-600'));
+    const iconBg = iconColor === 'brand' 
+      ? 'bg-brand-600' 
+      : (iconColor === 'orange' 
+          ? 'bg-orange-600' 
+          : (iconColor === 'redbrand' 
+              ? 'bg-redbrand-600' 
+              : (iconColor === 'purple' 
+                  ? 'bg-purple-600' 
+                  : 'bg-red-600')));
     
     // Configura le classi CSS dinamiche per evitare problemi di compilazione
-    const textBrandClass = iconColor === 'brand' ? 'text-brand-600' : (iconColor === 'orange' ? 'text-orange-600' : 'text-redbrand-600');
-    const focusBorderClass = iconColor === 'brand' ? 'focus:border-brand-500' : (iconColor === 'orange' ? 'focus:border-orange-500' : 'focus:border-redbrand-500');
+    const textBrandClass = iconColor === 'brand' 
+      ? 'text-brand-600' 
+      : (iconColor === 'orange' 
+          ? 'text-orange-600' 
+          : (iconColor === 'purple' 
+              ? 'text-purple-650' 
+              : 'text-redbrand-600'));
+              
+    const focusBorderClass = iconColor === 'brand' 
+      ? 'focus:border-brand-500' 
+      : (iconColor === 'orange' 
+          ? 'focus:border-orange-500' 
+          : (iconColor === 'purple' 
+              ? 'focus:border-purple-500' 
+              : 'focus:border-redbrand-500'));
+
 
     return (
         <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0 print:mb-2">

@@ -318,7 +318,8 @@ export default function ProjectStorage({
                 {toolType === 'termico' && 'Archivio Carichi termici'}
                 {toolType === 'dispersione' && 'Archivio Dispersioni'}
                 {toolType === 'verifica_linee' && 'Archivio Verifica linee'}
-                {!['idraulico', 'termico', 'dispersione', 'verifica_linee'].includes(toolType) && 'Archivio Calcoli'}
+                {toolType === 'gas' && 'Archivio Dimensionamento Gas'}
+                {!['idraulico', 'termico', 'dispersione', 'verifica_linee', 'gas'].includes(toolType) && 'Archivio Calcoli'}
               </h3>
               <button 
                 onClick={() => setShowModal(false)}

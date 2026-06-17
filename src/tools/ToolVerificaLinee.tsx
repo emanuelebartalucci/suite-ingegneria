@@ -31,7 +31,7 @@ interface TrattoLine {
   n_curve: number | string;
   n_tee: number | string;
   hierarchy: string;
-  parentId: string;
+  parentId: number | null;
   isoType: string;
   isoThick: number | string;
   isoLambda: number | string;
@@ -263,6 +263,70 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
     const [selectedTrattoId, setSelectedTrattoId] = useState<number | null>(null);
     const [pressureUnit, setPressureUnit] = useState<string>('mbar');
 
+    const computedBranchTags = useMemo(() => {
+        const tags: Record<number, string> = {};
+        
+        // Nodi radice (senza parentId)
+        const roots = tratti.filter(t => t.parentId === null);
+        
+        // Mappa dei figli
+        const childrenMap: Record<number, TrattoLine[]> = {};
+        tratti.forEach(t => {
+            if (t.parentId !== null) {
+                if (!childrenMap[t.parentId]) {
+                    childrenMap[t.parentId] = [];
+                }
+                childrenMap[t.parentId].push(t);
+            }
+        });
+
+        // Ordine stabile dei rami e figli
+        Object.keys(childrenMap).forEach(key => {
+            childrenMap[Number(key)].sort((a, b) => a.id - b.id);
+        });
+        roots.sort((a, b) => a.id - b.id);
+
+        let letterIndex = 0;
+        const getNextLetter = (): string => {
+            const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+            const index = letterIndex + 1;
+            letterIndex++;
+            
+            if (index < alphabet.length) {
+                return alphabet[index];
+            } else {
+                const firstChar = alphabet[Math.floor(index / alphabet.length) - 1];
+                const secondChar = alphabet[index % alphabet.length];
+                return firstChar + secondChar;
+            }
+        };
+
+        const dfs = (tratto: TrattoLine, parentEndLetter: string) => {
+            const startLetter = parentEndLetter;
+            const endLetter = getNextLetter();
+            tags[tratto.id] = startLetter + endLetter;
+
+            const children = childrenMap[tratto.id] || [];
+            children.forEach(child => {
+                dfs(child, endLetter);
+            });
+        };
+
+        roots.forEach(root => {
+            dfs(root, 'A');
+        });
+
+        // Gestione rami isolati o orfani
+        const visited = new Set<number>(Object.keys(tags).map(Number));
+        tratti.forEach(t => {
+            if (!visited.has(t.id)) {
+                dfs(t, 'A');
+            }
+        });
+
+        return tags;
+    }, [tratti]);
+
     // Calcolo densità e viscosità dinamica globali basati sulle percentuali di glicole in acqua
     const fluidProps = useMemo(() => {
         const T = Number(fluidTemp) || 55;
@@ -401,6 +465,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
 
             return {
                 ...t,
+                tag: computedBranchTags[t.id] || `L${t.id}`,
                 isoType,
                 isoThick,
                 isoLambda,
@@ -427,9 +492,10 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                 loss_tot_mH2O
             } as TrattoLine;
         });
-    }, [tratti, activeRho, activeVisc, fluidTemp]);
+    }, [tratti, activeRho, activeVisc, fluidTemp, computedBranchTags]);
 
     const addTratto = () => {
+        const defaultParent = tratti[tratti.length - 1]?.id || null;
         const newId = tratti.length > 0 ? Math.max(...tratti.map(t => t.id)) + 1 : 1;
         setTratti([
             ...tratti, 
@@ -447,7 +513,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                 n_curve: 0, 
                 n_tee: 0,
                 hierarchy: 'dorsale_principale',
-                parentId: '',
+                parentId: defaultParent,
                 isoType: 'pur',
                 isoThick: 50,
                 isoLambda: 0.025,
@@ -487,7 +553,13 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
     };
 
     const removeTratto = (id: number) => {
-        setTratti(tratti.filter(t => t.id !== id));
+        setTratti(tratti.filter(t => t.id !== id).map(t => {
+            if (t.parentId === id) {
+                const deletedTratto = tratti.find(x => x.id === id);
+                return { ...t, parentId: deletedTratto ? deletedTratto.parentId : null };
+            }
+            return t;
+        }));
         if (selectedTrattoId === id) setSelectedTrattoId(null);
     };
 
@@ -519,7 +591,48 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             setGlycolPrPercent(0);
         }
 
-        if (data.tratti) setTratti(data.tratti);
+        let loadedTratti = data.tratti || [];
+        if (loadedTratti.length > 0) {
+            const tagToIdMap = new Map<string, number>();
+            const originalIdToNewIdMap = new Map<any, number>();
+            
+            loadedTratti.forEach((t: any, index: number) => {
+                const oldId = t.id;
+                const newId = typeof oldId === 'number' ? oldId : (index + 1);
+                originalIdToNewIdMap.set(oldId, newId);
+                if (t.tag) {
+                    tagToIdMap.set(t.tag, newId);
+                }
+            });
+
+            loadedTratti = loadedTratti.map((t: any) => {
+                const newId = originalIdToNewIdMap.get(t.id)!;
+                let newParentId: number | null = null;
+
+                if (t.parentId !== undefined && t.parentId !== null && t.parentId !== '') {
+                    if (typeof t.parentId === 'number') {
+                        newParentId = originalIdToNewIdMap.get(t.parentId) ?? t.parentId;
+                    } else if (typeof t.parentId === 'string') {
+                        if (tagToIdMap.has(t.parentId)) {
+                            newParentId = tagToIdMap.get(t.parentId)!;
+                        } else {
+                            const numericParent = Number(t.parentId);
+                            if (!isNaN(numericParent) && numericParent > 0) {
+                                newParentId = originalIdToNewIdMap.get(numericParent) ?? numericParent;
+                            }
+                        }
+                    }
+                }
+                
+                return {
+                    ...t,
+                    id: newId,
+                    parentId: newParentId
+                };
+            });
+        }
+        setTratti(loadedTratti);
+        setSelectedTrattoId(null);
     };
 
     const getCloudSaveData = () => {
@@ -532,8 +645,63 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
         };
     };
 
-    // Cast per compatibilità del TopologicalTree che usa TrattoNode[]
-    const trattiNodesForTree = processedTratti as unknown as TrattoNode[];
+    const trattiNodesForTree = useMemo(() => {
+        const getTrattoDepth = (tratto: any): number => {
+            let depth = 0;
+            let current = tratto;
+            while (current.parentId !== null) {
+                const parent = tratti.find(t => t.id === current.parentId);
+                if (!parent || parent.id === current.id) break;
+                depth++;
+                current = parent;
+            }
+            return depth;
+        };
+
+        return processedTratti.map(t => {
+            let hierarchy = t.hierarchy;
+            if (!hierarchy) {
+                const depth = getTrattoDepth(t);
+                const hasChildren = tratti.some(x => x.parentId === t.id);
+                if (!hasChildren) {
+                    hierarchy = 'utenza';
+                } else if (depth === 1) {
+                    hierarchy = 'dorsale_secondaria';
+                } else if (depth >= 2) {
+                    hierarchy = 'dorsale_terziaria';
+                } else {
+                    hierarchy = 'dorsale_principale';
+                }
+            }
+
+            const tagText = `${computedBranchTags[t.id] || `L${t.id}`}${t.name ? ` ➔ [${t.name}]` : ''}`;
+
+            return {
+                tag: computedBranchTags[t.id] || `L${t.id}`,
+                parentId: t.parentId !== null ? (computedBranchTags[t.parentId] || null) : null,
+                hierarchy,
+                length: t.length,
+                name: tagText,
+                velocity: t.velocity,
+                loss_tot_mbar: t.loss_tot_mbar
+            } as TrattoNode;
+        });
+    }, [processedTratti, tratti, computedBranchTags]);
+
+    const getEligibleParents = (trattoId: number) => {
+        const descendants = new Set<number>([trattoId]);
+        let added = true;
+        while (added) {
+            added = false;
+            for (const t of tratti) {
+                if (t.parentId !== null && descendants.has(t.parentId) && !descendants.has(t.id)) {
+                    descendants.add(t.id);
+                    added = true;
+                }
+            }
+        }
+        return tratti.filter(t => t.id !== trattoId && !descendants.has(t.id));
+    };
 
     return (
         <div className="max-w-7xl mx-auto animate-fade-in text-slate-800">
@@ -788,6 +956,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                         processedTratti.map((t) => (
                             <div 
                                 key={t.id} 
+                                id={`tratto-card-${t.id}`} 
                                 onClick={() => setSelectedTrattoId(t.id)}
                                 className={`bg-white rounded-2xl shadow-sm border p-5 transition-all cursor-pointer ${selectedTrattoId === t.id ? 'border-brand-500 ring-2 ring-brand-500/10 shadow-md' : 'border-slate-200 hover:border-slate-350'}`}
                             >
@@ -808,12 +977,12 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                             <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-wider">1. Dati Generali & Geometria</h5>
                                             <div className="grid grid-cols-2 gap-2">
                                                 <div>
-                                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Tag Tratto</label>
+                                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Tag Tratto (Auto)</label>
                                                     <input 
                                                         type="text" 
-                                                        value={t.tag} 
-                                                        onChange={e => updateTratto(t.id, 'tag', e.target.value)} 
-                                                        className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-mono font-bold text-slate-800 focus:border-brand-500 focus:outline-none" 
+                                                        value={computedBranchTags[t.id] || ''} 
+                                                        readOnly 
+                                                        className="w-full text-xs p-1.5 border border-slate-200 rounded bg-slate-100 font-mono font-bold text-slate-500 focus:outline-none cursor-not-allowed" 
                                                     />
                                                 </div>
                                                 <div>
@@ -1011,13 +1180,13 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                 <div>
                                                     <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Diramato Da</label>
                                                     <select 
-                                                        value={t.parentId || ''} 
-                                                        onChange={e => updateTratto(t.id, 'parentId', e.target.value)} 
+                                                        value={t.parentId || ''}
+                                                        onChange={e => updateTratto(t.id, 'parentId', e.target.value ? Number(e.target.value) : null)} 
                                                         className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-semibold text-slate-800 focus:border-brand-500 focus:outline-none cursor-pointer"
                                                     >
                                                         <option value="">Nessuno (Radice)</option>
-                                                        {tratti.filter(x => x.id !== t.id).map(x => (
-                                                            <option key={x.id} value={x.tag}>[{x.tag}] {x.name}</option>
+                                                        {getEligibleParents(t.id).map(x => (
+                                                            <option key={x.id} value={x.id}>[{computedBranchTags[x.id] || `L${x.id}`}] {x.name}</option>
                                                         ))}
                                                     </select>
                                                 </div>
@@ -1051,7 +1220,23 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                             Rappresentazione Topologica della Rete (Albero di Distribuzione)
                         </h3>
                         <div className="flex-1 flex items-center justify-center min-h-[200px]">
-                            <TopologicalTree tratti={trattiNodesForTree} />
+                            <TopologicalTree 
+                                tratti={trattiNodesForTree} 
+                                activeTag={selectedTrattoId ? computedBranchTags[selectedTrattoId] : undefined}
+                                onSelectTag={(tag) => {
+                                    const foundId = Object.keys(computedBranchTags).find(key => computedBranchTags[Number(key)] === tag);
+                                    if (foundId) {
+                                        const numId = Number(foundId);
+                                        setSelectedTrattoId(numId);
+                                        setTimeout(() => {
+                                            const element = document.getElementById(`tratto-card-${numId}`);
+                                            if (element) {
+                                                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                            }
+                                        }, 100);
+                                    }
+                                }}
+                            />
                         </div>
                     </div>
                 </div>
@@ -1076,12 +1261,15 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             {/* Sezione Stampa: Albero e Dettagli Termici di Tutti i Tratti */}
             <div className="hidden print:block mt-6">
                 {/* Albero Topologico - Centrato e Visibile nella prima pagina */}
-                <div className="bg-white rounded-xl p-4 border border-slate-200 mb-6 break-inside-avoid print:max-w-xl print:mx-auto">
+                <div className="bg-white rounded-xl p-4 border border-slate-200 mb-6 break-inside-avoid print:w-full print:border-none print:p-0">
                     <h3 className="text-[10px] font-bold text-slate-800 mb-2 border-b-2 border-slate-800 pb-1 uppercase tracking-wide">
                         Topologia Rete (Albero di Distribuzione)
                     </h3>
-                    <div className="w-full flex items-center justify-center p-2 print:max-h-[170px] overflow-hidden">
-                        <TopologicalTree tratti={trattiNodesForTree} />
+                    <div className="w-full flex items-center justify-center p-0 print:h-auto print:overflow-visible">
+                        <TopologicalTree 
+                            tratti={trattiNodesForTree} 
+                            activeTag={selectedTrattoId ? computedBranchTags[selectedTrattoId] : undefined}
+                        />
                     </div>
                 </div>
 

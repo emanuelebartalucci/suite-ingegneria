@@ -13,6 +13,8 @@ export interface TrattoNode {
 
 interface TopologicalTreeProps {
   tratti: TrattoNode[];
+  activeTag?: string;
+  onSelectTag?: (tag: string) => void;
 }
 
 interface MapNode extends TrattoNode {
@@ -42,7 +44,7 @@ interface VisualLabel {
   dir: 'H' | 'V';
 }
 
-export default function TopologicalTree({ tratti }: TopologicalTreeProps) {
+export default function TopologicalTree({ tratti, activeTag, onSelectTag }: TopologicalTreeProps) {
   const svgData = useMemo(() => {
     if (!tratti || tratti.length === 0) return null;
 
@@ -80,52 +82,46 @@ export default function TopologicalTree({ tratti }: TopologicalTreeProps) {
       parentEndX: number, 
       parentEndY: number, 
       parentDir: 'H' | 'V', 
-      childIndex: number
+      childIndex: number,
+      intendedDir: 'H' | 'V'
     ): void => {
       const visualLen = getVisualLength(node.length);
       const startX = parentEndX;
       const startY = parentEndY;
 
-      // Determiniamo la direzione del tratto corrente:
-      // - principale -> H (Orizzontale)
-      // - secondaria -> V (Verticale)
-      // - terziaria -> H (Orizzontale)
-      // - utenza -> V (Verticale)
-      let dir: 'H' | 'V' = 'H';
-      if (node.hierarchy === 'dorsale_principale') {
-        dir = 'H';
-      } else if (node.hierarchy === 'dorsale_secondaria') {
-        dir = 'V';
-      } else if (node.hierarchy === 'dorsale_terziaria') {
-        dir = 'H';
-      } else {
-        dir = 'V'; // utenza o altri rami terminali
+      let dir = intendedDir;
+      if (childIndex > 0) {
+        dir = parentDir === 'H' ? 'V' : 'H';
       }
 
       let endX = startX;
       let endY = startY;
 
       if (dir === 'H') {
-        // Se il genitore era verticale, i figli orizzontali si sdoppiano a sinistra e destra
         if (parentDir === 'V') {
-          if (childIndex % 2 === 0) {
+          // Abbiamo svoltato da V a H: alterniamo sinistra e destra per le deviazioni
+          if (childIndex % 2 === 1) {
             endX = startX - visualLen; // Sinistra
           } else {
             endX = startX + visualLen; // Destra
           }
         } else {
-          endX = startX + visualLen; // Destra default
+          // Continua dritto (mantiene la direzione del genitore)
+          const sgnX = parentEndX - parentStartX < 0 ? -1 : 1;
+          endX = startX + sgnX * visualLen;
         }
       } else {
-        // Se il genitore era orizzontale, i figli verticali si alternano in basso e in alto (default in basso)
         if (parentDir === 'H') {
-          if (childIndex % 2 === 0) {
+          // Abbiamo svoltato da H a V: alterniamo basso e alto per le deviazioni
+          if (childIndex % 2 === 1) {
             endY = startY + visualLen; // Basso
           } else {
             endY = startY - visualLen; // Alto
           }
         } else {
-          endY = startY + visualLen; // Basso default
+          // Continua dritto (mantiene la direzione del genitore)
+          const sgnY = parentEndY - parentStartY < 0 ? -1 : 1;
+          endY = startY + sgnY * visualLen;
         }
       }
 
@@ -188,15 +184,25 @@ export default function TopologicalTree({ tratti }: TopologicalTreeProps) {
 
       sortedChildren.forEach(child => {
         let childDir: 'H' | 'V' = 'H';
-        if (child.hierarchy === 'dorsale_secondaria' || child.hierarchy === 'utenza') {
-          childDir = 'V';
+        if (dir === 'H') {
+          if (child.hierarchy === 'dorsale_secondaria' || child.hierarchy === 'dorsale_terziaria' || child.hierarchy === 'utenza') {
+            childDir = 'V';
+          } else {
+            childDir = 'H';
+          }
+        } else {
+          if (child.hierarchy === 'dorsale_terziaria' || child.hierarchy === 'utenza') {
+            childDir = 'H';
+          } else {
+            childDir = 'V';
+          }
         }
 
         if (childDir === 'H') {
-          layoutNode(child, startX, startY, endX, endY, dir, hCount);
+          layoutNode(child, startX, startY, endX, endY, dir, hCount, 'H');
           hCount++;
         } else {
-          layoutNode(child, startX, startY, endX, endY, dir, vCount);
+          layoutNode(child, startX, startY, endX, endY, dir, vCount, 'V');
           vCount++;
         }
       });
@@ -204,7 +210,7 @@ export default function TopologicalTree({ tratti }: TopologicalTreeProps) {
 
     // Inizializziamo le radici. Se ci sono più radici, le separiamo in verticale.
     roots.forEach((root, idx) => {
-      layoutNode(root, 40, 80 + idx * 200, 40, 80 + idx * 200, 'H', 0);
+      layoutNode(root, 40, 80 + idx * 200, 40, 80 + idx * 200, 'H', 0, 'H');
     });
 
     // 5. TROVIAMO I LIMITI ED APPLICHIAMO LO SHIFT PER EVITARE COORDINATE NEGATIVE
@@ -255,12 +261,12 @@ export default function TopologicalTree({ tratti }: TopologicalTreeProps) {
 
   return (
     <div className="w-full overflow-x-auto bg-slate-50 border border-slate-200 rounded-xl p-4 print:bg-white print:border-none print:p-0">
-      <div style={{ width: '100%', minWidth: `${totalWidth}px` }} className="mx-auto print:!min-w-0">
+      <div style={{ width: '100%', minWidth: `${totalWidth}px` }} className="mx-auto print:!min-w-0 print:!w-full">
         <svg 
           width="100%" 
           height={totalHeight} 
           viewBox={`0 0 ${totalWidth} ${totalHeight}`} 
-          className="select-none font-sans print:h-auto print:max-h-[165px] print:w-auto print:mx-auto"
+          className="select-none font-sans print:h-auto print:w-full print:mx-auto"
         >
           {/* Definiamo i marker per le frecce terminali dei rami sottili */}
           <defs>
@@ -270,44 +276,51 @@ export default function TopologicalTree({ tratti }: TopologicalTreeProps) {
           </defs>
 
           {/* Disegnamo i tratti reali di fluido ortogonali */}
-          {lines.map((l) => (
-            <g key={l.tag} className="group cursor-pointer">
-              <title>
-                {`${l.name}\nLunghezza: ${l.length} m\nVelocità: ${l.velocity?.toFixed(2)} m/s\nPerdita: ${l.loss?.toFixed(1)} mbar`}
-              </title>
-              {/* Linea di hover allargata per feedback utente */}
-              <line 
-                x1={l.x1}
-                y1={l.y1}
-                x2={l.x2}
-                y2={l.y2}
-                stroke="rgba(59, 130, 246, 0.08)"
-                strokeWidth={l.thickness + 6}
-                className="opacity-0 group-hover:opacity-100 transition-opacity"
-              />
-              {/* Linea reale del tratto */}
-              <line 
-                x1={l.x1}
-                y1={l.y1}
-                x2={l.x2}
-                y2={l.y2}
-                stroke={l.color}
-                strokeWidth={l.thickness}
-                strokeLinecap="round"
-                markerEnd={l.thickness <= 2 ? "url(#arrow)" : undefined}
-                className="transition-colors group-hover:stroke-orange-500"
-              />
-              {/* Nodo di giunzione all'inizio di ciascun tratto */}
-              <circle 
-                cx={l.x1} 
-                cy={l.y1} 
-                r={l.thickness > 3 ? "4.5" : "3"} 
-                fill="#cbd5e1" 
-                stroke="#475569" 
-                strokeWidth="1.5"
-              />
-            </g>
-          ))}
+          {lines.map((l) => {
+            const isActive = activeTag === l.tag;
+            return (
+              <g 
+                key={l.tag} 
+                className="group cursor-pointer"
+                onClick={() => onSelectTag?.(l.tag)}
+              >
+                <title>
+                  {`${l.name}\nLunghezza: ${l.length} m\nVelocità: ${l.velocity?.toFixed(2)} m/s\nPerdita: ${l.loss?.toFixed(1)} mbar`}
+                </title>
+                {/* Linea di hover/attiva allargata per feedback utente */}
+                <line 
+                  x1={l.x1}
+                  y1={l.y1}
+                  x2={l.x2}
+                  y2={l.y2}
+                  stroke={isActive ? "rgba(249, 115, 22, 0.25)" : "rgba(59, 130, 246, 0.08)"}
+                  strokeWidth={l.thickness + 8}
+                  className={isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 transition-opacity"}
+                />
+                {/* Linea reale del tratto */}
+                <line 
+                  x1={l.x1}
+                  y1={l.y1}
+                  x2={l.x2}
+                  y2={l.y2}
+                  stroke={isActive ? "#f97316" : l.color}
+                  strokeWidth={isActive ? l.thickness + 1 : l.thickness}
+                  strokeLinecap="round"
+                  markerEnd={l.thickness <= 2 ? "url(#arrow)" : undefined}
+                  className="transition-colors group-hover:stroke-orange-500"
+                />
+                {/* Nodo di giunzione all'inizio di ciascun tratto */}
+                <circle 
+                  cx={l.x1} 
+                  cy={l.y1} 
+                  r={isActive ? "5.5" : (l.thickness > 3 ? "4.5" : "3")} 
+                  fill={isActive ? "#ffedd5" : "#cbd5e1"} 
+                  stroke={isActive ? "#f97316" : "#475569"} 
+                  strokeWidth="1.5"
+                />
+              </g>
+            );
+          })}
 
           {/* Disegniamo i testi informativi sopra o a lato delle linee */}
           {labels.map((lbl, index) => (
@@ -328,10 +341,10 @@ export default function TopologicalTree({ tratti }: TopologicalTreeProps) {
         </svg>
       </div>
       <div className="flex gap-4 justify-center mt-3 text-[10px] text-slate-400 print:hidden">
-        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1.5 bg-[#1d4ed8]"></span> Dorsale Principale (H)</div>
-        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-[#2563eb]"></span> Dorsale Secondaria (V)</div>
-        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-[#10b981]"></span> Dorsale Terziaria (H)</div>
-        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-px bg-[#64748b]"></span> Utenza / Terminale (V)</div>
+        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1.5 bg-[#1d4ed8]"></span> Dorsale Principale</div>
+        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-[#2563eb]"></span> Dorsale Secondaria</div>
+        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-[#10b981]"></span> Dorsale Terziaria</div>
+        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-px bg-[#64748b]"></span> Tratto Terminale / Utenza</div>
       </div>
     </div>
   );
