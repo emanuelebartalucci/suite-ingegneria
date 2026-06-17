@@ -98,12 +98,12 @@ export default function App() {
     const [confirmModal, setConfirmModal] = useState<ConfirmModalState>({ visible: false, message: '', title: '', resolve: null });
     const [alertModal, setAlertModal] = useState<AlertModalState>({ visible: false, message: '', title: '', resolve: null });
 
-    // Seed automatico dell'anagrafica al mount
+    // Seed automatico dell'anagrafica dopo il login (evita errore di autorizzazione a sessione non attiva)
     useEffect(() => {
-        if (!isFirebaseMock) {
+        if (!isFirebaseMock && user) {
             seedRegistryIfEmpty(db);
         }
-    }, []);
+    }, [user]);
 
     // Registrazione delle funzioni globali di notifica e popup
     useEffect(() => {
