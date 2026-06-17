@@ -176,7 +176,7 @@ export default function Login({ onLoginDemo }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50 relative overflow-hidden font-sans">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-55 relative overflow-hidden">
       {/* Elementi decorativi di sfondo */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/20 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-400/20 rounded-full blur-3xl pointer-events-none"></div>
@@ -331,7 +331,7 @@ export default function Login({ onLoginDemo }: LoginProps) {
       </div>
 
       <footer className="text-center py-6 text-xs text-gray-400 opacity-40 select-none relative z-10">
-        © {new Date().getFullYear()} - Tutti i diritti riservati
+        Sviluppato da Emanuele Bartalucci
       </footer>
     </div>
   );
