@@ -44,6 +44,7 @@ interface TrattoLine {
   d_ext?: number;
   t_surf?: number;
   t_pipe_ext?: number;
+  t_pipe_int?: number;
   area_m2?: number;
   velocity?: number;
   Re?: number;
@@ -106,6 +107,24 @@ interface SVGGradienteSovrappostoProps {
   fluidTemp: number | string;
 }
 
+interface YLabelItem {
+  id: string;
+  val: number;
+  label: string;
+  color: string;
+  isBold: boolean;
+  targetY: number;
+  adjustedY?: number;
+}
+
+interface XLabelItem {
+  id: string;
+  label: string;
+  color: string;
+  targetX: number;
+  adjustedX?: number;
+}
+
 function SVGGradienteSovrapposto({ tratto, fluidTemp }: SVGGradienteSovrappostoProps) {
   if (!tratto || !tratto.d_int) return null;
 
@@ -116,17 +135,21 @@ function SVGGradienteSovrapposto({ tratto, fluidTemp }: SVGGradienteSovrappostoP
 
   const tf = Number(fluidTemp) || 55;
   const ta = tratto.tAmb !== undefined ? Number(tratto.tAmb) : -5;
+  const t_int_tubo = tratto.t_pipe_int !== undefined ? tratto.t_pipe_int : tf;
   const t_ext_tubo = tratto.t_pipe_ext !== undefined ? tratto.t_pipe_ext : tf;
   const t_s = tratto.t_surf !== undefined ? tratto.t_surf : tf;
 
+  // Raggio massimo da mostrare sull'asse X (estendiamo oltre l'isolamento per mostrare l'aria ambiente)
+  const R_max = riso * 1.35;
+
   // Coordinate e dimensioni dell'asse cartesiano
   const originX = 45;
-  const originY = 165;
+  const originY = 145;
   const graphWidth = 220;
-  const graphHeight = 120;
+  const graphHeight = 110;
 
   const getX = (r: number) => {
-    return originX + (r / riso) * graphWidth;
+    return originX + (r / R_max) * graphWidth;
   };
 
   const tMin = Math.min(tf, ta) - 5;
@@ -137,9 +160,9 @@ function SVGGradienteSovrapposto({ tratto, fluidTemp }: SVGGradienteSovrappostoP
   };
 
   // Raggi convertiti in pixel per il disegno dei quarti di cerchio concentrici
-  const R_i_px = (ri / riso) * graphWidth;
-  const R_e_px = (re / riso) * graphWidth;
-  const R_iso_px = graphWidth;
+  const R_i_px = (ri / R_max) * graphWidth;
+  const R_e_px = (re / R_max) * graphWidth;
+  const R_iso_px = (riso / R_max) * graphWidth;
 
   const isNoneIso = tratto.isoType === 'none';
 
@@ -149,109 +172,286 @@ function SVGGradienteSovrapposto({ tratto, fluidTemp }: SVGGradienteSovrappostoP
   if (tratto.isoType === 'rockwool') isoColor = "rgba(253, 224, 71, 0.35)"; // Lana di roccia
   if (tratto.isoType === 'rubber') isoColor = "rgba(51, 65, 85, 0.25)"; // Gomma nera
 
-  // Calcolo dei punti logaritmici per la curva della temperatura nell'isolante
-  const numPoints = 15;
-  let isoPathPoints = [];
-  for (let i = 0; i <= numPoints; i++) {
-    const fraction = i / numPoints;
+  // --- RISOLUTORE SOVRAPPOSIZIONI TESTI ---
+  const adjustYLabels = (y1: number, y2: number, y3: number, minSpace = 10): [number, number, number] => {
+    let ay1 = y1;
+    let ay2 = y2;
+    let ay3 = y3;
+    if (ay2 - ay1 < minSpace) {
+      const overlap = minSpace - (ay2 - ay1);
+      ay1 -= overlap / 2;
+      ay2 += overlap / 2;
+    }
+    if (ay3 - ay2 < minSpace) {
+      const overlap = minSpace - (ay3 - ay2);
+      ay2 -= overlap / 2;
+      ay3 += overlap / 2;
+      if (ay2 - ay1 < minSpace) {
+        ay1 = ay2 - minSpace;
+      }
+    }
+    return [ay1, ay2, ay3];
+  };
+
+  const adjustXLabels = (x1: number, x2: number, x3: number | null, minSpace = 28): [number, number, number | null] => {
+    let ax1 = x1;
+    let ax2 = x2;
+    if (x3 === null) {
+      if (ax2 - ax1 < minSpace) {
+        const overlap = minSpace - (ax2 - ax1);
+        ax1 -= overlap / 2;
+        ax2 += overlap / 2;
+      }
+      return [ax1, ax2, null];
+    } else {
+      let ax3 = x3;
+      if (ax2 - ax1 < minSpace) {
+        const overlap = minSpace - (ax2 - ax1);
+        ax1 -= overlap / 2;
+        ax2 += overlap / 2;
+      }
+      if (ax3 - ax2 < minSpace) {
+        const overlap = minSpace - (ax3 - ax2);
+        ax2 -= overlap / 2;
+        ax3 += overlap / 2;
+        if (ax2 - ax1 < minSpace) {
+          ax1 = ax2 - minSpace;
+        }
+      }
+      return [ax1, ax2, ax3];
+    }
+  };
+
+  // Configurazione etichette asse Y
+  const yLabelsData: YLabelItem[] = [
+    { id: 'tf', val: tf, label: `${tf.toFixed(0)}°C`, color: '#2563eb', isBold: true, targetY: getY(tf) },
+    { id: 'ts', val: t_s, label: `${t_s.toFixed(1)}°C`, color: '#b91c1c', isBold: true, targetY: getY(t_s) },
+    { id: 'ta', val: ta, label: `${ta.toFixed(0)}°C`, color: '#475569', isBold: false, targetY: getY(ta) }
+  ];
+  yLabelsData.sort((a, b) => a.targetY - b.targetY);
+  const [yA_adj, yB_adj, yC_adj] = adjustYLabels(yLabelsData[0].targetY, yLabelsData[1].targetY, yLabelsData[2].targetY, 10);
+  yLabelsData[0].adjustedY = yA_adj;
+  yLabelsData[1].adjustedY = yB_adj;
+  yLabelsData[2].adjustedY = yC_adj;
+
+  // Configurazione etichette asse X
+  const showIsoX = !isNoneIso && s_iso > 0;
+  const xLabelsData: XLabelItem[] = [
+    { id: 'ri', label: 'Ø_int', color: '#2563eb', targetX: getX(ri) },
+    { id: 're', label: 'Ø_est', color: '#475569', targetX: getX(re) }
+  ];
+  if (showIsoX) {
+    xLabelsData.push({ id: 'riso', label: 'Ø_iso', color: '#d97706', targetX: getX(riso) });
+  }
+  const [xA_adj, xB_adj, xC_adj] = adjustXLabels(xLabelsData[0].targetX, xLabelsData[1].targetX, showIsoX ? xLabelsData[2].targetX : null, 28);
+  xLabelsData[0].adjustedX = xA_adj;
+  xLabelsData[1].adjustedX = xB_adj;
+  if (showIsoX && xC_adj !== null) {
+    xLabelsData[2].adjustedX = xC_adj;
+  }
+
+  // --- PUNTI DELLA CURVA DI TEMPERATURA ---
+  
+  // 1. ZONA FLUIDO (costante a tf, ma con caduta convettiva vicino alla parete)
+  const fluidPoints: string[] = [];
+  const numFluidPoints = 10;
+  const r_start_conv = ri * 0.75;
+  for (let i = 0; i <= numFluidPoints; i++) {
+    const r = (r_start_conv * i) / numFluidPoints;
+    fluidPoints.push(`${getX(r)},${getY(tf)}`);
+  }
+  const numConvPoints = 5;
+  for (let i = 1; i <= numConvPoints; i++) {
+    const fraction = i / numConvPoints;
+    const r = r_start_conv + fraction * (ri - r_start_conv);
+    const t = fraction;
+    const temp = tf + (t_int_tubo - tf) * (3 * t*t - 2 * t*t*t);
+    fluidPoints.push(`${getX(r)},${getY(temp)}`);
+  }
+
+  // 2. ZONA PARETE TUBO (lineare tra ri e re)
+  const wallPath = `M ${getX(ri)},${getY(t_int_tubo)} L ${getX(re)},${getY(t_ext_tubo)}`;
+
+  // 3. ZONA ISOLANTE (caduta logaritmica pronunciata tra re e riso)
+  const isoPoints: string[] = [];
+  const numIsoPoints = 15;
+  for (let i = 0; i <= numIsoPoints; i++) {
+    const fraction = i / numIsoPoints;
     const r = re + fraction * s_iso;
     let temp = t_ext_tubo;
     if (s_iso > 0 && Math.abs(t_ext_tubo - t_s) > 0.01) {
       temp = t_ext_tubo - (t_ext_tubo - t_s) * (Math.log(r / re) / Math.log(riso / re));
     }
-    isoPathPoints.push(`${getX(r)},${getY(temp)}`);
+    isoPoints.push(`${getX(r)},${getY(temp)}`);
   }
-  const isoPath = `M ${isoPathPoints.join(' L ')}`;
+  const isoPath = `M ${isoPoints.join(' L ')}`;
+
+  // 4. ZONA ARIA ESTERNA (convezione esterna, decadimento esponenziale verso tAmb)
+  const airPoints: string[] = [];
+  const numAirPoints = 15;
+  const rStartAir = riso;
+  const rEndAir = R_max;
+  for (let i = 0; i <= numAirPoints; i++) {
+    const fraction = i / numAirPoints;
+    const r = rStartAir + fraction * (rEndAir - rStartAir);
+    const temp = ta + (t_s - ta) * Math.exp(-3 * fraction);
+    airPoints.push(`${getX(r)},${getY(temp)}`);
+  }
+  const airPath = `M ${airPoints.join(' L ')}`;
 
   return (
-    <svg width="100%" height="200" viewBox="0 0 300 200" className="mx-auto select-none font-sans bg-slate-900/5 border border-slate-200 rounded-xl p-2 print:h-auto print:bg-transparent print:border-none print:p-0">
-      {/* 1. GEOMETRIA DEL TUBO IN SOTTOFONDO (Quarti di cerchio concentrici con origine in basso a sinistra) */}
-      <g className="opacity-90">
-        {/* Isolante */}
-        {!isNoneIso && s_iso > 0 && (
+    <div className="space-y-3 print:space-y-2">
+      <svg width="100%" height="180" viewBox="0 0 300 180" className="mx-auto select-none font-sans bg-slate-900/5 border border-slate-200 rounded-xl p-2 print:h-auto print:bg-transparent print:border-none print:p-0">
+        {/* 1. GEOMETRIA DEL TUBO IN SOTTOFONDO */}
+        <g className="opacity-90">
+          {!isNoneIso && s_iso > 0 && (
+            <path 
+              d={`M ${originX} ${originY} L ${originX + R_iso_px} ${originY} A ${R_iso_px} ${R_iso_px} 0 0 0 ${originX} ${originY - R_iso_px} Z`} 
+              fill={isoColor} 
+              stroke="#cbd5e1" 
+              strokeWidth="0.5"
+            />
+          )}
+          
           <path 
-            d={`M ${originX} ${originY} L ${originX + R_iso_px} ${originY} A ${R_iso_px} ${R_iso_px} 0 0 0 ${originX} ${originY - R_iso_px} Z`} 
-            fill={isoColor} 
-            stroke="#cbd5e1" 
+            d={`M ${originX} ${originY} L ${originX + R_e_px} ${originY} A ${R_e_px} ${R_e_px} 0 0 0 ${originX} ${originY - R_e_px} Z`} 
+            fill={tratto.material === 'Acciaio' ? 'rgba(148, 163, 184, 0.4)' : 'rgba(71, 85, 105, 0.4)'} 
+            stroke="#94a3b8" 
             strokeWidth="0.5"
           />
+          
+          <path 
+            d={`M ${originX} ${originY} L ${originX + R_i_px} ${originY} A ${R_i_px} ${R_i_px} 0 0 0 ${originX} ${originY - R_i_px} Z`} 
+            fill="rgba(191, 219, 254, 0.65)" 
+            stroke="#60a5fa" 
+            strokeWidth="0.5"
+          />
+        </g>
+
+        {/* 2. GRIGLIA E ASSI CARTESIANI */}
+        <line x1={originX} y1={originY} x2={originX + graphWidth} y2={originY} stroke="#94a3b8" strokeWidth="1.5" />
+        <line x1={originX} y1={originY - graphHeight} x2={originX} y2={originY} stroke="#94a3b8" strokeWidth="1.5" />
+
+        {/* Ticks e etichette dell'asse Y */}
+        {yLabelsData.map((item) => {
+          const needsLeaderLine = Math.abs(item.targetY - (item.adjustedY ?? item.targetY)) > 1.5;
+          return (
+            <g key={item.id}>
+              <line x1={originX - 4} y1={item.targetY} x2={originX} y2={item.targetY} stroke="#475569" strokeWidth="1" />
+              {needsLeaderLine && (
+                <polyline 
+                  points={`${originX - 4},${item.targetY} ${originX - 8},${item.adjustedY}`} 
+                  fill="none" 
+                  stroke={item.color} 
+                  strokeWidth="0.5" 
+                  strokeDasharray="1,1"
+                />
+              )}
+              <text 
+                x={needsLeaderLine ? originX - 10 : originX - 8} 
+                y={(item.adjustedY ?? item.targetY) + 3} 
+                textAnchor="end" 
+                fill={item.color} 
+                fontSize="8" 
+                fontWeight={item.isBold ? 'bold' : 'normal'}
+              >
+                {item.label}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Ticks e etichette dell'asse X */}
+        {xLabelsData.map((item) => {
+          const needsLeaderLine = Math.abs(item.targetX - (item.adjustedX ?? item.targetX)) > 1.5;
+          return (
+            <g key={item.id}>
+              <line 
+                x1={item.targetX} 
+                y1={originY - graphHeight} 
+                x2={item.targetX} 
+                y2={originY} 
+                stroke={item.color} 
+                strokeWidth="0.75" 
+                strokeDasharray="1.5,1.5" 
+              />
+              {needsLeaderLine ? (
+                <polyline 
+                  points={`${item.targetX},${originY} ${item.targetX},${originY + 4} ${item.adjustedX},${originY + 8}`}
+                  fill="none"
+                  stroke={item.color}
+                  strokeWidth="0.5"
+                  strokeDasharray="1,1"
+                />
+              ) : (
+                <line 
+                  x1={item.targetX} 
+                  y1={originY} 
+                  x2={item.targetX} 
+                  y2={originY + 4} 
+                  stroke={item.color} 
+                  strokeWidth="0.5" 
+                />
+              )}
+              <text 
+                x={item.adjustedX ?? item.targetX} 
+                y={originY + (needsLeaderLine ? 16 : 12)} 
+                textAnchor="middle" 
+                fill={item.color} 
+                fontSize="7" 
+                fontWeight="semibold"
+              >
+                {item.label}
+              </text>
+            </g>
+          );
+        })}
+
+        <text x={originX + graphWidth} y={originY + 10} textAnchor="end" fill="#64748b" fontSize="7">Raggio r</text>
+
+        {/* 3. TRACCIATO DELLA CURVA */}
+        <path d={`M ${fluidPoints.join(' L ')}`} fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" />
+        <path d={wallPath} fill="none" stroke="#475569" strokeWidth="2.5" />
+        {!isNoneIso && s_iso > 0 ? (
+          <path d={isoPath} fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round" />
+        ) : null}
+        <path d={airPath} fill="none" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="2,2" strokeLinecap="round" />
+
+        <circle cx={getX(ri)} cy={getY(t_int_tubo)} r="2" fill="#2563eb" />
+        <circle cx={getX(re)} cy={getY(t_ext_tubo)} r="2" fill={(!isNoneIso && s_iso > 0) ? "#475569" : "#b91c1c"} />
+        {!isNoneIso && s_iso > 0 && (
+          <circle cx={getX(riso)} cy={getY(t_s)} r="2.5" fill="#b91c1c" />
         )}
         
-        {/* Parete metallica del tubo */}
-        <path 
-          d={`M ${originX} ${originY} L ${originX + R_e_px} ${originY} A ${R_e_px} ${R_e_px} 0 0 0 ${originX} ${originY - R_e_px} Z`} 
-          fill={tratto.material === 'Acciaio' ? 'rgba(148, 163, 184, 0.4)' : 'rgba(71, 85, 105, 0.4)'} 
-          stroke="#94a3b8" 
-          strokeWidth="0.5"
-        />
-        
-        {/* Fluido interno */}
-        <path 
-          d={`M ${originX} ${originY} L ${originX + R_i_px} ${originY} A ${R_i_px} ${R_i_px} 0 0 0 ${originX} ${originY - R_i_px} Z`} 
-          fill="rgba(191, 219, 254, 0.65)" 
-          stroke="#60a5fa" 
-          strokeWidth="0.5"
-        />
-      </g>
+        <text x={getX((riso + R_max) / 2)} y={getY(ta) - 4} textAnchor="middle" fill="#94a3b8" fontSize="7" className="italic">Aria ambiente</text>
+      </svg>
 
-      {/* 2. ASSI CARTESIANI E GRIGLIA */}
-      <line x1={originX} y1={originY} x2={originX + graphWidth + 15} y2={originY} stroke="#475569" strokeWidth="1.5" />
-      <line x1={originX} y1={originY - graphHeight - 10} x2={originX} y2={originY} stroke="#475569" strokeWidth="1.5" />
-
-      {/* Tacche ed etichette Y (Temperatura) */}
-      <line x1={originX - 4} y1={getY(tf)} x2={originX} y2={getY(tf)} stroke="#475569" strokeWidth="1.5" />
-      <text x={originX - 7} y={getY(tf) + 3} textAnchor="end" fill="#0f172a" fontSize="8" fontWeight="bold">{tf.toFixed(0)}°C</text>
-
-      <line x1={originX - 4} y1={getY(t_s)} x2={originX} y2={getY(t_s)} stroke="#475569" strokeWidth="1.5" />
-      <text x={originX - 7} y={getY(t_s) + 3} textAnchor="end" fill="#b91c1c" fontSize="8" fontWeight="bold">{t_s.toFixed(1)}°C</text>
-
-      <line x1={originX - 4} y1={getY(ta)} x2={originX} y2={getY(ta)} stroke="#475569" strokeWidth="1.5" />
-      <text x={originX - 7} y={getY(ta) + 3} textAnchor="end" fill="#475569" fontSize="8">{ta.toFixed(0)}°C</text>
-
-      {/* Tacche ed etichette X (Raggio in mm) */}
-      <line x1={getX(ri)} y1={originY} x2={getX(ri)} y2={originY + 4} stroke="#3b82f6" strokeWidth="1.5" />
-      <text x={getX(ri)} y={originY + 11} textAnchor="middle" fill="#2563eb" fontSize="7" fontWeight="bold">{ri.toFixed(0)}</text>
-
-      <line x1={getX(re)} y1={originY} x2={getX(re)} y2={originY + 4} stroke="#475569" strokeWidth="1.5" />
-      <text x={getX(re)} y={originY + 11} textAnchor="middle" fill="#475569" fontSize="7" fontWeight="bold">{re.toFixed(0)}</text>
-
-      {!isNoneIso && s_iso > 0 && (
-        <>
-          <line x1={getX(riso)} y1={originY} x2={getX(riso)} y2={originY + 4} stroke="#d97706" strokeWidth="1.5" />
-          <text x={getX(riso)} y={originY + 11} textAnchor="middle" fill="#d97706" fontSize="7" fontWeight="bold">{riso.toFixed(0)}</text>
-        </>
-      )}
-
-      {/* Etichette assi */}
-      <text x={originX + graphWidth + 12} y={originY - 3} textAnchor="end" fill="#475569" fontSize="7.5" fontWeight="bold">r (mm)</text>
-      <text x={originX + 4} y={originY - graphHeight - 4} textAnchor="start" fill="#475569" fontSize="7.5" fontWeight="bold">T (°C)</text>
-
-      {/* 3. TRACCIAMENTO GRADIENTE TERMICO (Sopra la geometria) */}
-      {/* Fluido (Piatto) */}
-      <line x1={getX(0)} y1={getY(tf)} x2={getX(ri)} y2={getY(tf)} stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" />
-
-      {/* Tubo (Lineare) */}
-      <line x1={getX(ri)} y1={getY(tf)} x2={getX(re)} y2={getY(t_ext_tubo)} stroke="#334155" strokeWidth="2.5" />
-
-      {/* Isolante (Logaritmica) */}
-      {!isNoneIso && s_iso > 0 ? (
-        <path d={isoPath} fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round" />
-      ) : null}
-
-      {/* Convezione Esterna (Raccordo tratteggiato) */}
-      <line x1={getX(riso)} y1={getY(t_s)} x2={getX(riso) + 10} y2={getY(ta)} stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="2,2" />
-
-      {/* Punti caratteristici */}
-      <circle cx={getX(re)} cy={getY(t_ext_tubo)} r="2" fill="#334155" />
-      <circle cx={getX(riso)} cy={getY(t_s)} r="2.5" fill="#b91c1c" />
-
-      {/* Etichette testuali delle zone */}
-      <text x={originX + R_i_px / 2} y={originY - 6} textAnchor="middle" fill="#1d4ed8" fontSize="6" fontWeight="bold">Fluido</text>
-      <text x={originX + R_i_px + (R_e_px - R_i_px) / 2} y={originY - 6} textAnchor="middle" fill="#334155" fontSize="6" fontWeight="bold">Tubo</text>
-      {!isNoneIso && s_iso > 0 && (
-        <text x={originX + R_e_px + (R_iso_px - R_e_px) / 2} y={originY - 6} textAnchor="middle" fill="#b45309" fontSize="6" fontWeight="bold">Isolante</text>
-      )}
-    </svg>
+      {/* Legenda orizzontale */}
+      <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-[10px] text-slate-600 font-semibold px-2 print:justify-start print:px-0">
+        <div className="flex items-center space-x-1 shrink-0">
+          <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: '#2563eb' }}></span>
+          <span>Fluido ({tf.toFixed(0)}°C)</span>
+        </div>
+        <div className="flex items-center space-x-1 shrink-0">
+          <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: '#475569' }}></span>
+          <span>Parete ({tratto.material})</span>
+        </div>
+        {!isNoneIso && s_iso > 0 && (
+          <div className="flex items-center space-x-1 shrink-0">
+            <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: '#d97706' }}></span>
+            <span>Isolante ({tratto.isoType === 'pur' ? 'PUR' : tratto.isoType === 'rockwool' ? 'Lana' : 'Gomma'})</span>
+          </div>
+        )}
+        <div className="flex items-center space-x-1 shrink-0">
+          <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: '#b91c1c' }}></span>
+          <span>Superficie ({t_s.toFixed(1)}°C)</span>
+        </div>
+        <div className="flex items-center space-x-1 shrink-0">
+          <span className="w-2.5 h-0.5 border-t border-dashed border-slate-400 inline-block"></span>
+          <span className="text-slate-400 italic">Aria Ambiente ({ta.toFixed(0)}°C)</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -450,15 +650,18 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             const R_ext = 1 / (7.4 * (r_iso_m * 2)); // alphaExt = 7.4
 
             const R_tot = R_int + R_pipe + R_iso + R_ext;
-            const deltaT = T - activeTAmb;
+            const deltaT = Math.abs(T - activeTAmb);
             const Q_Wm = R_tot > 0 ? (Math.PI * deltaT) / R_tot : 0;
 
+            let t_pipe_int = T;
             let t_pipe_ext = T;
             let t_surf = T;
             if (T > activeTAmb) {
+                t_pipe_int = T - (Q_Wm / Math.PI) * R_int;
                 t_pipe_ext = T - (Q_Wm / Math.PI) * (R_int + R_pipe);
                 t_surf = activeTAmb + Q_Wm / (Math.PI * 7.4 * (r_iso_m * 2));
             } else {
+                t_pipe_int = T + (Q_Wm / Math.PI) * R_int;
                 t_pipe_ext = T + (Q_Wm / Math.PI) * (R_int + R_pipe);
                 t_surf = activeTAmb - Q_Wm / (Math.PI * 7.4 * (r_iso_m * 2));
             }
@@ -474,6 +677,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                 d_ext,
                 t_surf,
                 t_pipe_ext,
+                t_pipe_int,
                 roughness,
                 area_m2,
                 velocity,
@@ -721,7 +925,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                     <h3 className="text-sm font-bold text-slate-700">
                       Proprietà del Fluido Pompato (Verifica)
                     </h3>
-                    <div className="print-hide flex bg-slate-100 p-1 rounded-lg border border-slate-200 gap-1 items-center shrink-0">
+                    <div className="print:hidden flex bg-slate-100 p-1 rounded-lg border border-slate-200 gap-1 items-center shrink-0">
                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider px-1">Unità Pressione:</span>
                         {['mbar', 'Pa', 'kPa', 'mH2O'].map((unit) => (
                             <button 
@@ -821,7 +1025,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             </div>
 
             {/* Sezione Tabella Tratti (Larghezza Intera) */}
-            <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0">
+            <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0 print:!break-inside-auto">
                 <div className="flex justify-between items-center mb-4 print:hidden">
                     <h2 className="font-bold text-sm text-slate-800 flex items-center"><IconArrowUp className="w-4 h-4 mr-2"/> Tabella Verifica Perdite di Carico</h2>
                     <button onClick={addTratto} className="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-xs font-bold shadow-sm flex items-center hover:bg-slate-700 cursor-pointer">
@@ -834,6 +1038,8 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                         <thead>
                             <tr className="border-b border-slate-300 bg-slate-50 text-slate-600 uppercase text-[9px] font-bold tracking-wider">
                                 <th className="py-2.5 px-2 print:p-1">TAG / Nome</th>
+                                <th className="py-2.5 px-2 print:p-1">Genitore</th>
+                                <th className="py-2.5 px-2 print:p-1">Gerarchia</th>
                                 <th className="py-2.5 px-2 print:p-1">Fluido / Q (m³/h)</th>
                                 <th className="py-2.5 px-2 print:p-1">Materiale / DN / PN</th>
                                 <th className="py-2.5 px-2 print:p-1">L (m)</th>
@@ -857,6 +1063,43 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                     <td className="py-2.5 px-2 print:p-1 space-y-0.5">
                                         <span className="font-bold font-mono text-xs text-slate-800">{t.tag}</span>
                                         <span className="block text-[10px] text-slate-500 leading-tight">{t.name || '-'}</span>
+                                    </td>
+                                    
+                                    {/* Genitore */}
+                                    <td className="py-1 px-2" onClick={e => e.stopPropagation()}>
+                                        <select
+                                            value={t.parentId || ''}
+                                            onChange={e => updateTratto(t.id, 'parentId', e.target.value ? Number(e.target.value) : null)}
+                                            className="bg-transparent font-semibold text-slate-750 focus:outline-none cursor-pointer print:hidden text-xs"
+                                        >
+                                            <option value="">Nessuno (Radice)</option>
+                                            {getEligibleParents(t.id).map(p => (
+                                                <option key={p.id} value={p.id}>{computedBranchTags[p.id] || `L${p.id}`}</option>
+                                            ))}
+                                        </select>
+                                        <span className="hidden print:inline font-semibold">
+                                            {t.parentId ? computedBranchTags[t.parentId] || `L${t.parentId}` : 'Radice'}
+                                        </span>
+                                    </td>
+
+                                    {/* Gerarchia */}
+                                    <td className="py-1 px-2" onClick={e => e.stopPropagation()}>
+                                        <select
+                                            value={t.hierarchy || 'dorsale_principale'}
+                                            onChange={e => updateTratto(t.id, 'hierarchy', e.target.value)}
+                                            className="bg-transparent font-semibold text-slate-750 focus:outline-none cursor-pointer print:hidden text-xs"
+                                        >
+                                            <option value="dorsale_principale">Principale</option>
+                                            <option value="dorsale_secondaria">Secondaria</option>
+                                            <option value="dorsale_terziaria">Terziaria</option>
+                                            <option value="utenza">Utenza</option>
+                                        </select>
+                                        <span className="hidden print:inline">
+                                            {t.hierarchy === 'dorsale_principale' && 'Principale'}
+                                            {t.hierarchy === 'dorsale_secondaria' && 'Secondaria'}
+                                            {t.hierarchy === 'dorsale_terziaria' && 'Terziaria'}
+                                            {t.hierarchy === 'utenza' && 'Utenza'}
+                                        </span>
                                     </td>
                                     
                                     {/* Portata */}
@@ -937,307 +1180,273 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                     </table>
                 </div>
             </div>
-            {/* Sezione Dettagli Termici e Topologia (2 Colonne sotto la tabella) */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6 print:hidden">
-                {/* Dettagli Termici di Tutti i Tratti */}
-                <div className="space-y-6">
+            {/* Sezione Dettagli Termici e Topologia (Layout verticale a larghezza intera) */}
+            <div className="space-y-6 mb-6 print:hidden">
+                {/* Dettagli Termici del Tratto Selezionato */}
+                <div className="space-y-4">
                     <h3 className="text-sm font-bold text-slate-800 border-b border-slate-200 pb-2 flex items-center justify-between">
-                        <span>🌡️ Dettagli Termici dei Tratti</span>
-                        <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-mono font-bold">
-                            {processedTratti.length} {processedTratti.length === 1 ? 'Tratto' : 'Tratti'}
-                        </span>
+                        <span>🌡️ Dettagli ed Isolamento Termico Tratto</span>
+                        {activeTratto && (
+                            <span className="text-xs font-mono bg-brand-100 text-brand-700 px-2 py-0.5 rounded-md font-black">
+                                Tratto {activeTratto.tag}
+                            </span>
+                        )}
                     </h3>
 
                     {processedTratti.length === 0 ? (
                         <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400 italic text-xs">
-                            Aggiungi dei tratti nella tabella sopra per configurare l'isolamento e visualizzare i dettagli termici.
+                            Aggiungi dei tratti nella tabella sopra per iniziare.
                         </div>
-                    ) : (
-                        processedTratti.map((t) => (
-                            <div 
-                                key={t.id} 
-                                id={`tratto-card-${t.id}`} 
-                                onClick={() => setSelectedTrattoId(t.id)}
-                                className={`bg-white rounded-2xl shadow-sm border p-5 transition-all cursor-pointer ${selectedTrattoId === t.id ? 'border-brand-500 ring-2 ring-brand-500/10 shadow-md' : 'border-slate-200 hover:border-slate-350'}`}
-                            >
-                                <h4 className="text-xs font-bold text-slate-800 mb-4 border-b border-slate-200 pb-2 flex items-center justify-between">
-                                    <span className="flex items-center gap-1.5">
-                                        <span className="w-2.5 h-2.5 rounded-full bg-brand-500 animate-pulse"></span>
-                                        Tratto: <span className="font-mono text-brand-650 font-black">{t.tag}</span>
-                                    </span>
-                                    <span className="text-[10px] text-slate-500 font-normal truncate max-w-[200px]">
-                                        {t.name || '(Nessun nome)'}
-                                    </span>
+                    ) : activeTratto ? (
+                        <div 
+                            id={`tratto-card-${activeTratto.id}`}
+                            className="bg-white rounded-2xl shadow-sm border p-6 border-brand-500 ring-2 ring-brand-500/10 shadow-md space-y-6"
+                        >
+                            {/* Titolo e Nome */}
+                            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                                <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-brand-500 animate-pulse"></span>
+                                    Configurazione Tratto: <span className="font-mono text-brand-650 font-black">{activeTratto.tag}</span>
                                 </h4>
+                                <div className="text-xs text-slate-500 font-semibold bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
+                                    {activeTratto.name || 'Senza Nome'}
+                                </div>
+                            </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6" onClick={e => e.stopPropagation()}>
-                                    {/* Colonna Sinistra: Configurazione Base, Conduttura e Pezzi Speciali */}
-                                    <div className="space-y-4">
-                                        <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/60 space-y-3">
-                                            <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-wider">1. Dati Generali & Geometria</h5>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <div>
-                                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Tag Tratto (Auto)</label>
-                                                    <input 
-                                                        type="text" 
-                                                        value={computedBranchTags[t.id] || ''} 
-                                                        readOnly 
-                                                        className="w-full text-xs p-1.5 border border-slate-200 rounded bg-slate-100 font-mono font-bold text-slate-500 focus:outline-none cursor-not-allowed" 
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Nome Tratto</label>
-                                                    <input 
-                                                        type="text" 
-                                                        value={t.name} 
-                                                        onChange={e => updateTratto(t.id, 'name', e.target.value)} 
-                                                        className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-semibold text-slate-800 focus:border-brand-500 focus:outline-none" 
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Portata Q (m³/h)</label>
-                                                    <input 
-                                                        type="number" 
-                                                        value={t.portata === '' ? '' : t.portata} 
-                                                        onChange={e => updateTratto(t.id, 'portata', e.target.value === '' ? '' : Number(e.target.value))} 
-                                                        className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-bold text-slate-800 focus:border-brand-500 focus:outline-none" 
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Lunghezza L (m)</label>
-                                                    <input 
-                                                        type="number" 
-                                                        value={t.length === '' ? '' : t.length} 
-                                                        onChange={e => updateTratto(t.id, 'length', e.target.value === '' ? '' : Number(e.target.value))} 
-                                                        className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-bold text-slate-800 focus:border-brand-500 focus:outline-none" 
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-3 gap-2 pt-1">
-                                                <div>
-                                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Materiale</label>
-                                                    <select 
-                                                        value={t.material} 
-                                                        onChange={e => updateTratto(t.id, 'material', e.target.value)} 
-                                                        className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-semibold text-slate-800 focus:border-brand-500 focus:outline-none cursor-pointer"
-                                                    >
-                                                        <option value="manuale">Manuale...</option>
-                                                        {Object.keys(PIPE_CATALOG).map(m => <option key={m} value={m}>{m}</option>)}
-                                                    </select>
-                                                </div>
-                                                {t.material !== 'manuale' ? (
-                                                    <>
-                                                        <div>
-                                                            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">DN</label>
-                                                            <select 
-                                                                value={t.DN} 
-                                                                onChange={e => updateTratto(t.id, 'DN', e.target.value)} 
-                                                                className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-semibold text-slate-800 focus:border-brand-500 focus:outline-none cursor-pointer"
-                                                            >
-                                                                {Object.keys(PIPE_CATALOG[t.material]?.specs || {}).map(dn => <option key={dn} value={dn}>DN{dn}</option>)}
-                                                            </select>
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">PN</label>
-                                                            <select 
-                                                                value={t.PN} 
-                                                                onChange={e => updateTratto(t.id, 'PN', e.target.value)} 
-                                                                className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-semibold text-slate-800 focus:border-brand-500 focus:outline-none cursor-pointer"
-                                                            >
-                                                                {Object.keys(PIPE_CATALOG[t.material]?.specs[t.DN] || {}).map(pn => <option key={pn} value={pn}>{pn}</option>)}
-                                                            </select>
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <div>
-                                                            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Ø Int. (mm)</label>
-                                                            <input 
-                                                                type="number" 
-                                                                value={t.D === '' ? '' : t.D} 
-                                                                onChange={e => updateTratto(t.id, 'D', e.target.value === '' ? '' : Number(e.target.value))} 
-                                                                className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-bold text-slate-800 focus:border-brand-500 focus:outline-none" 
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Scabrezza (mm)</label>
-                                                            <input 
-                                                                type="number" 
-                                                                step="0.01" 
-                                                                value={t.roughness === '' ? '' : t.roughness} 
-                                                                onChange={e => updateTratto(t.id, 'roughness', e.target.value === '' ? '' : Number(e.target.value))} 
-                                                                className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-bold text-slate-800 focus:border-brand-500 focus:outline-none" 
-                                                            />
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/60 space-y-3">
-                                            <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-wider flex justify-between items-center">
-                                                <span>2. Pezzi Speciali & Accessori (K)</span>
-                                                {t.leq_tot && t.leq_tot > 0 ? <span className="text-[8px] text-brand-600 font-bold font-mono">L_eq = +{t.leq_tot.toFixed(1)} m</span> : null}
-                                            </h5>
-                                            <div className="grid grid-cols-4 gap-2">
-                                                <div>
-                                                    <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 text-center">Valvole</label>
-                                                    <input 
-                                                        type="number" 
-                                                        min="0"
-                                                        value={t.n_valvole === '' ? '' : t.n_valvole} 
-                                                        onChange={e => updateTratto(t.id, 'n_valvole', e.target.value === '' ? '' : Number(e.target.value))} 
-                                                        className="w-full text-xs p-1 bg-white border border-slate-300 rounded font-bold text-slate-800 focus:border-brand-500 focus:outline-none text-center" 
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 text-center">Riduzioni</label>
-                                                    <input 
-                                                        type="number" 
-                                                        min="0"
-                                                        value={t.n_riduzioni === '' ? '' : t.n_riduzioni} 
-                                                        onChange={e => updateTratto(t.id, 'n_riduzioni', e.target.value === '' ? '' : Number(e.target.value))} 
-                                                        className="w-full text-xs p-1 bg-white border border-slate-300 rounded font-bold text-slate-800 focus:border-brand-500 focus:outline-none text-center" 
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 text-center">Curve</label>
-                                                    <input 
-                                                        type="number" 
-                                                        min="0"
-                                                        value={t.n_curve === '' ? '' : t.n_curve} 
-                                                        onChange={e => updateTratto(t.id, 'n_curve', e.target.value === '' ? '' : Number(e.target.value))} 
-                                                        className="w-full text-xs p-1 bg-white border border-slate-300 rounded font-bold text-slate-800 focus:border-brand-500 focus:outline-none text-center" 
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 text-center">Tee</label>
-                                                    <input 
-                                                        type="number" 
-                                                        min="0"
-                                                        value={t.n_tee === '' ? '' : t.n_tee} 
-                                                        onChange={e => updateTratto(t.id, 'n_tee', e.target.value === '' ? '' : Number(e.target.value))} 
-                                                        className="w-full text-xs p-1 bg-white border border-slate-300 rounded font-bold text-slate-800 focus:border-brand-500 focus:outline-none text-center" 
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Colonna Destra: Ambiente, Isolamento, Topologia e SVG Gradiente */}
-                                    <div className="space-y-4">
-                                        <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/60 space-y-3">
-                                            <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-wider">3. Ambiente, Isolamento & Topologia</h5>
+                            {/* Contenuto dell'editor a 3 Colonne */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {/* Colonna 1: Dati Generali & Geometria + Pezzi Speciali */}
+                                <div className="space-y-4">
+                                    <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/60 space-y-3">
+                                        <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-wider">1. Dati Generali & Geometria</h5>
+                                        <div className="grid grid-cols-2 gap-2.5">
                                             <div>
-                                                <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Tipo Isolamento</label>
+                                                <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Nome Tratto</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={activeTratto.name} 
+                                                    onChange={e => updateTratto(activeTratto.id, 'name', e.target.value)} 
+                                                    className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-semibold text-slate-800 focus:border-brand-500 focus:outline-none" 
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Portata Q (m³/h)</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={activeTratto.portata === '' ? '' : activeTratto.portata} 
+                                                    onChange={e => updateTratto(activeTratto.id, 'portata', e.target.value === '' ? '' : Number(e.target.value))} 
+                                                    className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-bold text-slate-800 focus:border-brand-500 focus:outline-none" 
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Lunghezza L (m)</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={activeTratto.length === '' ? '' : activeTratto.length} 
+                                                    onChange={e => updateTratto(activeTratto.id, 'length', e.target.value === '' ? '' : Number(e.target.value))} 
+                                                    className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-bold text-slate-800 focus:border-brand-500 focus:outline-none" 
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Materiale</label>
                                                 <select 
-                                                    value={t.isoType} 
-                                                    onChange={e => updateTratto(t.id, 'isoType', e.target.value)} 
+                                                    value={activeTratto.material} 
+                                                    onChange={e => updateTratto(activeTratto.id, 'material', e.target.value)} 
                                                     className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-semibold text-slate-800 focus:border-brand-500 focus:outline-none cursor-pointer"
                                                 >
-                                                    {INSULATION_CATALOG.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                                                    <option value="manuale">Manuale...</option>
+                                                    {Object.keys(PIPE_CATALOG).map(m => <option key={m} value={m}>{m}</option>)}
                                                 </select>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <div>
-                                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Spessore (mm)</label>
-                                                    <input 
-                                                        type="number" 
-                                                        min="0"
-                                                        value={t.isoThick === '' ? '' : t.isoThick} 
-                                                        onChange={e => updateTratto(t.id, 'isoThick', e.target.value === '' ? '' : Number(e.target.value))} 
-                                                        className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-bold text-slate-800 focus:border-brand-500 focus:outline-none" 
-                                                        disabled={t.isoType === 'none'}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">T. Amb. Tratto (°C)</label>
-                                                    <input 
-                                                        type="number" 
-                                                        value={t.tAmb === '' ? '' : t.tAmb} 
-                                                        onChange={e => updateTratto(t.id, 'tAmb', e.target.value === '' ? '' : Number(e.target.value))} 
-                                                        className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-bold text-slate-800 focus:border-brand-500 focus:outline-none" 
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200">
-                                                <div>
-                                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Gerarchia</label>
-                                                    <select 
-                                                        value={t.hierarchy || 'dorsale_principale'} 
-                                                        onChange={e => updateTratto(t.id, 'hierarchy', e.target.value)} 
-                                                        className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-semibold text-slate-800 focus:border-brand-500 focus:outline-none cursor-pointer"
-                                                    >
-                                                        <option value="dorsale_principale">Dorsale Principale</option>
-                                                        <option value="dorsale_secondaria">Dorsale Secondaria</option>
-                                                        <option value="dorsale_terziaria">Dorsale Terziaria</option>
-                                                        <option value="utenza">Utenza Finale</option>
-                                                    </select>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Diramato Da</label>
-                                                    <select 
-                                                        value={t.parentId || ''}
-                                                        onChange={e => updateTratto(t.id, 'parentId', e.target.value ? Number(e.target.value) : null)} 
-                                                        className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-semibold text-slate-800 focus:border-brand-500 focus:outline-none cursor-pointer"
-                                                    >
-                                                        <option value="">Nessuno (Radice)</option>
-                                                        {getEligibleParents(t.id).map(x => (
-                                                            <option key={x.id} value={x.id}>[{computedBranchTags[x.id] || `L${x.id}`}] {x.name}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-                                            <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-200/60 space-y-1 text-[10px] font-mono leading-relaxed text-slate-600">
-                                                <h6 className="text-[9px] font-black text-slate-400 uppercase tracking-wider font-sans mb-1">Riepilogo Calcoli</h6>
-                                                <div>Øi / Øe: <strong>{t.d_int?.toFixed(1)} / {t.d_ext?.toFixed(1)} mm</strong></div>
-                                                <div>Velocità: <strong>{t.velocity?.toFixed(2)} m/s</strong></div>
-                                                <div>Reynolds: <strong>{Math.round(t.Re || 0).toLocaleString()}</strong></div>
-                                                <div className="text-red-600 font-bold">T. Sup. Est.: {t.t_surf?.toFixed(1)} °C</div>
-                                                <div className="font-bold text-brand-600 border-t border-slate-200/80 pt-1 mt-1">∆P: {formatPressureVal(t.loss_tot_Pa || 0, pressureUnit)} {getPressureUnitLabel(pressureUnit)}</div>
+                                        {activeTratto.material !== 'manuale' ? (
+                                            <div className="grid grid-cols-2 gap-2.5">
+                                                <div>
+                                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">DN</label>
+                                                    <select 
+                                                        value={activeTratto.DN} 
+                                                        onChange={e => updateTratto(activeTratto.id, 'DN', e.target.value)} 
+                                                        className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-semibold text-slate-800 focus:border-brand-500 focus:outline-none cursor-pointer"
+                                                    >
+                                                        {Object.keys(PIPE_CATALOG[activeTratto.material]?.specs || {}).map(dn => <option key={dn} value={dn}>DN{dn}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">PN</label>
+                                                    <select 
+                                                        value={activeTratto.PN} 
+                                                        onChange={e => updateTratto(activeTratto.id, 'PN', e.target.value)} 
+                                                        className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-semibold text-slate-800 focus:border-brand-500 focus:outline-none cursor-pointer"
+                                                    >
+                                                        {Object.keys(PIPE_CATALOG[activeTratto.material]?.specs[activeTratto.DN] || {}).map(pn => <option key={pn} value={pn}>{pn}</option>)}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-2 gap-2.5">
+                                                <div>
+                                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Ø Int. (mm)</label>
+                                                    <input 
+                                                        type="number" 
+                                                        value={activeTratto.D === '' ? '' : activeTratto.D} 
+                                                        onChange={e => updateTratto(activeTratto.id, 'D', e.target.value === '' ? '' : Number(e.target.value))} 
+                                                        className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-bold text-slate-800 focus:border-brand-500 focus:outline-none" 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Scabrezza (mm)</label>
+                                                    <input 
+                                                        type="number" 
+                                                        step="0.01" 
+                                                        value={activeTratto.roughness === '' ? '' : activeTratto.roughness} 
+                                                        onChange={e => updateTratto(activeTratto.id, 'roughness', e.target.value === '' ? '' : Number(e.target.value))} 
+                                                        className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-bold text-slate-800 focus:border-brand-500 focus:outline-none" 
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/60 space-y-3">
+                                        <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-wider flex justify-between items-center">
+                                            <span>2. Pezzi Speciali & Accessori (K)</span>
+                                            {activeTratto.leq_tot && activeTratto.leq_tot > 0 ? <span className="text-[8px] text-brand-600 font-bold font-mono">L_eq = +{activeTratto.leq_tot.toFixed(1)} m</span> : null}
+                                        </h5>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            <div>
+                                                <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 text-center">Valvole</label>
+                                                <input 
+                                                    type="number" 
+                                                    min="0"
+                                                    value={activeTratto.n_valvole === '' ? '' : activeTratto.n_valvole} 
+                                                    onChange={e => updateTratto(activeTratto.id, 'n_valvole', e.target.value === '' ? '' : Number(e.target.value))} 
+                                                    className="w-full text-xs p-1 bg-white border border-slate-300 rounded font-bold text-slate-800 focus:border-brand-500 focus:outline-none text-center" 
+                                                />
                                             </div>
                                             <div>
-                                                <SVGGradienteSovrapposto tratto={t} fluidTemp={fluidTemp} />
+                                                <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 text-center">Riduzioni</label>
+                                                <input 
+                                                    type="number" 
+                                                    min="0"
+                                                    value={activeTratto.n_riduzioni === '' ? '' : activeTratto.n_riduzioni} 
+                                                    onChange={e => updateTratto(activeTratto.id, 'n_riduzioni', e.target.value === '' ? '' : Number(e.target.value))} 
+                                                    className="w-full text-xs p-1 bg-white border border-slate-300 rounded font-bold text-slate-800 focus:border-brand-500 focus:outline-none text-center" 
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 text-center">Curve</label>
+                                                <input 
+                                                    type="number" 
+                                                    min="0"
+                                                    value={activeTratto.n_curve === '' ? '' : activeTratto.n_curve} 
+                                                    onChange={e => updateTratto(activeTratto.id, 'n_curve', e.target.value === '' ? '' : Number(e.target.value))} 
+                                                    className="w-full text-xs p-1 bg-white border border-slate-300 rounded font-bold text-slate-800 focus:border-brand-500 focus:outline-none text-center" 
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[8px] font-bold text-slate-400 uppercase mb-1 text-center">Tee</label>
+                                                <input 
+                                                    type="number" 
+                                                    min="0"
+                                                    value={activeTratto.n_tee === '' ? '' : activeTratto.n_tee} 
+                                                    onChange={e => updateTratto(activeTratto.id, 'n_tee', e.target.value === '' ? '' : Number(e.target.value))} 
+                                                    className="w-full text-xs p-1 bg-white border border-slate-300 rounded font-bold text-slate-800 focus:border-brand-500 focus:outline-none text-center" 
+                                                />
                                             </div>
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Colonna 2: Ambiente & Isolamento + Riepilogo Calcoli */}
+                                <div className="space-y-4">
+                                    <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/60 space-y-3">
+                                        <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-wider">3. Ambiente & Isolamento</h5>
+                                        <div>
+                                            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Tipo Isolamento</label>
+                                            <select 
+                                                value={activeTratto.isoType} 
+                                                onChange={e => updateTratto(activeTratto.id, 'isoType', e.target.value)} 
+                                                className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-semibold text-slate-800 focus:border-brand-500 focus:outline-none cursor-pointer"
+                                            >
+                                                {INSULATION_CATALOG.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                                            </select>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Spessore (mm)</label>
+                                                <input 
+                                                    type="number" 
+                                                    min="0"
+                                                    value={activeTratto.isoThick === '' ? '' : activeTratto.isoThick} 
+                                                    onChange={e => updateTratto(activeTratto.id, 'isoThick', e.target.value === '' ? '' : Number(e.target.value))} 
+                                                    className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-bold text-slate-800 focus:border-brand-500 focus:outline-none" 
+                                                    disabled={activeTratto.isoType === 'none'}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">T. Amb. Tratto (°C)</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={activeTratto.tAmb === '' ? '' : activeTratto.tAmb} 
+                                                    onChange={e => updateTratto(activeTratto.id, 'tAmb', e.target.value === '' ? '' : Number(e.target.value))} 
+                                                    className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-bold text-slate-800 focus:border-brand-500 focus:outline-none" 
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/60 space-y-2 text-[10px] font-mono leading-relaxed text-slate-650">
+                                        <h6 className="text-[9px] font-black text-slate-400 uppercase tracking-wider font-sans mb-2 border-b border-slate-200 pb-1 flex justify-between items-center">
+                                            <span>Riepilogo Calcoli</span>
+                                            <span className="text-[8px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-sans uppercase">Output</span>
+                                        </h6>
+                                        <div>Øi / Øe: <strong>{activeTratto.d_int?.toFixed(1)} / {activeTratto.d_ext?.toFixed(1)} mm</strong></div>
+                                        <div>Velocità: <strong>{activeTratto.velocity?.toFixed(2)} m/s</strong></div>
+                                        <div>Reynolds: <strong>{Math.round(activeTratto.Re || 0).toLocaleString()}</strong></div>
+                                        <div className="text-red-600 font-bold">T. Sup. Est.: {activeTratto.t_surf?.toFixed(1)} °C</div>
+                                        <div className="font-bold text-brand-600 border-t border-slate-200/80 pt-1.5 mt-1">∆P Tratto: {formatPressureVal(activeTratto.loss_tot_Pa || 0, pressureUnit)} {getPressureUnitLabel(pressureUnit)}</div>
+                                    </div>
+                                </div>
+
+                                {/* Colonna 3: Grafico del Profilo Termico Radiale */}
+                                <div className="bg-slate-50/30 p-4 rounded-xl border border-slate-200/50 flex flex-col justify-between">
+                                    <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-1.5 mb-2">4. Profilo Termico Radiale</h5>
+                                    <div className="flex-1 flex items-center justify-center min-h-[220px]">
+                                        <div className="w-full max-w-[320px]">
+                                            <SVGGradienteSovrapposto tratto={activeTratto} fluidTemp={fluidTemp} />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        ))
-                    )}
+                        </div>
+                    ) : null}
                 </div>
 
-                {/* Rappresentazione Topologica della Rete (Albero di Distribuzione) */}
-                <div className="lg:sticky lg:top-4 h-fit">
-                    <div className="bg-white rounded-2xl shadow-sm p-5 border border-slate-200 flex flex-col">
-                        <h3 className="text-sm font-bold text-slate-700 mb-3 border-b border-slate-100 pb-2">
-                            Rappresentazione Topologica della Rete (Albero di Distribuzione)
-                        </h3>
-                        <div className="flex-1 flex items-center justify-center min-h-[200px]">
-                            <TopologicalTree 
-                                tratti={trattiNodesForTree} 
-                                activeTag={selectedTrattoId ? computedBranchTags[selectedTrattoId] : undefined}
-                                onSelectTag={(tag) => {
-                                    const foundId = Object.keys(computedBranchTags).find(key => computedBranchTags[Number(key)] === tag);
-                                    if (foundId) {
-                                        const numId = Number(foundId);
-                                        setSelectedTrattoId(numId);
-                                        setTimeout(() => {
-                                            const element = document.getElementById(`tratto-card-${numId}`);
-                                            if (element) {
-                                                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                            }
-                                        }, 100);
-                                    }
-                                }}
-                            />
-                        </div>
+                {/* Rappresentazione Topologica della Rete (Albero di Distribuzione - Larghezza Intera) */}
+                <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 flex flex-col">
+                    <h3 className="text-sm font-bold text-slate-700 mb-4 border-b border-slate-150 pb-2">
+                        Rappresentazione Topologica della Rete (Albero di Distribuzione)
+                    </h3>
+                    <div className="w-full flex items-center justify-center min-h-[250px]">
+                        <TopologicalTree 
+                            tratti={trattiNodesForTree} 
+                            activeTag={selectedTrattoId ? computedBranchTags[selectedTrattoId] : undefined}
+                            onSelectTag={(tag) => {
+                                const foundId = Object.keys(computedBranchTags).find(key => computedBranchTags[Number(key)] === tag);
+                                if (foundId) {
+                                    const numId = Number(foundId);
+                                    setSelectedTrattoId(numId);
+                                    setTimeout(() => {
+                                        const element = document.getElementById(`tratto-card-${numId}`);
+                                        if (element) {
+                                            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                        }
+                                    }, 100);
+                                }
+                            }}
+                        />
                     </div>
                 </div>
             </div>
@@ -1274,7 +1483,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                 </div>
 
                 {/* Pagina successiva per i dettagli termici di ciascun tratto */}
-                <div style={{ breakBefore: 'page' }}></div>
+                {processedTratti.length > 2 && <div style={{ breakBefore: 'page' }}></div>}
 
                 <h3 className="text-[11px] font-bold text-slate-800 mb-4 uppercase tracking-wider border-b-2 border-slate-800 pb-1">
                     Dettagli Termici e Geometrici dei Tratti

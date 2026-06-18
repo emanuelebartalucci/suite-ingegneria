@@ -197,6 +197,177 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
         };
     };
 
+    const renderCharts = () => {
+        if (processedLoads.length === 0) return null;
+
+        // Donut Chart calculations
+        const donutSlices = (() => {
+            if (totalKW === 0) return [];
+            let accumulatedPercent = 0;
+            const colors = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#6366f1'];
+            return processedLoads.map((load, index) => {
+                const power = load.calcPower_kW || 0;
+                const percent = power / totalKW;
+                const strokeLength = percent * 251.2;
+                const strokeOffset = accumulatedPercent * 251.2;
+                accumulatedPercent += percent;
+                return {
+                    id: load.id,
+                    name: load.name,
+                    power,
+                    percent: percent * 100,
+                    strokeLength,
+                    strokeOffset: -strokeOffset,
+                    color: colors[index % colors.length]
+                };
+            });
+        })();
+
+        return (
+            <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mt-6 print:shadow-none print:border-none print:p-0 print:mt-4 print:break-inside-avoid">
+                <h3 className="text-sm font-bold text-slate-700 mb-4 border-b border-slate-100 pb-2 print:border-b print:border-slate-800 print:pb-1 flex items-center gap-2">
+                    <span>📊</span> Analisi Grafica della Rete
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-2 print:gap-4">
+                    {/* Donut Chart */}
+                    <div className="border border-slate-100 rounded-xl p-4 bg-slate-50/50 print:bg-transparent print:border-none print:p-0 flex flex-col sm:flex-row items-center gap-4">
+                        <div className="w-32 h-32 flex-shrink-0 relative">
+                            {totalKW > 0 ? (
+                                <svg width="128" height="128" viewBox="0 0 120 120" className="-rotate-90">
+                                    {donutSlices.map((slice) => (
+                                        <circle
+                                            key={slice.id}
+                                            cx="60"
+                                            cy="60"
+                                            r="40"
+                                            fill="transparent"
+                                            stroke={slice.color}
+                                            strokeWidth="16"
+                                            strokeDasharray={`${slice.strokeLength.toFixed(1)} 251.3`}
+                                            strokeDashoffset={slice.strokeOffset.toFixed(1)}
+                                            className="transition-all duration-300"
+                                        />
+                                    ))}
+                                    {/* Centro bianco della ciambella */}
+                                    <circle cx="60" cy="60" r="32" fill="#ffffff" />
+                                </svg>
+                            ) : (
+                                <div className="w-full h-full rounded-full border-4 border-dashed border-slate-200 flex items-center justify-center text-[10px] text-slate-400">Nessun carico</div>
+                            )}
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400">Totale</span>
+                                <span className="text-xs font-black text-slate-800 font-mono">{totalKW.toFixed(1)} kW</span>
+                            </div>
+                        </div>
+                        <div className="flex-1 flex flex-col justify-center space-y-1.5 w-full max-h-32 overflow-y-auto pr-1">
+                            {totalKW > 0 ? (
+                                donutSlices.map((slice) => (
+                                    <div key={slice.id} className="flex items-center justify-between text-[10px] text-slate-600">
+                                        <div className="flex items-center gap-1.5 min-w-0">
+                                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: slice.color }}></span>
+                                            <span className="truncate font-semibold">{slice.name}</span>
+                                        </div>
+                                        <span className="font-mono font-bold text-slate-700 shrink-0 ml-2">{slice.power.toFixed(1)} kW ({slice.percent.toFixed(0)}%)</span>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-xs text-slate-400 italic text-center">Nessuna potenza termica definita.</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Bar Chart */}
+                    <div className="border border-slate-100 rounded-xl p-4 bg-slate-50/50 print:bg-transparent print:border-none print:p-0 flex flex-col justify-between">
+                        {/* Grafico barre SVG */}
+                        <div className="w-full overflow-x-auto">
+                            {processedLoads.length > 0 ? (
+                                (() => {
+                                    const chartWidth = 320;
+                                    const leftMargin = 80;
+                                    const rightMargin = 35;
+                                    const barAreaWidth = chartWidth - leftMargin - rightMargin;
+                                    const maxVelocity = Math.max(...processedLoads.map(l => l.realVelocity || 0), Number(vTarget) || 1.0, 2.0);
+                                    const scale = barAreaWidth / maxVelocity;
+                                    const targetVal = Number(vTarget) || 1.0;
+                                    const targetX = leftMargin + targetVal * scale;
+                                    const chartHeight = processedLoads.length * 24 + 25;
+
+                                    return (
+                                        <svg width="100%" height={chartHeight} viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="min-w-[320px]">
+                                            {/* Griglia di sfondo */}
+                                            {[0.5, 1.0, 1.5, 2.0].map((v) => {
+                                                if (v > maxVelocity) return null;
+                                                const x = leftMargin + v * scale;
+                                                return (
+                                                    <g key={v}>
+                                                        <line x1={x} y1="10" x2={x} y2={chartHeight - 15} stroke="#e2e8f0" strokeDasharray="2 2" />
+                                                        <text x={x} y={chartHeight - 4} textAnchor="middle" fontSize="7" fill="#94a3b8" className="font-mono">{v.toFixed(1)}</text>
+                                                    </g>
+                                                );
+                                            })}
+
+                                            {/* Linea Target Velocità */}
+                                            <line x1={targetX} y1="10" x2={targetX} y2={chartHeight - 15} stroke="#f97316" strokeWidth="1" strokeDasharray="3 3" />
+                                            <text x={targetX} y="8" textAnchor="middle" fontSize="7" fontWeight="bold" fill="#f97316" className="font-sans">{targetVal.toFixed(1)} m/s</text>
+
+                                            {/* Barre per ogni carico */}
+                                            {processedLoads.map((load, idx) => {
+                                                const y = 14 + idx * 24;
+                                                const barW = (load.realVelocity || 0) * scale;
+                                                
+                                                let barColor = '#10b981'; // Verde di base
+                                                if ((load.realVelocity || 0) > targetVal * 1.3) {
+                                                    barColor = '#ef4444'; // Rosso (alta velocità)
+                                                } else if ((load.realVelocity || 0) < 0.4) {
+                                                    barColor = '#f59e0b'; // Giallo (bassa velocità)
+                                                }
+
+                                                return (
+                                                    <g key={load.id}>
+                                                        {/* Nome della zona */}
+                                                        <text x={leftMargin - 6} y={y + 8} textAnchor="end" fontSize="8" fontWeight="bold" fill="#475569" className="font-sans">
+                                                            {load.name.length > 13 ? load.name.slice(0, 11) + '..' : load.name}
+                                                        </text>
+                                                        {/* Slot sfondo */}
+                                                        <rect x={leftMargin} y={y} width={barAreaWidth} height="10" rx="2" fill="#f1f5f9" />
+                                                        {/* Barra reale */}
+                                                        <rect x={leftMargin} y={y} width={Math.max(0, barW)} height="10" rx="2" fill={barColor} />
+                                                        {/* Valore numerico della velocità */}
+                                                        <text x={leftMargin + Math.max(0, barW) + 4} y={y + 8} fontSize="8" fontWeight="bold" fill="#334155" className="font-mono">
+                                                            {(load.realVelocity || 0).toFixed(2)} m/s
+                                                        </text>
+                                                    </g>
+                                                );
+                                            })}
+                                        </svg>
+                                    );
+                                })()
+                            ) : (
+                                <p className="text-xs text-slate-400 italic text-center py-6">Aggiungi utenze per vedere il grafico delle velocità.</p>
+                            )}
+                        </div>
+                        
+                        {/* Legenda Velocità */}
+                        <div className="flex gap-4 justify-center mt-3 pt-2 border-t border-slate-100 text-[8px] font-bold uppercase text-slate-500">
+                             <div className="flex items-center gap-1">
+                                 <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ backgroundColor: '#f59e0b' }}></span> 
+                                 <span>Bassa (&lt;0.4 m/s)</span>
+                             </div>
+                             <div className="flex items-center gap-1">
+                                 <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ backgroundColor: '#10b981' }}></span> 
+                                 <span>Ottimale (0.4 - {((Number(vTarget) || 1.0) * 1.3).toFixed(1)} m/s)</span>
+                             </div>
+                             <div className="flex items-center gap-1">
+                                 <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ backgroundColor: '#ef4444' }}></span> 
+                                 <span>Alta (&gt;{((Number(vTarget) || 1.0) * 1.3).toFixed(1)} m/s)</span>
+                             </div>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <div className="max-w-6xl mx-auto animate-fade-in">
             <ProjectHeader pData={projectData} setPData={setProjectData} title="Calcolo Carichi Termici & Reti" setAppMode={setAppMode} iconColor="orange" />
@@ -466,6 +637,11 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                 <button onClick={addLoad} className="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold shadow-sm flex items-center hover:bg-slate-700"><IconPlus className="w-4 h-4 mr-2"/> Aggiungi Utenza</button>
             </div>
 
+            {/* Grafici a schermo */}
+            <div className="print-hide">
+                {renderCharts()}
+            </div>
+
             {/* Tabella di Stampa Report */}
             <div className="hidden print:block mt-6">
                 <h3 className="text-sm font-bold text-slate-800 mb-2 border-b-2 border-slate-800 pb-1">Distinta Utenze e Dimensionamento Tubazioni</h3>
@@ -507,11 +683,14 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                                 <td className="py-1">{l.material}</td>
                                 <td className="py-1 font-bold">DN {l.DN} - {l.PN}</td>
                                 <td className="py-1 font-mono">{l.realD?.toFixed(1)}</td>
-                                <td className="py-1 text-right font-mono">{(l.realVelocity || 0).toFixed(2)}</td>
+                                <td className="py-1 text-right font-mono">{(l.realVelocity || 0).toFixed(2)} m/s</td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
+
+                {/* Grafici in stampa sotto la tabella */}
+                {renderCharts()}
                 
                 <div className="flex gap-4 mt-8 mx-auto max-w-lg">
                     <div className="flex-1 p-3 rounded-lg border-2 border-slate-800 text-center">

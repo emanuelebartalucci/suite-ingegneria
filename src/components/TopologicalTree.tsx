@@ -74,6 +74,123 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
     const lines: VisualLine[] = [];
     const labels: VisualLabel[] = [];
 
+    const checkCollision = (
+      x1: number, y1: number, x2: number, y2: number,
+      placedLines: VisualLine[]
+    ): boolean => {
+      const minX1 = Math.min(x1, x2);
+      const maxX1 = Math.max(x1, x2);
+      const minY1 = Math.min(y1, y2);
+      const maxY1 = Math.max(y1, y2);
+      const isH1 = (y1 === y2);
+
+      // 1. Evitamento allineamento parallelo sulle quote
+      if (isH1) {
+        for (const line of placedLines) {
+          if (Math.abs(x2 - line.x1) < 15 && !(x2 === line.x1 && y2 === line.y1)) {
+            return true;
+          }
+          if (Math.abs(x2 - line.x2) < 15 && !(x2 === line.x2 && y2 === line.y2)) {
+            return true;
+          }
+        }
+      } else {
+        for (const line of placedLines) {
+          if (Math.abs(y2 - line.y1) < 15 && !(x2 === line.x1 && y2 === line.y1)) {
+            return true;
+          }
+          if (Math.abs(y2 - line.y2) < 15 && !(x2 === line.x2 && y2 === line.y2)) {
+            return true;
+          }
+        }
+      }
+
+      // 2. Controllo intersezioni o contatti lungo i segmenti
+      for (const line of placedLines) {
+        const minX2 = Math.min(line.x1, line.x2);
+        const maxX2 = Math.max(line.x1, line.x2);
+        const minY2 = Math.min(line.y1, line.y2);
+        const maxY2 = Math.max(line.y1, line.y2);
+        const isH2 = (line.y1 === line.y2);
+
+        let intersectsOrTouches = false;
+        let touchX = -1;
+        let touchY = -1;
+
+        if (isH1 && isH2) {
+          if (y1 === line.y1) {
+            const overlapStart = Math.max(minX1, minX2);
+            const overlapEnd = Math.min(maxX1, maxX2);
+            if (overlapStart <= overlapEnd) {
+              intersectsOrTouches = true;
+              touchX = overlapStart;
+              touchY = y1;
+            }
+          }
+        } else if (!isH1 && !isH2) {
+          if (x1 === line.x1) {
+            const overlapStart = Math.max(minY1, minY2);
+            const overlapEnd = Math.min(maxY1, maxY2);
+            if (overlapStart <= overlapEnd) {
+              intersectsOrTouches = true;
+              touchX = x1;
+              touchY = overlapStart;
+            }
+          }
+        } else {
+          const hY = isH1 ? y1 : line.y1;
+          const hMinX = isH1 ? minX1 : minX2;
+          const hMaxX = isH1 ? maxX1 : maxX2;
+
+          const vX = isH1 ? line.x1 : x1;
+          const vMinY = isH1 ? minY2 : minY1;
+          const vMaxY = isH1 ? maxY2 : maxY1;
+
+          if (vX >= hMinX && vX <= hMaxX && hY >= vMinY && hY <= vMaxY) {
+            intersectsOrTouches = true;
+            touchX = vX;
+            touchY = hY;
+          }
+        }
+
+        if (intersectsOrTouches) {
+          const isStartTouchOnly = (touchX === x1 && touchY === y1);
+          if (!isStartTouchOnly) {
+            return true;
+          }
+          if (isH1 && isH2 && y1 === line.y1) {
+            const overlapStart = Math.max(minX1, minX2);
+            const overlapEnd = Math.min(maxX1, maxX2);
+            if (overlapEnd - overlapStart > 1) {
+              return true;
+            }
+          }
+          if (!isH1 && !isH2 && x1 === line.x1) {
+            const overlapStart = Math.max(minY1, minY2);
+            const overlapEnd = Math.min(maxY1, maxY2);
+            if (overlapEnd - overlapStart > 1) {
+              return true;
+            }
+          }
+        }
+      }
+
+      // 3. Prossimità degli endpoint dei rami
+      const minDistance = 28;
+      for (const line of placedLines) {
+        const dStart = Math.hypot(x2 - line.x1, y2 - line.y1);
+        if (dStart < minDistance && !(x2 === line.x1 && y2 === line.y1)) {
+          return true;
+        }
+        const dEnd = Math.hypot(x2 - line.x2, y2 - line.y2);
+        if (dEnd < minDistance && !(x2 === line.x2 && y2 === line.y2)) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
     // Algoritmo ricorsivo per posizionare i nodi in modo ortogonale perpendicolare
     const layoutNode = (
       node: MapNode, 
@@ -90,38 +207,74 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
       const startY = parentEndY;
 
       let dir = intendedDir;
-      if (childIndex > 0) {
-        dir = parentDir === 'H' ? 'V' : 'H';
-      }
 
       let endX = startX;
       let endY = startY;
 
-      if (dir === 'H') {
-        if (parentDir === 'V') {
-          // Abbiamo svoltato da V a H: alterniamo sinistra e destra per le deviazioni
-          if (childIndex % 2 === 1) {
-            endX = startX - visualLen; // Sinistra
-          } else {
-            endX = startX + visualLen; // Destra
-          }
-        } else {
-          // Continua dritto (mantiene la direzione del genitore)
-          const sgnX = parentEndX - parentStartX < 0 ? -1 : 1;
-          endX = startX + sgnX * visualLen;
+      let collision = true;
+      let attempts = 0;
+      const offsets = [0, 25, -25, 50, -50, 75, -75, 100, -100];
+
+      while (collision && attempts < offsets.length) {
+        const candidateLen = visualLen + offsets[attempts];
+        if (candidateLen < 15) {
+          attempts++;
+          continue;
         }
-      } else {
-        if (parentDir === 'H') {
-          // Abbiamo svoltato da H a V: alterniamo basso e alto per le deviazioni
-          if (childIndex % 2 === 1) {
-            endY = startY + visualLen; // Basso
+
+        let tempEndX = startX;
+        let tempEndY = startY;
+
+        if (dir === 'H') {
+          if (parentDir === 'V') {
+            // Lo schema deve andare sempre verso destra (+x), mai a sinistra
+            tempEndX = startX + candidateLen;
           } else {
-            endY = startY - visualLen; // Alto
+            const sgnX = parentEndX - parentStartX < 0 ? -1 : 1;
+            tempEndX = startX + sgnX * candidateLen;
           }
         } else {
-          // Continua dritto (mantiene la direzione del genitore)
-          const sgnY = parentEndY - parentStartY < 0 ? -1 : 1;
-          endY = startY + sgnY * visualLen;
+          if (parentDir === 'H') {
+            if (childIndex % 2 === 1) {
+              tempEndY = startY - candidateLen; // Alternando, va verso l'alto (dispari)
+            } else {
+              tempEndY = startY + candidateLen; // Di default, va verso il basso (pari/singolo)
+            }
+          } else {
+            const sgnY = parentEndY - parentStartY < 0 ? -1 : 1;
+            tempEndY = startY + sgnY * candidateLen;
+          }
+        }
+
+        if (!checkCollision(startX, startY, tempEndX, tempEndY, lines)) {
+          collision = false;
+          endX = tempEndX;
+          endY = tempEndY;
+        } else {
+          attempts++;
+        }
+      }
+
+      if (collision) {
+        if (dir === 'H') {
+          if (parentDir === 'V') {
+            // Lo schema deve andare sempre verso destra (+x), mai a sinistra
+            endX = startX + visualLen;
+          } else {
+            const sgnX = parentEndX - parentStartX < 0 ? -1 : 1;
+            endX = startX + sgnX * visualLen;
+          }
+        } else {
+          if (parentDir === 'H') {
+            if (childIndex % 2 === 1) {
+              endY = startY - visualLen; // Alternando, va verso l'alto (dispari)
+            } else {
+              endY = startY + visualLen; // Di default, va verso il basso (pari/singolo)
+            }
+          } else {
+            const sgnY = parentEndY - parentStartY < 0 ? -1 : 1;
+            endY = startY + sgnY * visualLen;
+          }
         }
       }
 
@@ -133,7 +286,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
         lineColor = "#1d4ed8"; // Blu scuro
       } else if (node.hierarchy === 'dorsale_secondaria') {
         lineThickness = 3.5;
-        lineColor = "#2563eb"; // Blu
+        lineColor = "#0ea5e9"; // Celeste / Azzurro chiaro
       } else if (node.hierarchy === 'dorsale_terziaria') {
         lineThickness = 2.5;
         lineColor = "#10b981"; // Smeraldo
@@ -178,33 +331,31 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
       // Ricorsione sui figli
       const sortedChildren = [...node.children].sort((a, b) => a.tag.localeCompare(b.tag));
       
-      // Contatori per distribuire i figli orizzontali e verticali separatamente
-      let hCount = 0;
+      let hasStraight = false;
       let vCount = 0;
 
-      sortedChildren.forEach(child => {
-        let childDir: 'H' | 'V' = 'H';
-        if (dir === 'H') {
-          if (child.hierarchy === 'dorsale_secondaria' || child.hierarchy === 'dorsale_terziaria' || child.hierarchy === 'utenza') {
-            childDir = 'V';
+      sortedChildren.forEach((child) => {
+        // Se la gerarchia del figlio è identica a quella del genitore prosegue dritto (stessa direzione 'dir'),
+        // altrimenti svolta di 90 gradi.
+        const desiredDir: 'H' | 'V' = child.hierarchy === node.hierarchy ? dir : (dir === 'H' ? 'V' : 'H');
+        
+        let actualDir = desiredDir;
+        if (desiredDir === dir) {
+          if (!hasStraight) {
+            hasStraight = true;
           } else {
-            childDir = 'H';
-          }
-        } else {
-          if (child.hierarchy === 'dorsale_terziaria' || child.hierarchy === 'utenza') {
-            childDir = 'H';
-          } else {
-            childDir = 'V';
+            // Se c'è già un ramo che prosegue dritto, forziamo questo a svoltare per evitare sovrapposizioni
+            actualDir = dir === 'H' ? 'V' : 'H';
           }
         }
 
-        if (childDir === 'H') {
-          layoutNode(child, startX, startY, endX, endY, dir, hCount, 'H');
-          hCount++;
-        } else {
-          layoutNode(child, startX, startY, endX, endY, dir, vCount, 'V');
+        let childIndex = 0;
+        if (actualDir === 'V') {
+          childIndex = vCount;
           vCount++;
         }
+
+        layoutNode(child, startX, startY, endX, endY, dir, childIndex, actualDir);
       });
     };
 
@@ -261,12 +412,13 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
 
   return (
     <div className="w-full overflow-x-auto bg-slate-50 border border-slate-200 rounded-xl p-4 print:bg-white print:border-none print:p-0">
-      <div style={{ width: '100%', minWidth: `${totalWidth}px` }} className="mx-auto print:!min-w-0 print:!w-full">
+      <div style={{ width: '100%', minWidth: `${totalWidth}px` }} className="mx-auto print:!min-w-0 print:!w-full print:flex print:justify-center">
         <svg 
-          width="100%" 
+          width={totalWidth} 
           height={totalHeight} 
           viewBox={`0 0 ${totalWidth} ${totalHeight}`} 
-          className="select-none font-sans print:h-auto print:w-full print:mx-auto"
+          style={{ maxWidth: '100%', height: 'auto' }}
+          className="select-none font-sans print:max-h-[250px] print:mx-auto"
         >
           {/* Definiamo i marker per le frecce terminali dei rami sottili */}
           <defs>
@@ -342,7 +494,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
       </div>
       <div className="flex gap-4 justify-center mt-3 text-[10px] text-slate-400 print:hidden">
         <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1.5 bg-[#1d4ed8]"></span> Dorsale Principale</div>
-        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-[#2563eb]"></span> Dorsale Secondaria</div>
+        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-[#0ea5e9]"></span> Dorsale Secondaria</div>
         <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-[#10b981]"></span> Dorsale Terziaria</div>
         <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-px bg-[#64748b]"></span> Tratto Terminale / Utenza</div>
       </div>

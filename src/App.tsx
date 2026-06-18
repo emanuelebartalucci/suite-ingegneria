@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { User } from 'firebase/auth';
 import { auth, db, isFirebaseMock } from './firebase/config';
@@ -11,6 +11,7 @@ import { ToolDispersione } from './tools/ToolDispersione';
 import { ToolVerificaLinee } from './tools/ToolVerificaLinee';
 import { ToolDimensionamentoGas } from './tools/ToolDimensionamentoGas';
 import { IconWaves, IconFlame, IconThermometer, IconArrowUp, IconWind } from './components/Icons';
+import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star } from 'lucide-react';
 
 import logoImg from './assets/Logo.png';
 
@@ -94,6 +95,12 @@ export default function App() {
     const [newMemberIsAdmin, setNewMemberIsAdmin] = useState<boolean>(false);
     const [adminError, setAdminError] = useState<string>('');
     const [adminSuccess, setAdminSuccess] = useState<string>('');
+    const [adminActiveTab, setAdminActiveTab] = useState<'risorse' | 'ruoli'>('risorse');
+    const [selectedEmailForAdmin, setSelectedEmailForAdmin] = useState<string>('');
+
+    const nonAdminMembers = useMemo(() => {
+        return registryList.filter(m => m.role !== 'admin');
+    }, [registryList]);
 
     // Stati per notifiche e pop-up moderni
     const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -254,7 +261,7 @@ export default function App() {
         }
     }, [showAdminModal]);
 
-    // Inserimento nuovo dipendente
+    // Inserimento nuovo dipendente (Sempre ruolo 'user' di default)
     const handleAddMember = async (e: React.FormEvent) => {
         e.preventDefault();
         setAdminError('');
@@ -277,7 +284,7 @@ export default function App() {
         const newMember: RegistryMember = {
             name,
             email: emailVal,
-            role: newMemberIsAdmin ? 'admin' : 'user',
+            role: 'user',
             isSocio: false
         };
 
@@ -295,10 +302,52 @@ export default function App() {
             }
             setNewMemberName('');
             setNewMemberEmail('');
-            setNewMemberIsAdmin(false);
         } catch (err) {
             console.error("Errore nell'aggiungere dipendente:", err);
             setAdminError("Impossibile salvare il dipendente.");
+        }
+    };
+
+    // Elevazione utente ad Amministratore
+    const handleNominateAdmin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setAdminError('');
+        setAdminSuccess('');
+
+        if (!selectedEmailForAdmin) {
+            setAdminError("Seleziona una risorsa da nominare come amministratore.");
+            return;
+        }
+
+        const member = registryList.find(m => m.email.toLowerCase().trim() === selectedEmailForAdmin.toLowerCase().trim());
+        if (!member) {
+            setAdminError("Risorsa non trovata nell'anagrafica.");
+            return;
+        }
+
+        try {
+            const isDemoMode = isFirebaseMock || (userProfile && userProfile.isDemo);
+            if (isDemoMode) {
+                const updated = registryList.map(u => {
+                    if (u.email.toLowerCase().trim() === member.email.toLowerCase().trim()) {
+                        return { ...u, role: 'admin' as const };
+                    }
+                    return u;
+                });
+                saveLocalRegistry(updated as any);
+                setAdminSuccess(`Ruolo di ${member.name} aggiornato ad Amministratore in locale.`);
+                await fetchRegistry();
+            } else {
+                await updateDoc(doc(db, "anagrafica", member.email.toLowerCase().trim()), {
+                    role: 'admin'
+                });
+                setAdminSuccess(`Ruolo di ${member.name} aggiornato ad Amministratore nel database.`);
+                await fetchRegistry();
+            }
+            setSelectedEmailForAdmin('');
+        } catch (err) {
+            console.error("Errore nell'aggiornare ruolo:", err);
+            setAdminError("Impossibile nominare amministratore la risorsa selezionata.");
         }
     };
 
@@ -513,15 +562,16 @@ export default function App() {
             {/* ADMIN MODAL */}
             {showAdminModal && createPortal(
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-all">
-                    <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-scale-up text-left">
+                    <div className="bg-white rounded-[2rem] shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-scale-up text-left">
                         {/* Header */}
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                             <div>
                                 <h3 className="font-black text-xl text-slate-800 flex items-center gap-2">
-                                    <span>⚙️</span> Gestione Anagrafica Dipendenti
+                                    <div className="p-2 bg-slate-100 rounded-xl"><Settings className="w-5 h-5 text-slate-700 animate-spin-slow" /></div>
+                                    Impostazioni Piattaforma
                                 </h3>
                                 <p className="text-slate-400 text-xs mt-1">
-                                    Aggiungi, elimina e imposta i permessi degli utenti della Suite
+                                    Aggiungi risorse all'anagrafica ed eleva utenti con privilegi amministrativi
                                 </p>
                             </div>
                             <button 
@@ -532,121 +582,240 @@ export default function App() {
                             </button>
                         </div>
 
+                        {/* Menu a schede (Tabs) */}
+                        <div className="flex gap-2 px-6 py-3 border-b border-slate-150 bg-slate-50">
+                            <button
+                                onClick={() => setAdminActiveTab('risorse')}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all active:scale-95 cursor-pointer ${
+                                    adminActiveTab === 'risorse'
+                                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/10'
+                                        : 'bg-white/80 text-slate-600 hover:bg-slate-200 border border-slate-200'
+                                }`}
+                            >
+                                <Users className="w-3.5 h-3.5" />
+                                <span>Anagrafica Risorse</span>
+                            </button>
+
+                            <button
+                                onClick={() => setAdminActiveTab('ruoli')}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all active:scale-95 cursor-pointer ${
+                                    adminActiveTab === 'ruoli'
+                                        ? 'bg-purple-600 text-white shadow-md shadow-purple-500/10'
+                                        : 'bg-white/80 text-slate-600 hover:bg-slate-200 border border-slate-200'
+                                }`}
+                            >
+                                <Shield className="w-3.5 h-3.5" />
+                                <span>Ruoli & Permessi</span>
+                            </button>
+                        </div>
+
                         <div className="p-6 overflow-y-auto flex-1 space-y-6">
                             {adminError && (
-                                <div className="bg-red-500/10 border border-red-500/20 text-red-700 text-xs font-semibold rounded-2xl p-4 flex items-center gap-2">
+                                <div className="bg-red-500/10 border border-red-500/20 text-red-700 text-xs font-semibold rounded-2xl p-4 flex items-center gap-2 animate-in fade-in duration-300">
                                     <span>⚠️</span> {adminError}
                                 </div>
                             )}
                             {adminSuccess && (
-                                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 text-xs font-semibold rounded-2xl p-4 flex items-center gap-2">
+                                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 text-xs font-semibold rounded-2xl p-4 flex items-center gap-2 animate-in fade-in duration-300">
                                     <span>✅</span> {adminSuccess}
                                 </div>
                             )}
 
-                            {/* Form Nuovo Dipendente */}
-                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5">
-                                <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-4">Aggiungi Nuovo Dipendente</h4>
-                                <form onSubmit={handleAddMember} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Cognome Nome</label>
-                                        <input
-                                            type="text"
-                                            placeholder="es. Rossi Mario"
-                                            value={newMemberName}
-                                            onChange={e => setNewMemberName(e.target.value)}
-                                            className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:border-brand-500 font-sans"
-                                            required
-                                        />
+                            {/* TAB 1: Anagrafica Risorse */}
+                            {adminActiveTab === 'risorse' && (
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start animate-in fade-in duration-300">
+                                    {/* Form Aggiunta */}
+                                    <div className="lg:col-span-1 bg-gradient-to-br from-indigo-50 to-slate-50 p-5 rounded-3xl border border-indigo-100 shadow-sm">
+                                        <h4 className="text-sm font-bold text-indigo-900 mb-1 flex items-center gap-1.5">
+                                            <Users className="w-4 h-4 text-indigo-600" /> Nuova Risorsa
+                                        </h4>
+                                        <p className="text-[11px] text-indigo-700/80 mb-4">Inserisci una nuova risorsa nell'anagrafica aziendale.</p>
+                                        <form onSubmit={handleAddMember} className="space-y-4">
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-indigo-950 mb-1 ml-1">Cognome Nome</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="es. Rossi Mario"
+                                                    value={newMemberName}
+                                                    onChange={e => setNewMemberName(e.target.value)}
+                                                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 font-sans shadow-sm font-semibold"
+                                                    required
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-indigo-950 mb-1 ml-1">Email Aziendale</label>
+                                                <input
+                                                    type="email"
+                                                    placeholder="es. mrossi@ingegno06.it"
+                                                    value={newMemberEmail}
+                                                    onChange={e => setNewMemberEmail(e.target.value)}
+                                                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 font-mono shadow-sm font-medium"
+                                                    required
+                                                />
+                                            </div>
+                                            <button
+                                                type="submit"
+                                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-md shadow-indigo-500/10 cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                                            >
+                                                <Plus className="w-4 h-4" /> Aggiungi Risorsa
+                                            </button>
+                                        </form>
                                     </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Email Aziendale</label>
-                                        <input
-                                            type="email"
-                                            placeholder="es. mrossi@ingegno06.it"
-                                            value={newMemberEmail}
-                                            onChange={e => setNewMemberEmail(e.target.value)}
-                                            className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:border-brand-500 font-mono"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="flex items-center justify-between gap-4">
-                                        <div className="flex items-center gap-2 py-2">
-                                            <input
-                                                type="checkbox"
-                                                id="newAdminCheckbox"
-                                                checked={newMemberIsAdmin}
-                                                onChange={e => setNewMemberIsAdmin(e.target.checked)}
-                                                className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 border-slate-300 cursor-pointer"
-                                            />
-                                            <label htmlFor="newAdminCheckbox" className="text-xs font-semibold text-slate-700 cursor-pointer">
-                                                Amministratore
-                                            </label>
-                                        </div>
-                                        <button
-                                            type="submit"
-                                            className="bg-brand-600 hover:bg-brand-500 text-white font-bold py-2 px-4 rounded-xl text-xs shadow-md shadow-brand-600/10 cursor-pointer transition-colors"
-                                        >
-                                            Aggiungi
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
 
-                            {/* Lista Dipendenti */}
-                            <div>
-                                <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3">Elenco Registrati ({registryList.length})</h4>
-                                <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                                    {registryLoading ? (
-                                        <div className="p-8 text-center text-slate-400 text-xs">Caricamento anagrafica in corso...</div>
-                                    ) : (
-                                        <table className="w-full text-left border-collapse">
-                                            <thead>
-                                                <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                                                    <th className="py-3 px-4">Nominativo</th>
-                                                    <th className="py-3 px-4">Email</th>
-                                                    <th className="py-3 px-4 text-center">Amministratore</th>
-                                                    <th className="py-3 px-4 text-right">Azioni</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100 text-xs">
-                                                {registryList.map((m) => {
-                                                    const isSocio = m.isSocio || m.email === "mcorbellini@ingegno06.it" || m.email === "aprofeti@ingegno06.it";
-                                                    return (
-                                                        <tr key={m.email} className="hover:bg-slate-50/50">
-                                                            <td className="py-3.5 px-4 font-bold text-slate-800">{m.name}</td>
-                                                            <td className="py-3.5 px-4 font-mono text-slate-500">{m.email}</td>
-                                                            <td className="py-3.5 px-4 text-center">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={m.role === 'admin'}
-                                                                    disabled={isSocio}
-                                                                    onChange={() => handleToggleRole(m)}
-                                                                    className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 border-slate-300 cursor-pointer disabled:cursor-not-allowed"
-                                                                />
-                                                            </td>
-                                                            <td className="py-3.5 px-4 text-right">
-                                                                {isSocio ? (
-                                                                    <span className="text-[9px] bg-slate-100 text-slate-500 px-2.5 py-1 rounded-full font-bold border border-slate-200 select-none">
-                                                                        SOCIO
-                                                                    </span>
-                                                                ) : (
-                                                                    <button
-                                                                        onClick={() => handleDeleteMember(m)}
-                                                                        className="px-2.5 py-1 bg-red-50 hover:bg-red-650 text-red-500 hover:text-white rounded-lg text-[10px] font-bold border border-red-200 hover:border-red-650 transition-all cursor-pointer"
-                                                                    >
-                                                                        Elimina
-                                                                    </button>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    )}
+                                    {/* Tabella Elenco */}
+                                    <div className="lg:col-span-2 space-y-3">
+                                        <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-between">
+                                            <span>Elenco Registrati ({registryList.length})</span>
+                                        </h4>
+                                        <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
+                                            {registryLoading ? (
+                                                <div className="p-8 text-center text-slate-400 text-xs">Caricamento anagrafica in corso...</div>
+                                            ) : (
+                                                <div className="max-h-[50vh] overflow-y-auto">
+                                                    <table className="w-full text-left border-collapse">
+                                                        <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider shadow-sm z-10">
+                                                            <tr>
+                                                                <th className="py-3 px-4">Nominativo</th>
+                                                                <th className="py-3 px-4">Email</th>
+                                                                <th className="py-3 px-4 text-center">Ruolo</th>
+                                                                <th className="py-3 px-4 text-right">Azioni</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100 text-xs">
+                                                            {registryList.map((m) => {
+                                                                const isSocio = m.isSocio || m.email === "mcorbellini@ingegno06.it" || m.email === "aprofeti@ingegno06.it";
+                                                                return (
+                                                                    <tr key={m.email} className="hover:bg-slate-50/50 transition-colors">
+                                                                        <td className="py-3.5 px-4 font-bold text-slate-800">{m.name}</td>
+                                                                        <td className="py-3.5 px-4 font-mono text-slate-500">{m.email}</td>
+                                                                        <td className="py-3.5 px-4 text-center">
+                                                                            {m.role === 'admin' ? (
+                                                                                <span className="text-[10px] bg-rose-500/10 text-rose-700 px-2 py-0.5 rounded-full font-bold">Admin</span>
+                                                                            ) : (
+                                                                                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-bold border border-slate-200">Utente</span>
+                                                                            )}
+                                                                        </td>
+                                                                        <td className="py-3.5 px-4 text-right">
+                                                                            {isSocio ? (
+                                                                                <span className="text-[9px] bg-rose-100 text-rose-700 px-2.5 py-1 rounded-full font-bold border border-rose-200 select-none">
+                                                                                    SOCIO
+                                                                                </span>
+                                                                            ) : (
+                                                                                <button
+                                                                                    onClick={() => handleDeleteMember(m)}
+                                                                                    className="p-1.5 text-slate-450 hover:text-red-650 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                                                                    title="Elimina dall'anagrafica"
+                                                                                >
+                                                                                    <Trash2 className="w-4 h-4" />
+                                                                                </button>
+                                                                            )}
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
+
+                            {/* TAB 2: Ruoli & Permessi */}
+                            {adminActiveTab === 'ruoli' && (
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start animate-in fade-in duration-300">
+                                    {/* Form Nomina */}
+                                    <div className="lg:col-span-1 bg-gradient-to-br from-purple-50 to-indigo-50 p-5 rounded-3xl border border-purple-100 shadow-sm">
+                                        <h4 className="text-sm font-bold text-purple-900 mb-1 flex items-center gap-1.5">
+                                            <Shield className="w-4 h-4 text-purple-600" /> Nomina Admin
+                                        </h4>
+                                        <p className="text-[11px] text-purple-700/80 mb-4">Promuovi una risorsa per concedere i privilegi di amministratore.</p>
+                                        <form onSubmit={handleNominateAdmin} className="space-y-4">
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-purple-950 mb-1 ml-1">Seleziona Risorsa</label>
+                                                <select
+                                                    required
+                                                    value={selectedEmailForAdmin}
+                                                    onChange={e => setSelectedEmailForAdmin(e.target.value)}
+                                                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-400 font-semibold shadow-sm cursor-pointer"
+                                                >
+                                                    <option value="">-- Scegli risorsa --</option>
+                                                    {nonAdminMembers.map(m => (
+                                                        <option key={m.email} value={m.email}>{m.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <button
+                                                type="submit"
+                                                className="w-full bg-purple-600 hover:bg-purple-750 text-white font-bold py-2.5 px-4 rounded-xl text-xs shadow-md shadow-purple-500/10 cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-1.5"
+                                            >
+                                                <Plus className="w-4 h-4" /> Eleva ad Admin
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    {/* Elenco Amministratori */}
+                                    <div className="lg:col-span-2 space-y-3">
+                                        <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-1">Amministratori della Suite</h4>
+                                        <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm bg-white">
+                                            {registryLoading ? (
+                                                <div className="p-8 text-center text-slate-400 text-xs">Caricamento anagrafica in corso...</div>
+                                            ) : (
+                                                <div className="max-h-[50vh] overflow-y-auto">
+                                                    <table className="w-full text-left border-collapse">
+                                                        <thead className="sticky top-0 bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-400 uppercase tracking-wider shadow-sm z-10">
+                                                            <tr>
+                                                                <th className="py-3 px-4">Nominativo</th>
+                                                                <th className="py-3 px-4">Email</th>
+                                                                <th className="py-3 px-4 text-center">Tipo</th>
+                                                                <th className="py-3 px-4 text-right">Revoca Admin</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100 text-xs">
+                                                            {/* Prima mostriamo i Soci Proprietari hardcoded per sicurezza o da data */}
+                                                            {registryList.filter(m => m.role === 'admin' && (m.isSocio || m.email === "mcorbellini@ingegno06.it" || m.email === "aprofeti@ingegno06.it")).map((m) => (
+                                                                <tr key={m.email} className="bg-rose-50/10 hover:bg-rose-50/20 transition-colors">
+                                                                    <td className="py-3.5 px-4 font-bold text-rose-900">{m.name}</td>
+                                                                    <td className="py-3.5 px-4 font-mono text-rose-700/80">{m.email}</td>
+                                                                    <td className="py-3.5 px-4 text-center">
+                                                                        <span className="text-[9px] bg-rose-100 text-rose-700 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">SOCIO</span>
+                                                                    </td>
+                                                                    <td className="py-3.5 px-4 text-right">
+                                                                        <span className="p-1.5 text-slate-300 select-none cursor-not-allowed" title="Socio non revocabile">
+                                                                            <Shield className="w-4 h-4 inline-block opacity-40" />
+                                                                        </span>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+
+                                                            {/* Poi mostriamo gli altri amministratori dinamici */}
+                                                            {registryList.filter(m => m.role === 'admin' && !(m.isSocio || m.email === "mcorbellini@ingegno06.it" || m.email === "aprofeti@ingegno06.it")).map((m) => (
+                                                                <tr key={m.email} className="hover:bg-slate-50/50 transition-colors">
+                                                                    <td className="py-3.5 px-4 font-bold text-slate-800">{m.name}</td>
+                                                                    <td className="py-3.5 px-4 font-mono text-slate-500">{m.email}</td>
+                                                                    <td className="py-3.5 px-4 text-center">
+                                                                        <span className="text-[10px] bg-purple-100 text-purple-700 px-2.5 py-0.5 rounded-full font-bold">Admin</span>
+                                                                    </td>
+                                                                    <td className="py-3.5 px-4 text-right">
+                                                                        <button
+                                                                            onClick={() => handleToggleRole(m)}
+                                                                            className="p-1.5 text-slate-450 hover:text-red-650 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                                                            title="Revoca stato di Amministratore"
+                                                                        >
+                                                                            <Trash2 className="w-4 h-4" />
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Footer */}

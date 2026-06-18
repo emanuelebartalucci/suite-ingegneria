@@ -1207,7 +1207,7 @@ export function ToolDimensionamentoGas({
       </div>
 
       {/* REPORT COMPLETO DI DIMENSIONAMENTO E VERIFICA */}
-      <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 print:shadow-none print:border-none print:p-0 animate-slide-in">
+      <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 print:shadow-none print:border-none print:p-0 print:!break-inside-auto animate-slide-in">
         <h3 className="text-sm font-bold text-slate-700 border-b border-slate-100 pb-2 mb-4">
           Report di Dimensionamento e Verifica Linee Rete
         </h3>

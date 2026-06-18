@@ -521,7 +521,7 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
             </div>
 
             {/* Riepilogo Profilo e Grafico SVG - Posizionata in Fondo a Larghezza Intera */}
-            <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0">
+            <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0 print:!break-inside-auto">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
                     {/* Riepilogo (Larghezza 2/3) */}
                     <div className="md:col-span-2">
