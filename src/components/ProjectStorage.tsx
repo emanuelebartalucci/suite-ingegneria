@@ -82,14 +82,15 @@ export default function ProjectStorage({
       } else {
         const q = query(
           collection(db, `users/${u.uid}/projects`),
-          where("toolType", "==", toolType),
-          orderBy("updatedAt", "desc")
+          where("toolType", "==", toolType)
         );
         const querySnapshot = await getDocs(q);
         const list: Project[] = [];
         querySnapshot.forEach((docSnapshot) => {
           list.push({ id: docSnapshot.id, ...docSnapshot.data() } as Project);
         });
+        // Ordinamento in memoria per data decrescente (evita l'obbligo di creare un indice composito su Firestore)
+        list.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
         setProjects(list);
       }
     } catch (err) {

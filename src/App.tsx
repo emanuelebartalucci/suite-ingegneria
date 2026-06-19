@@ -11,7 +11,7 @@ import { ToolDispersione } from './tools/ToolDispersione';
 import { ToolVerificaLinee } from './tools/ToolVerificaLinee';
 import { ToolDimensionamentoGas } from './tools/ToolDimensionamentoGas';
 import { IconWaves, IconFlame, IconThermometer, IconArrowUp, IconWind } from './components/Icons';
-import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star } from 'lucide-react';
+import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap } from 'lucide-react';
 
 import logoImg from './assets/Logo.png';
 
@@ -78,6 +78,7 @@ export default function App() {
     const [authLoading, setAuthLoading] = useState<boolean>(true);
     const [appMode, setAppMode] = useState<string>('dashboard');
     const [prevMode, setPrevMode] = useState<string>('dashboard');
+    const [dashboardSection, setDashboardSection] = useState<'home' | 'termoidraulica' | 'elettrica'>('home');
     
     const [projectData, setProjectData] = useState<ProjectData>({
         client: 'Progetto Impianto',
@@ -113,6 +114,11 @@ export default function App() {
             seedRegistryIfEmpty(db);
         }
     }, [user]);
+
+    // Ripristina lo scorrimento all'inizio della pagina al cambio di tool o sezione dashboard
+    useEffect(() => {
+        window.scrollTo(0, 0);
+    }, [appMode, dashboardSection]);
 
     // Registrazione delle funzioni globali di notifica e popup
     useEffect(() => {
@@ -494,6 +500,18 @@ export default function App() {
                 </div>
             </div>
 
+            {appMode !== 'dashboard' && (
+                <div className="max-w-7xl mx-auto text-center mb-6 print:hidden">
+                    <h1 className="text-3xl md:text-4xl font-black tracking-tight drop-shadow-sm flex items-center justify-center gap-3">
+                        {appMode === 'idraulico' && <>🌊 <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Profilo Idraulico</span></>}
+                        {appMode === 'termico' && <>🔥 <span className="bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">Carichi Termici</span></>}
+                        {appMode === 'dispersione' && <>🌡️ <span className="bg-gradient-to-r from-rose-600 to-red-600 bg-clip-text text-transparent">Dispersioni</span></>}
+                        {appMode === 'verifica_linee' && <>📈 <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">Verifica Perdita Linee</span></>}
+                        {appMode === 'gas' && <>💨 <span className="bg-gradient-to-r from-purple-600 to-fuchsia-600 bg-clip-text text-transparent">Dimensionamento Gas</span></>}
+                    </h1>
+                </div>
+            )}
+
             <div className="max-w-7xl mx-auto">
                 {appMode === 'dashboard' && (
                     <div className="bg-white rounded-3xl shadow-xl p-10 text-center relative overflow-hidden">
@@ -503,46 +521,129 @@ export default function App() {
 
                         <img src={logoImg} alt="Logo" className="h-16 mx-auto mb-4 object-contain" onError={(e) => { (e.target as HTMLElement).style.display='none' }} />
                         <h1 className="text-3xl font-black text-slate-800 mb-2">Suite Ingegneria</h1>
-                        <p className="text-slate-500 mb-10 text-sm max-w-lg mx-auto">
-                            Strumenti professionali di dimensionamento e calcolo per reti idrauliche e termotecniche aziendali.
-                        </p>
                         
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-                            {/* 1. Profilo Idraulico */}
-                            <button onClick={() => setAppMode('idraulico')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-brand-500 hover:bg-brand-50 transition-all text-left cursor-pointer">
-                                <div className="w-14 h-14 bg-blue-100 text-brand-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconWaves /></div>
-                                <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Profilo Idraulico</h2>
-                                <p className="text-[11px] text-slate-500 text-center leading-relaxed">Perdite di carico, scabrezza e quote piezometriche.</p>
-                            </button>
+                        {dashboardSection === 'home' && (
+                            <>
+                                <p className="text-slate-500 mb-10 text-sm max-w-lg mx-auto">
+                                    Seleziona l'area tematica per accedere agli strumenti di dimensionamento e calcolo.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-4">
+                                    {/* Pulsante 1: Termoidraulica & Fluidi */}
+                                    <button 
+                                        onClick={() => setDashboardSection('termoidraulica')}
+                                        className="group flex flex-col items-center p-8 bg-slate-50 border-2 border-slate-200 rounded-[2rem] hover:border-brand-500 hover:bg-brand-50/30 shadow-md hover:shadow-xl transition-all text-center cursor-pointer min-h-[240px] justify-center"
+                                    >
+                                        <div className="w-18 h-18 bg-blue-100 text-brand-600 p-4.5 rounded-full mb-6 group-hover:scale-110 transition-transform flex items-center justify-center">
+                                            <IconWaves className="w-9 h-9" />
+                                        </div>
+                                        <h2 className="text-lg font-bold text-slate-800 mb-2">Termoidraulica & Fluidi</h2>
+                                        <p className="text-xs text-slate-500 leading-relaxed max-w-xs text-center">
+                                            Profilo idraulico, carichi termici, isolamento termico, verifica linee e gas.
+                                        </p>
+                                    </button>
 
-                            {/* 2. Carichi Termici */}
-                            <button onClick={() => setAppMode('termico')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-orange-500 hover:bg-orange-50 transition-all text-left cursor-pointer">
-                                <div className="w-14 h-14 bg-orange-100 text-orange-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconFlame /></div>
-                                <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Carichi Termici</h2>
-                                <p className="text-[11px] text-slate-500 text-center leading-relaxed">Portate, miscele glicole, calcolo Cp/ρ e tubi commerciali.</p>
-                            </button>
+                                    {/* Pulsante 2: Impianti Elettrici */}
+                                    <button 
+                                        onClick={() => setDashboardSection('elettrica')}
+                                        className="group flex flex-col items-center p-8 bg-slate-50 border-2 border-slate-200 rounded-[2rem] hover:border-amber-500 hover:bg-amber-50/30 shadow-md hover:shadow-xl transition-all text-center cursor-pointer min-h-[240px] justify-center"
+                                    >
+                                        <div className="w-18 h-18 bg-amber-100 text-amber-600 p-4.5 rounded-full mb-6 group-hover:scale-110 transition-transform flex items-center justify-center">
+                                            <Zap className="w-9 h-9" />
+                                        </div>
+                                        <h2 className="text-lg font-bold text-slate-800 mb-2">Impianti Elettrici</h2>
+                                        <p className="text-xs text-slate-500 leading-relaxed max-w-xs text-center">
+                                            Calcoli elettrici, dimensionamento condutture e cavi BT (sezione in sviluppo).
+                                        </p>
+                                    </button>
+                                </div>
+                            </>
+                        )}
 
-                            {/* 3. Dispersioni */}
-                            <button onClick={() => setAppMode('dispersione')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-redbrand-500 hover:bg-redbrand-50 transition-all text-left cursor-pointer">
-                                <div className="w-14 h-14 bg-redbrand-100 text-redbrand-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconThermometer /></div>
-                                <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Dispersioni</h2>
-                                <p className="text-[11px] text-slate-500 text-center leading-relaxed">Isolamento termico, sezione 2D e curva gradiente radiale.</p>
-                            </button>
+                        {dashboardSection === 'termoidraulica' && (
+                            <div className="animate-in fade-in duration-300">
+                                {/* Header di sezione */}
+                                <div className="flex flex-col sm:flex-row items-center justify-between border-b border-slate-100 pb-4 mb-8 gap-4">
+                                    <button
+                                        onClick={() => setDashboardSection('home')}
+                                        className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-150 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all active:scale-95 cursor-pointer shadow-sm border border-slate-200"
+                                    >
+                                        ← Indietro
+                                    </button>
+                                    <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                                        <span className="p-1.5 bg-blue-100 text-brand-600 rounded-lg flex items-center justify-center"><IconWaves className="w-4 h-4" /></span>
+                                        Termoidraulica & Fluidi
+                                    </h3>
+                                    <div className="w-[84px] hidden sm:block" /> {/* Bilanciamento spaziale */}
+                                </div>
 
-                            {/* 4. Verifica Perdita Linee */}
-                            <button onClick={() => setAppMode('verifica_linee')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left cursor-pointer">
-                                <div className="w-14 h-14 bg-emerald-100 text-emerald-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconArrowUp /></div>
-                                <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Verifica Perdita Linee</h2>
-                                <p className="text-[11px] text-slate-500 text-center leading-relaxed">Calcolo delle perdite di carico delle condutture, con accessori e albero di distribuzione.</p>
-                            </button>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 text-left">
+                                    {/* 1. Profilo Idraulico */}
+                                    <button onClick={() => setAppMode('idraulico')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-brand-500 hover:bg-brand-50 transition-all text-left cursor-pointer w-full">
+                                        <div className="w-14 h-14 bg-blue-100 text-brand-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconWaves /></div>
+                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Profilo Idraulico</h2>
+                                        <p className="text-[11px] text-slate-500 text-center leading-relaxed">Perdite di carico, scabrezza e quote piezometriche.</p>
+                                    </button>
 
-                            {/* 5. Dimensionamento Gas */}
-                            <button onClick={() => setAppMode('gas')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-purple-500 hover:bg-purple-50 transition-all text-left cursor-pointer">
-                                <div className="w-14 h-14 bg-purple-100 text-purple-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconWind /></div>
-                                <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Dimensionamento Gas</h2>
-                                <p className="text-[11px] text-slate-500 text-center leading-relaxed">Dimensionamento reti gas metano, azoto o ossigeno, con dislivelli geodetici ed accessori.</p>
-                            </button>
-                        </div>
+                                    {/* 2. Carichi Termici */}
+                                    <button onClick={() => setAppMode('termico')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-orange-500 hover:bg-orange-50 transition-all text-left cursor-pointer w-full">
+                                        <div className="w-14 h-14 bg-orange-100 text-orange-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconFlame /></div>
+                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Carichi Termici</h2>
+                                        <p className="text-[11px] text-slate-500 text-center leading-relaxed">Portate, miscele glicole, calcolo Cp/ρ e tubi commerciali.</p>
+                                    </button>
+
+                                    {/* 3. Dispersioni */}
+                                    <button onClick={() => setAppMode('dispersione')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-redbrand-500 hover:bg-redbrand-50 transition-all text-left cursor-pointer w-full">
+                                        <div className="w-14 h-14 bg-redbrand-100 text-redbrand-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconThermometer /></div>
+                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Dispersioni</h2>
+                                        <p className="text-[11px] text-slate-500 text-center leading-relaxed">Isolamento termico, sezione 2D e curva gradiente radiale.</p>
+                                    </button>
+
+                                    {/* 4. Verifica Perdita Linee */}
+                                    <button onClick={() => setAppMode('verifica_linee')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left cursor-pointer w-full">
+                                        <div className="w-14 h-14 bg-emerald-100 text-emerald-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconArrowUp /></div>
+                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Verifica Perdita Linee</h2>
+                                        <p className="text-[11px] text-slate-500 text-center leading-relaxed">Calcolo delle perdite di carico delle condutture, con accessori e albero di distribuzione.</p>
+                                    </button>
+
+                                    {/* 5. Dimensionamento Gas */}
+                                    <button onClick={() => setAppMode('gas')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-purple-500 hover:bg-purple-50 transition-all text-left cursor-pointer w-full">
+                                        <div className="w-14 h-14 bg-purple-100 text-purple-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconWind /></div>
+                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Dimensionamento Gas</h2>
+                                        <p className="text-[11px] text-slate-500 text-center leading-relaxed">Dimensionamento reti gas metano, azoto o ossigeno, con dislivelli geodetici ed accessori.</p>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {dashboardSection === 'elettrica' && (
+                            <div className="animate-in fade-in duration-300">
+                                {/* Header di sezione */}
+                                <div className="flex flex-col sm:flex-row items-center justify-between border-b border-slate-100 pb-4 mb-8 gap-4">
+                                    <button
+                                        onClick={() => setDashboardSection('home')}
+                                        className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-150 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all active:scale-95 cursor-pointer shadow-sm border border-slate-200"
+                                    >
+                                        ← Indietro
+                                    </button>
+                                    <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                                        <span className="p-1.5 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center"><Zap className="w-4 h-4" /></span>
+                                        Impianti Elettrici
+                                    </h3>
+                                    <div className="w-[84px] hidden sm:block" /> {/* Bilanciamento spaziale */}
+                                </div>
+
+                                {/* Sezione vuota di design premium */}
+                                <div className="py-16 px-6 border-2 border-dashed border-slate-200 rounded-3xl max-w-xl mx-auto flex flex-col items-center justify-center text-center bg-slate-50/50">
+                                    <div className="p-4 bg-slate-100 text-slate-400 rounded-full mb-4 shadow-inner">
+                                        <Zap className="w-12 h-12 stroke-1 animate-pulse" />
+                                    </div>
+                                    <h4 className="font-bold text-slate-700 mb-1.5 text-sm">Sezione Elettrica Vuota</h4>
+                                    <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
+                                        Questa area è pronta e predisposta per essere popolata con i tool di dimensionamento e calcolo non appena richiesti dagli ingegneri.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 

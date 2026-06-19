@@ -420,6 +420,40 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
           style={{ maxWidth: '100%', height: 'auto' }}
           className="select-none font-sans print:max-h-[250px] print:mx-auto"
         >
+          <style>{`
+            @media print {
+              .topo-highlight-line {
+                display: none !important;
+              }
+              .topo-line-dorsale-principale {
+                stroke: #1d4ed8 !important;
+                stroke-width: 5px !important;
+              }
+              .topo-line-dorsale-secondaria {
+                stroke: #0ea5e9 !important;
+                stroke-width: 3.5px !important;
+              }
+              .topo-line-dorsale-terziaria {
+                stroke: #10b981 !important;
+                stroke-width: 2.5px !important;
+              }
+              .topo-line-utenza {
+                stroke: #64748b !important;
+                stroke-width: 1.5px !important;
+              }
+              .topo-circle-node {
+                fill: #cbd5e1 !important;
+                stroke: #475569 !important;
+              }
+              .topo-circle-thick {
+                r: 4.5px !important;
+              }
+              .topo-circle-thin {
+                r: 3px !important;
+              }
+            }
+          `}</style>
+
           {/* Definiamo i marker per le frecce terminali dei rami sottili */}
           <defs>
             <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -447,7 +481,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
                   y2={l.y2}
                   stroke={isActive ? "rgba(249, 115, 22, 0.25)" : "rgba(59, 130, 246, 0.08)"}
                   strokeWidth={l.thickness + 8}
-                  className={isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 transition-opacity"}
+                  className={`topo-highlight-line ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 transition-opacity"}`}
                 />
                 {/* Linea reale del tratto */}
                 <line 
@@ -459,7 +493,11 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
                   strokeWidth={isActive ? l.thickness + 1 : l.thickness}
                   strokeLinecap="round"
                   markerEnd={l.thickness <= 2 ? "url(#arrow)" : undefined}
-                  className="transition-colors group-hover:stroke-orange-500"
+                  className={`transition-colors group-hover:stroke-orange-500 ${
+                    l.color === "#1d4ed8" ? "topo-line-dorsale-principale" :
+                    l.color === "#0ea5e9" ? "topo-line-dorsale-secondaria" :
+                    l.color === "#10b981" ? "topo-line-dorsale-terziaria" : "topo-line-utenza"
+                  }`}
                 />
                 {/* Nodo di giunzione all'inizio di ciascun tratto */}
                 <circle 
@@ -469,6 +507,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
                   fill={isActive ? "#ffedd5" : "#cbd5e1"} 
                   stroke={isActive ? "#f97316" : "#475569"} 
                   strokeWidth="1.5"
+                  className={`topo-circle-node ${l.thickness > 3 ? "topo-circle-thick" : "topo-circle-thin"}`}
                 />
               </g>
             );
