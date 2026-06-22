@@ -10,8 +10,10 @@ import { ToolCarichiTermici } from './tools/ToolCarichiTermici';
 import { ToolDispersione } from './tools/ToolDispersione';
 import { ToolVerificaLinee } from './tools/ToolVerificaLinee';
 import { ToolDimensionamentoGas } from './tools/ToolDimensionamentoGas';
+import { ToolCalcoliElettrici } from './tools/ToolCalcoliElettrici';
+import { ToolCalcoliVari } from './tools/ToolCalcoliVari';
 import { IconWaves, IconFlame, IconThermometer, IconArrowUp, IconWind } from './components/Icons';
-import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap } from 'lucide-react';
+import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap, Scale } from 'lucide-react';
 
 import logoImg from './assets/Logo.png';
 
@@ -453,18 +455,32 @@ export default function App() {
         <div className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans">
             {/* Global User Header Bar (in alto a sinistra/destra) */}
             <div className="max-w-7xl mx-auto flex justify-between items-center mb-6 text-xs text-slate-500 print:hidden gap-3">
-                {/* Sinistra: Pulsante Menù Principale (visibile solo se fuori dalla dashboard) */}
+                {/* Sinistra: Pulsante Torna Indietro e Pagina Principale (visibili solo se fuori dalla dashboard) */}
                 <div>
                     {appMode !== 'dashboard' ? (
-                        <button 
-                            onClick={() => setAppMode('dashboard')}
-                            className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 rounded-lg border border-slate-300 shadow-sm cursor-pointer transition-colors flex items-center gap-1.5 font-bold"
-                        >
-                            <svg className="w-3.5 h-3.5 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                            </svg>
-                            Menu Principale
-                        </button>
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => setAppMode('dashboard')}
+                                className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 rounded-lg border border-slate-300 shadow-sm cursor-pointer transition-colors flex items-center gap-1.5 font-bold"
+                            >
+                                <svg className="w-3.5 h-3.5 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                                </svg>
+                                Torna Indietro
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    setAppMode('dashboard');
+                                    setDashboardSection('home');
+                                }}
+                                className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 rounded-lg border border-slate-300 shadow-sm cursor-pointer transition-colors flex items-center gap-1.5 font-bold"
+                            >
+                                <svg className="w-3.5 h-3.5 text-slate-550" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                </svg>
+                                Pagina Principale
+                            </button>
+                        </div>
                     ) : <div />}
                 </div>
 
@@ -508,6 +524,8 @@ export default function App() {
                         {appMode === 'dispersione' && <>🌡️ <span className="bg-gradient-to-r from-rose-600 to-red-600 bg-clip-text text-transparent">Dispersioni</span></>}
                         {appMode === 'verifica_linee' && <>📈 <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">Verifica Perdita Linee</span></>}
                         {appMode === 'gas' && <>💨 <span className="bg-gradient-to-r from-purple-600 to-fuchsia-600 bg-clip-text text-transparent">Dimensionamento Gas</span></>}
+                        {appMode === 'calcoli_vari' && <>🛠️ <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Calcoli Rapidi & Utilità</span></>}
+                        {appMode === 'calcoli_elettrici' && <>⚡ <span className="bg-gradient-to-r from-amber-500 to-yellow-600 bg-clip-text text-transparent">Calcoli Elettrici Rapidi</span></>}
                     </h1>
                 </div>
             )}
@@ -576,7 +594,7 @@ export default function App() {
                                     <div className="w-[84px] hidden sm:block" /> {/* Bilanciamento spaziale */}
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 text-left">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 text-left">
                                     {/* 1. Profilo Idraulico */}
                                     <button onClick={() => setAppMode('idraulico')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-brand-500 hover:bg-brand-50 transition-all text-left cursor-pointer w-full">
                                         <div className="w-14 h-14 bg-blue-100 text-brand-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconWaves /></div>
@@ -611,6 +629,13 @@ export default function App() {
                                         <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Dimensionamento Gas</h2>
                                         <p className="text-[11px] text-slate-500 text-center leading-relaxed">Dimensionamento reti gas metano, azoto o ossigeno, con dislivelli geodetici ed accessori.</p>
                                     </button>
+
+                                    {/* 6. Calcoli Vari & Utilità */}
+                                    <button onClick={() => setAppMode('calcoli_vari')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left cursor-pointer w-full">
+                                        <div className="w-14 h-14 bg-blue-100 text-blue-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><Scale className="w-7 h-7" /></div>
+                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Calcoli Rapidi & Utilità</h2>
+                                        <p className="text-[11px] text-slate-500 text-center leading-relaxed">Conversioni veloci, distanza appoggi e volumi serbatoi.</p>
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -632,15 +657,13 @@ export default function App() {
                                     <div className="w-[84px] hidden sm:block" /> {/* Bilanciamento spaziale */}
                                 </div>
 
-                                {/* Sezione vuota di design premium */}
-                                <div className="py-16 px-6 border-2 border-dashed border-slate-200 rounded-3xl max-w-xl mx-auto flex flex-col items-center justify-center text-center bg-slate-50/50">
-                                    <div className="p-4 bg-slate-100 text-slate-400 rounded-full mb-4 shadow-inner">
-                                        <Zap className="w-12 h-12 stroke-1 animate-pulse" />
-                                    </div>
-                                    <h4 className="font-bold text-slate-700 mb-1.5 text-sm">Sezione Elettrica Vuota</h4>
-                                    <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
-                                        Questa area è pronta e predisposta per essere popolata con i tool di dimensionamento e calcolo non appena richiesti dagli ingegneri.
-                                    </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 text-left">
+                                    {/* 1. Calcoli Elettrici Rapidi */}
+                                    <button onClick={() => setAppMode('calcoli_elettrici')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-amber-500 hover:bg-amber-50 transition-all text-left cursor-pointer w-full">
+                                        <div className="w-14 h-14 bg-amber-100 text-amber-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><Zap className="w-7 h-7" /></div>
+                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Calcoli Elettrici Rapidi</h2>
+                                        <p className="text-[11px] text-slate-500 text-center leading-relaxed">Dimensionamento sezione conduttori e verifica caduta di tensione.</p>
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -652,6 +675,8 @@ export default function App() {
                 {appMode === 'dispersione' && <ToolDispersione projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 {appMode === 'verifica_linee' && <ToolVerificaLinee projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 {appMode === 'gas' && <ToolDimensionamentoGas projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
+                {appMode === 'calcoli_vari' && <ToolCalcoliVari projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
+                {appMode === 'calcoli_elettrici' && <ToolCalcoliElettrici projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
 
             </div>
 

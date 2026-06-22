@@ -1259,7 +1259,7 @@ export function ToolDimensionamentoGas({
                     <td className="py-2 px-1 pl-3 text-slate-500 truncate max-w-[150px]" title={b.utenzeLabel}>{b.utenzeLabel}</td>
                     <td className="py-2 pl-1 text-center">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${statusClasses}`} title={b.message}>
-                        {b.status === 'ok' ? 'OK' : b.status === 'warning' ? 'VERIFICA' : 'BLOCCATO'}
+                        {b.status === 'ok' ? 'Verificato' : b.status === 'warning' ? 'critico' : 'inadeguato'}
                       </span>
                     </td>
                   </tr>
