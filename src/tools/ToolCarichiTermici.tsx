@@ -382,11 +382,11 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
             />
 
             {/* Spiegazione & Formula */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+            <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
               <p>
                 <strong>Descrizione:</strong> Calcola la portata volumetrica e massica del fluido termovettore (acqua o miscele acqua-glicole) necessarie per soddisfare la potenza termica di ciascuna utenza, dimensionando il diametro interno teorico dei tubi in base alla velocità target impostata.
               </p>
-              <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+              <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                 <p className="font-bold text-slate-700 mb-2.5 text-[11px] uppercase tracking-wide">Formule applicate:</p>
                 <div className="space-y-3.5 pl-2 text-xs">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">

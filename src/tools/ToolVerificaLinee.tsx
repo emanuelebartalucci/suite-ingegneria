@@ -921,11 +921,11 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             />
 
             {/* Spiegazione & Formula */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+            <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
               <p>
                 <strong>Descrizione:</strong> Esegue il calcolo e la verifica idraulica e termica delle linee di tubazione per liquidi (acqua o miscele acqua-glicole), determinando le perdite di carico distribuite (Darcy-Weisbach) e concentrate (metodo delle lunghezze equivalenti degli accessori) e tracciando lo schema topologico ad albero.
               </p>
-              <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+              <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                 <p className="font-bold text-slate-700 mb-2.5 text-[11px] uppercase tracking-wide">Formule applicate per il moto dei liquidi:</p>
                 <div className="space-y-4 pl-2 text-xs">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">

@@ -228,9 +228,9 @@ export function ToolCalcoliElettrici({ projectData, setProjectData, setAppMode }
                   Calcolo Sezione Conduttori
                 </h3>
 
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+                <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
                   <p><strong>Descrizione:</strong> Calcola la sezione minima teorica dei conduttori in rame (resistività ρ = 0.0178 Ω·mm²/m a 20°C) necessaria per limitare la caduta di tensione entro la soglia desiderata, proponendo la sezione commerciale standard più idonea.</p>
-                  <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                  <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                     <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Formule di calcolo della sezione:</p>
                     <div className="space-y-3 font-serif pl-2 text-sm">
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -375,9 +375,9 @@ export function ToolCalcoliElettrici({ projectData, setProjectData, setAppMode }
                   Verifica Caduta di Tensione
                 </h3>
 
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-655 space-y-2.5 print:hidden">
+                <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-655 space-y-2.5 print:hidden">
                   <p><strong>Descrizione:</strong> Verifica la caduta di tensione (in Volt ed in percentuale) generata lungo una linea elettrica in rame a sezione nota, confrontando il risultato con il limite consigliato del 4% per gli impianti terminali.</p>
-                  <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                  <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                     <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Formule della caduta di tensione:</p>
                     <div className="space-y-3 font-serif pl-2 text-sm">
                       <div className="flex items-center gap-1.5 flex-wrap">
@@ -558,9 +558,9 @@ export function ToolCalcoliElettrici({ projectData, setProjectData, setAppMode }
                   Portate Standard Conduttori in Rame BT
                 </h3>
 
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+                <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
                   <p><strong>Descrizione:</strong> Elenca la portata termica nominale di corrente (Iz) per conduttori in rame isolati in PVC o gomma, secondo le norme UNEL 35011-72 e IEC 60364-5-52, in base al numero di conduttori attivi e al tipo di posa.</p>
-                  <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                  <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                     <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Riferimenti normativi e fattori di correzione:</p>
                     <div className="space-y-3 font-serif pl-2 text-sm">
                       <div>• Posa in aria/tubazione: Tabella UNEL 35011-72 / CEI UNEL 35024 (conduttori in rame isolati in PVC a 70°C o gomma a 90°C).</div>

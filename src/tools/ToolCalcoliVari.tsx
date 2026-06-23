@@ -338,6 +338,93 @@ const CATEGORY_LABELS: Record<string, string> = {
   angolo: 'Angolo'
 };
 
+const UNIT_LABELS: Record<string, string> = {
+  bar: 'bar',
+  mbar: 'mbar',
+  Pa: 'Pa',
+  kPa: 'kPa',
+  MPa: 'MPa',
+  atm: 'atm',
+  mH2O: 'm H₂O',
+  psi: 'psi',
+  C: '°C',
+  F: '°F',
+  K: 'K',
+  m3_h: 'm³/h',
+  l_min: 'l/min',
+  l_s: 'l/s',
+  m3_s: 'm³/s',
+  gpm: 'gpm (USA)',
+  m: 'm',
+  mm: 'mm',
+  cm: 'cm',
+  km: 'km',
+  in: 'in',
+  ft: 'ft',
+  yd: 'yd',
+  mi: 'mi',
+  W: 'W',
+  kW: 'kW',
+  MW: 'MW',
+  cv: 'cv',
+  hp: 'hp',
+  kcal_h: 'kcal/h',
+  btu_h: 'BTU/h',
+  m2: 'm²',
+  mm2: 'mm²',
+  cm2: 'cm²',
+  km2: 'km²',
+  he: 'he (ettari)',
+  are: 'are',
+  in2: 'in²',
+  ft2: 'ft²',
+  ac: 'ac (acri)',
+  J: 'J',
+  kJ: 'kJ',
+  MJ: 'MJ',
+  GJ: 'GJ',
+  cal: 'cal',
+  kcal: 'kcal',
+  Wh: 'Wh',
+  kWh: 'kWh',
+  MWh: 'MWh',
+  btu: 'BTU',
+  kgm: 'kg·m',
+  m_s: 'm/s',
+  km_h: 'km/h',
+  mph: 'mph',
+  kn: 'kn (nodi)',
+  ft_s: 'ft/s',
+  m3: 'm³',
+  dm3: 'dm³ (litri)',
+  cm3: 'cm³ (ml)',
+  mm3: 'mm³',
+  in3: 'in³',
+  ft3: 'ft³',
+  gal_us: 'gal (USA)',
+  gal_uk: 'gal (UK)',
+  kg_m3: 'kg/m³',
+  g_cm3: 'g/cm³',
+  lb_ft3: 'lb/ft³',
+  lb_in3: 'lb/in³',
+  m_s2: 'm/s²',
+  g: 'g',
+  cm_s2: 'cm/s²',
+  ft_s2: 'ft/s²',
+  N: 'N',
+  kN: 'kN',
+  daN: 'daN',
+  kgf: 'kg / kgf',
+  t: 't',
+  lbf: 'lbf',
+  oz: 'oz',
+  deg: '°',
+  rad: 'rad',
+  grad: 'grad',
+  arcmin: "'",
+  arcsec: '"'
+};
+
 const MATERIAL_PROPERTIES = {
   'Acciaio': { name: 'Acciaio', E: 210000, sigma: 140, rho: 7850 },
   'Rame': { name: 'Rame', E: 132000, sigma: 70, rho: 8960 },
@@ -1387,9 +1474,9 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                 Convertitore di Unità di Misura
               </h3>
               
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+              <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
                 <p><strong>Descrizione:</strong> Converte in tempo reale valori tra diverse unità di misura fisiche (Pressione, Temperatura, Portata, Lunghezza, Potenza, Superficie, Energia, Velocità, Volume, Densità, Accelerazione, Forza/Massa, Angolo) basate sugli standard scientifici internazionali.</p>
-                <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                   <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Formule di conversione applicate:</p>
                   <div className="space-y-3 font-serif pl-2">
                     <div className="flex items-center gap-1.5 text-sm">
@@ -1813,7 +1900,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                     <div><strong>Categoria:</strong></div>
                     <div>{CATEGORY_LABELS[data.convCategory] || data.convCategory}</div>
                     <div><strong>Valore inserito:</strong></div>
-                    <div>{formatNumber(data.convValSorgente, 4)} {data.convUnitSorgente}</div>
+                    <div>{formatNumber(data.convValSorgente, 4)} {UNIT_LABELS[data.convUnitSorgente] || data.convUnitSorgente}</div>
                   </div>
                 </div>
 
@@ -1828,7 +1915,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                         {conversionResult.toLocaleString('it-IT', { maximumFractionDigits: 5 })}
                       </p>
                       <span className="inline-block text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-bold">
-                        {data.convUnitDestinazione}
+                        {UNIT_LABELS[data.convUnitDestinazione] || data.convUnitDestinazione}
                       </span>
                     </div>
                   </div>
@@ -1849,9 +1936,9 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                 Distanza Appoggi Tubazioni Sospese
               </h3>
 
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+              <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
                 <p><strong>Descrizione:</strong> Calcola la spaziatura massima consigliata tra i sostegni di una condotta sospesa. Esegue una doppia verifica strutturale: limita la freccia elastica (inflessione) e controlla che lo sforzo di flessione massimo non superi la tensione ammissibile del materiale.</p>
-                <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                   <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Formule strutturali applicate (Trave appoggiata con carico uniformemente distribuito):</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 font-serif pl-2 text-sm">
                     <div className="flex items-center gap-1.5">
@@ -2201,9 +2288,9 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                 Volume Liquido in Serbatoio
               </h3>
 
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+              <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
                 <p><strong>Descrizione:</strong> Calcola il volume effettivo occupato dal liquido all'interno di serbatoi a riempimento parziale, per geometrie cilindriche orizzontali e sferiche.</p>
-                <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                   <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Formule geometriche applicate:</p>
                   <div className="space-y-3 font-serif pl-2 text-sm">
                     <div>
@@ -2375,9 +2462,9 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                 Portata - Sezione - Velocità
               </h3>
 
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-4 text-xs text-slate-650 space-y-2.5 print:hidden">
+              <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-4 text-xs text-slate-650 space-y-2.5 print:hidden">
                 <p><strong>Descrizione:</strong> Risolve l'equazione di continuità per condotte a sezione circolare piena. Inserendo due parametri qualsiasi, lo strumento calcola automaticamente il terzo parametro mancante (incognita libera).</p>
-                <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                   <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Equazione di continuità applicata:</p>
                   <div className="space-y-3 font-serif pl-2 text-sm">
                     <div className="flex items-center gap-1.5 flex-wrap">
@@ -2532,11 +2619,11 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
               </div>
 
               {/* Spiegazione & Formula (invisibile in stampa) */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+              <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
                 {data.foroTipo === 'circolare' && (
                   <>
                     <p><strong>Descrizione:</strong> Calcola la portata effluente da una luce circolare a spigolo vivo completamente sommersa, o ricava il battente/diametro necessario (incognita libera).</p>
-                    <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                    <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                       <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Equazioni di efflusso applicate:</p>
                       <div className="space-y-3 font-serif pl-2">
                         <div className="flex items-center gap-1 text-sm">
@@ -2560,7 +2647,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                 {data.foroTipo === 'tubo_interno' && (
                   <>
                     <p><strong>Descrizione:</strong> Calcola la portata effluente da una luce circolare con tubo addizionale interno (Borda) completamente sommersa, o ricava il battente/diametro necessario (incognita libera).</p>
-                    <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                    <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                       <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Equazioni di efflusso applicate:</p>
                       <div className="space-y-3 font-serif pl-2">
                         <div className="flex items-center gap-1 text-sm">
@@ -2584,7 +2671,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                 {data.foroTipo === 'tubo_esterno' && (
                   <>
                     <p><strong>Descrizione:</strong> Calcola la portata effluente da una luce circolare con tubo addizionale esterno (lunghezza &gt; 2 diametri), o ricava il battente/diametro necessario (incognita libera).</p>
-                    <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                    <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                       <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Equazioni di efflusso applicate:</p>
                       <div className="space-y-3 font-serif pl-2">
                         <div className="flex items-center gap-1 text-sm">
@@ -2608,7 +2695,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                 {data.foroTipo === 'rettangolare' && (
                   <>
                     <p><strong>Descrizione:</strong> Calcola il deflusso attraverso luci a battente rettangolari di grandi dimensioni verticali, dove il carico idraulico varia sensibilmente lungo la sezione.</p>
-                    <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                    <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                       <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Equazione di efflusso (rettangolo grande):</p>
                       <div className="space-y-3 font-serif pl-2">
                         <div className="flex items-center gap-1 text-sm">
@@ -2627,7 +2714,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                 {data.foroTipo === 'stramazzo_grossa' && (
                   <>
                     <p><strong>Descrizione:</strong> Calcola il deflusso sopra una bocca a stramazzo a parete grossa (soglia larga), in condizioni di carico indisturbato a monte.</p>
-                    <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                    <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                       <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Equazione dello stramazzo a parete grossa:</p>
                       <div className="space-y-3 font-serif pl-2">
                         <div className="flex items-center gap-1 text-sm">
@@ -2641,7 +2728,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                 {data.foroTipo === 'stramazzo_sottile' && (
                   <>
                     <p><strong>Descrizione:</strong> Calcola la portata effluente da uno stramazzo in parete sottile (o stramazzo Bazin) senza contrazione laterale.</p>
-                    <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                    <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                       <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Equazione dello stramazzo Bazin:</p>
                       <div className="space-y-3 font-serif pl-2">
                         <div className="flex items-center gap-1 text-sm">
@@ -3013,11 +3100,11 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
               </div>
 
               {/* Spiegazione & Formula */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+              <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
                 {data.svTipo === 'cilindrico_vert' && (
                   <>
                     <p><strong>Descrizione:</strong> Calcola il tempo di svuotamento gravitazionale completo per un serbatoio cilindrico verticale a fondo piatto, o ricava uno dei parametri dimensionali (incognita libera).</p>
-                    <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                    <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                       <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Formula di Torricelli (Cilindro Verticale):</p>
                       <div className="space-y-3 font-serif pl-2">
                         <div className="flex items-center gap-1 text-sm">
@@ -3035,7 +3122,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                 {data.svTipo === 'cilindrico_oriz' && (
                   <>
                     <p><strong>Descrizione:</strong> Calcola il tempo di svuotamento di un serbatoio cilindrico orizzontale a fondo circolare e teste piatte (estensione premium).</p>
-                    <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                    <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                       <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Equazione analitica integrata (Cilindro Orizzontale):</p>
                       <div className="space-y-3 font-serif pl-2">
                         <div className="flex items-center gap-1 text-sm">
@@ -3053,7 +3140,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                 {data.svTipo === 'sferico' && (
                   <>
                     <p><strong>Descrizione:</strong> Calcola il tempo di svuotamento di un serbatoio sferico a riempimento parziale con foro sul fondo (estensione premium).</p>
-                    <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                    <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                       <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Equazione analitica integrata (Serbatoio Sferico):</p>
                       <div className="space-y-3 font-serif pl-2">
                         <div className="flex items-center gap-1 text-sm">
@@ -3246,11 +3333,11 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
               </div>
 
               {/* Spiegazione & Formula */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+              <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
                 {data.plTipo === 'circolare' && (
                   <>
                     <p><strong>Descrizione:</strong> Calcola la portata e la velocità in una condotta circolare parzialmente riempita (fognatura a gravità), o determina uno dei parametri geometrici/scabrezza ad incognita libera.</p>
-                    <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                    <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                       <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Equazione di Gauckler-Strickler:</p>
                       <div className="space-y-3 font-serif pl-2">
                         <div className="flex items-center gap-1.5 text-sm">
@@ -3267,7 +3354,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                 {data.plTipo === 'rettangolare' && (
                   <>
                     <p><strong>Descrizione:</strong> Calcola la portata e la velocità in un canale rettangolare a pelo libero (o corso d'acqua/ruscello) utilizzando le formule di Chézy e Bazin.</p>
-                    <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                    <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                       <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Formule applicate (Chézy-Bazin):</p>
                       <div className="space-y-3 font-serif pl-2">
                         <div className="flex flex-col gap-2 text-sm">
@@ -3294,7 +3381,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                 {data.plTipo === 'khafagi_venturi' && (
                   <>
                     <p><strong>Descrizione:</strong> Calcola la portata passante in un canale di misura Khafagi-Venturi secondo la taratura del laboratorio dell'Università di Stoccarda.</p>
-                    <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                    <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                       <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Formula di Stoccarda:</p>
                       <div className="space-y-3 font-serif pl-2">
                         <div className="flex flex-col gap-1.5 text-sm">
@@ -3726,12 +3813,12 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
               </div>
 
               {/* Spiegazione & Formula con stile matematico elegante */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+              <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
                 <p>
                   <strong>Descrizione:</strong> Calcola il momento flettente massimo (M<sub>max</sub>) e il modulo di resistenza minimo (W<sub>min</sub>) necessari per la trave in base al vincolo e al carico, e suggerisce il profilo commerciale più piccolo che garantisce la resistenza strutturale.
                 </p>
                 
-                <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
                   <p className="font-bold text-slate-700 mb-2.5 text-[11px] uppercase tracking-wide">Formule di verifica stabilità applicate:</p>
                   <div className="space-y-4 pl-2">
                     {/* Formula momento */}
