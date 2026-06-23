@@ -77,156 +77,9 @@ interface ToolHVACProps {
   setAppMode: (mode: string) => void;
 }
 
-// Default/mock HVAC systems
-const DEFAULT_SYSTEMS: HVACSystem[] = [
-  { id: 'AH-102-01', name: 'AH-102-01', description: 'Macchina a parziale ricircolo - LINK CORRIDOR' },
-  { id: 'AH-103-01', name: 'AH-103-01', description: 'Macchina a parziale ricircolo - MAGAZZINO BASSO' },
-  { id: 'AH-104-01', name: 'AH-104-01', description: 'Macchina a tutta aria esterna - SERVIZI E LOCK' }
-];
-
-// Default/mock rooms (seeding the UI with data similar to Calcoli HVAC.xlsx)
-const DEFAULT_ROOMS: HVACRoom[] = [
-  {
-    id: 'room-1',
-    systemId: 'AH-102-01',
-    code: 'E001',
-    description: 'MATERIAL RECEIVING LINK CORRIDOR',
-    gmpClass: 'NC',
-    bioLevel: 'N.A.',
-    ricambiStd: 6,
-    ricambiApp: 6,
-    area: 238.5,
-    height: 2.7,
-    tempSummer: 22,
-    tempSummerTol: '≤ 25,0',
-    rhSummer: 50,
-    rhSummerTol: '≤ 65,0',
-    tempWinter: 22,
-    tempWinterTol: '≥ 15,0',
-    rhWinter: 50,
-    rhWinterTol: '≤ 65,0',
-    lightLoad_W_m2: 20,
-    peopleCount: 0,
-    peopleSensible_W: 100,
-    peopleLatent_W: 75,
-    externalHeatGain_W: 2400,
-    externalHeatLoss_W: 1800,
-    pressure_Pa: 0,
-    equipment: [
-      { id: 'eq-1-1', name: 'Ricarica AGV', power_W: 3000, quantity: 0, usageFactor: 0.5, dissipationFactor: 0.15 },
-      { id: 'eq-1-2', name: 'Motori rulliere', power_W: 1000, quantity: 4, usageFactor: 0.75, dissipationFactor: 0.15 }
-    ],
-    doors: [],
-    supplyTempSummer: 17,
-    supplyTempWinter: 25,
-    reheatZone: 'RC-102-01',
-    reheatCoilUpstreamTemp: 18.2
-  },
-  {
-    id: 'room-2',
-    systemId: 'AH-103-01',
-    code: 'A001',
-    description: 'ENTRANCE',
-    gmpClass: 'NC',
-    bioLevel: 'N.A.',
-    ricambiStd: 3,
-    ricambiApp: 3,
-    area: 18.51,
-    height: 5.2,
-    tempSummer: 22,
-    tempSummerTol: '±2',
-    rhSummer: 50,
-    rhSummerTol: '≤ 65,0',
-    tempWinter: 22,
-    tempWinterTol: '±2',
-    rhWinter: 50,
-    rhWinterTol: '≤ 65,0',
-    lightLoad_W_m2: 20,
-    peopleCount: 0,
-    peopleSensible_W: 100,
-    peopleLatent_W: 75,
-    externalHeatGain_W: 300,
-    externalHeatLoss_W: 250,
-    pressure_Pa: 0,
-    equipment: [],
-    doors: [],
-    supplyTempSummer: 18,
-    supplyTempWinter: 26,
-    reheatZone: 'RC-103-01',
-    reheatCoilUpstreamTemp: 18.1
-  },
-  {
-    id: 'room-3',
-    systemId: 'AH-103-01',
-    code: 'A002',
-    description: 'HANDLING AREA',
-    gmpClass: 'NC',
-    bioLevel: 'N.A.',
-    ricambiStd: 3,
-    ricambiApp: 3,
-    area: 366.14,
-    height: 5.2,
-    tempSummer: 22,
-    tempSummerTol: '≤ 25,0',
-    rhSummer: 50,
-    rhSummerTol: '≤ 65,0',
-    tempWinter: 22,
-    tempWinterTol: '≥ 15,0',
-    rhWinter: 50,
-    rhWinterTol: '≤ 65,0',
-    lightLoad_W_m2: 20,
-    peopleCount: 10,
-    peopleSensible_W: 100,
-    peopleLatent_W: 75,
-    externalHeatGain_W: 6500,
-    externalHeatLoss_W: 4200,
-    pressure_Pa: 0,
-    equipment: [
-      { id: 'eq-3-1', name: 'Motori rulliere', power_W: 1000, quantity: 3, usageFactor: 0.75, dissipationFactor: 0.15 },
-      { id: 'eq-3-2', name: 'Wrapping machine', power_W: 2000, quantity: 1, usageFactor: 0.5, dissipationFactor: 0.15 }
-    ],
-    doors: [],
-    supplyTempSummer: 17,
-    supplyTempWinter: 26,
-    reheatZone: 'RC-103-01',
-    reheatCoilUpstreamTemp: 18.1
-  },
-  {
-    id: 'room-4',
-    systemId: 'AH-104-01',
-    code: 'A104',
-    description: 'MALE CHANGING ROOM',
-    gmpClass: 'NC',
-    bioLevel: 'N.A.',
-    ricambiStd: 4,
-    ricambiApp: 4,
-    area: 18.37,
-    height: 2.7,
-    tempSummer: 22,
-    tempSummerTol: '±2',
-    rhSummer: 50,
-    rhSummerTol: '≤ 65,0',
-    tempWinter: 22,
-    tempWinterTol: '±2',
-    rhWinter: 50,
-    rhWinterTol: '≤ 65,0',
-    lightLoad_W_m2: 20,
-    peopleCount: 5,
-    peopleSensible_W: 100,
-    peopleLatent_W: 75,
-    externalHeatGain_W: 250,
-    externalHeatLoss_W: 200,
-    pressure_Pa: -5,
-    equipment: [],
-    doors: [
-      { id: 'leak-1', type: 'singola', direction: 'in', adjacentPressure_Pa: 0, description: 'Porta verso corridoio' }
-    ],
-    supplyTempSummer: 22,
-    supplyTempWinter: 22,
-    reheatZone: 'RC-104-01',
-    reheatCoilUpstreamTemp: 18.0
-  }
-];
+// Default empty systems and rooms
+const DEFAULT_SYSTEMS: HVACSystem[] = [];
+const DEFAULT_ROOMS: HVACRoom[] = [];
 
 export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACProps) {
   // Tabs: criteria (Locali & Criteri), flows (Portate Aria), leakage (Trafilamenti), reheat (Batterie di Post), summary (Consumi & Diametri)
@@ -454,23 +307,39 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
 
   // UI Handlers for Systems & Rooms
   const handleAddSystem = () => {
+    const suiteUI = (window as any).suiteUI;
     const code = prompt("Inserisci il codice del sistema (es. AH-105-01):");
     if (!code) return;
     if (systems.some(s => s.id === code)) {
-      alert("Questo sistema esiste già!");
+      if (suiteUI) {
+        suiteUI.toast("Questo sistema esiste già!", "error");
+      } else {
+        alert("Questo sistema esiste già!");
+      }
       return;
     }
     const desc = prompt("Inserisci una descrizione per il sistema:");
     const newSystem: HVACSystem = { id: code, name: code, description: desc || '' };
     setSystems([...systems, newSystem]);
+    if (suiteUI) {
+      suiteUI.toast("Sistema aggiunto con successo", "success");
+    }
   };
 
-  const handleRemoveSystem = (sysId: string) => {
-    if (confirm(`Sei sicuro di voler eliminare il sistema ${sysId} e tutti i suoi locali associati?`)) {
-      setSystems(systems.filter(s => s.id !== sysId));
-      setRooms(rooms.filter(r => r.systemId !== sysId));
-      if (selectedRoom?.systemId === sysId) {
-        setSelectedRoomId(rooms.find(r => r.systemId !== sysId)?.id || null);
+  const handleRemoveSystem = async (sysId: string) => {
+    const suiteUI = (window as any).suiteUI;
+    const isConfirmed = suiteUI
+      ? await suiteUI.confirm(`Sei sicuro di voler eliminare il sistema ${sysId} e tutti i suoi locali associati?`, "Elimina Sistema")
+      : window.confirm(`Sei sicuro di voler eliminare il sistema ${sysId} e tutti i suoi locali associati?`);
+    if (isConfirmed) {
+      setSystems(prev => prev.filter(s => s.id !== sysId));
+      setRooms(prev => prev.filter(r => r.systemId !== sysId));
+      setSelectedRoomId(prev => {
+        const remaining = rooms.filter(r => r.systemId !== sysId);
+        return remaining[0]?.id || null;
+      });
+      if (suiteUI) {
+        suiteUI.toast("Sistema e locali rimossi", "info");
       }
     }
   };
@@ -516,14 +385,25 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
 
     setRooms([...rooms, newRoom]);
     setSelectedRoomId(newId);
+    const suiteUI = (window as any).suiteUI;
+    if (suiteUI) {
+      suiteUI.toast("Locale aggiunto con successo", "success");
+    }
   };
 
-  const handleRemoveRoom = (roomId: string) => {
-    if (confirm("Sei sicuro di voler rimuovere questo locale?")) {
+  const handleRemoveRoom = async (roomId: string) => {
+    const suiteUI = (window as any).suiteUI;
+    const isConfirmed = suiteUI
+      ? await suiteUI.confirm("Sei sicuro di voler rimuovere questo locale?", "Rimuovi Locale")
+      : window.confirm("Sei sicuro di voler rimuovere questo locale?");
+    if (isConfirmed) {
       const updated = rooms.filter(r => r.id !== roomId);
       setRooms(updated);
       if (selectedRoomId === roomId) {
         setSelectedRoomId(updated[0]?.id || null);
+      }
+      if (suiteUI) {
+        suiteUI.toast("Locale rimosso con successo", "info");
       }
     }
   };
@@ -639,6 +519,54 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
         setProjectInfo={setProjectData}
       />
 
+      {/* Box Informativo con Formule */}
+      <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+        <p>
+          <strong>Descrizione:</strong> Questo strumento consente di effettuare il dimensionamento aeraulico completo dei sistemi HVAC (UTA). Calcola le portate d'aria per smaltimento carichi o ricambi minimi, esegue il bilancio aeraulico dei locali considerando infiltrazioni/trafilamenti dalle porte per pressione differenziale, e calcola il carico termico e la portata d'acqua per le batterie di post-riscaldo.
+        </p>
+        <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
+          <p className="font-bold text-slate-700 mb-2.5 text-[11px] uppercase tracking-wide">Formule e criteri di calcolo applicati:</p>
+          <div className="space-y-3.5 pl-2 text-xs">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span>• Portata Aria Estiva (smaltimento carichi):</span>
+              <span className="font-serif font-bold text-slate-800">
+                G<sub>estate</sub> = Q<sub>sens</sub> × 0.86 × (1 / 0.3) × [1 / (T<sub>locale</sub> - T<sub>imm,est</sub>)] [m³/h]
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span>• Portata Aria Invernale (dispersioni):</span>
+              <span className="font-serif font-bold text-slate-800">
+                G<sub>inverno</sub> = Q<sub>dispers</sub> × 0.86 × (1 / 0.3) × [1 / (T<sub>imm,inv</sub> - T<sub>locale</sub>)] [m³/h]
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span>• Portata per Ricambi d'Aria minimi:</span>
+              <span className="font-serif font-bold text-slate-800">
+                G<sub>ricambi</sub> = Volume × Ricambi Applicati [m³/h]
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span>• Trafilamento fessure porte per differenziale di pressione (ΔP):</span>
+              <span className="font-serif font-bold text-slate-800">
+                Q<sub>leak</sub> = l × s × α × 3600 × √|ΔP| [m³/h]
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span>• Equazione di bilancio aeraulico (Ripresa):</span>
+              <span className="font-serif font-bold text-slate-800">
+                G<sub>ripresa</sub> = G<sub>mandata</sub> + Infiltrazioni (Entranti) - Espulsioni - Trafilamenti (Uscenti)
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span>• Potenza termica Batteria Post-Riscaldo:</span>
+              <span className="font-serif font-bold text-slate-800">
+                P<sub>post</sub> = G<sub>mandata</sub> × (T<sub>valle</sub> - T<sub>monte</sub>) × 0.3 [kcal/h]
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Global Config / Parameter Controls */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-5 mb-6">
         <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
@@ -714,7 +642,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
               : 'bg-white border border-slate-200 text-slate-650 hover:bg-slate-50'
           }`}
         >
-          <IconWind />
+          <IconWind className="w-4 h-4 shrink-0" />
           2. Portate d'Aria
         </button>
         <button
@@ -822,6 +750,11 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                       </div>
                     );
                   })}
+                  {systems.length === 0 && (
+                    <div className="text-center py-8 text-slate-450 italic text-xs">
+                      Nessun sistema creato. Clicca su "+" in alto a destra per iniziare.
+                    </div>
+                  )}
                 </div>
               </div>
 
