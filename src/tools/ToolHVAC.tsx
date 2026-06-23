@@ -709,7 +709,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
         {/* TAB 1: Locali e Criteri di Design */}
         {activeTab === 'criteria' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:block">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 print:block">
               {/* Left pane: Systems and Room Tree */}
               <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4 print:hidden">
                 <div className="flex justify-between items-center border-b border-slate-100 pb-2">
@@ -1142,13 +1142,32 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                   <p className="text-slate-450 italic text-sm">Seleziona o crea un locale per iniziare.</p>
                 </div>
               )}
+
+              {/* Help Sidebar */}
+              <div className="lg:col-span-1 bg-amber-50/60 border border-amber-200/60 rounded-3xl p-5 space-y-4 print:hidden self-start shadow-sm text-xs text-slate-650">
+                <h5 className="font-bold text-amber-900 flex items-center gap-1.5 uppercase tracking-wide text-[10px]">
+                  💡 Guida: Locali & Carichi
+                </h5>
+                <div className="space-y-3 leading-relaxed">
+                  <p>In questa sezione definisci la struttura e i setpoint del locale:</p>
+                  <ul className="list-disc pl-4 space-y-1.5">
+                    <li><strong>Codice & Descrizione</strong>: Identificativi del locale.</li>
+                    <li><strong>Dimensioni</strong>: Area ed altezza per calcolare il volume.</li>
+                    <li><strong>GMP & Bio</strong>: Classificazioni di sterilità (es. NC, Classe A, L2).</li>
+                    <li><strong>Pressione Relativa (Pa)</strong>: La pressione target rispetto ai confinanti.</li>
+                    <li><strong>Carichi Sensibili (W)</strong>: Apporti per luci, persone ed esterni.</li>
+                    <li><strong>Apparecchiature</strong>: Carichi termici elettrici dissipati in ambiente.</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
         {/* TAB 2: Portate d'Aria */}
         {activeTab === 'flows' && (
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 print:block">
+            <div className="lg:col-span-3 space-y-6 print:w-full">
             {systems.map(sys => {
               const sysCalcs = roomCalculations.filter(c => c.room.systemId === sys.id);
               const sysTotals = systemCalculations.find(s => s.system.id === sys.id);
@@ -1266,13 +1285,29 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                 </div>
               );
             })}
+            </div>
+            {/* Help Sidebar */}
+            <div className="lg:col-span-1 bg-amber-50/60 border border-amber-200/60 rounded-3xl p-5 space-y-4 print:hidden self-start shadow-sm text-xs text-slate-650">
+              <h5 className="font-bold text-amber-900 flex items-center gap-1.5 uppercase tracking-wide text-[10px]">
+                💡 Guida: Portate d'Aria
+              </h5>
+              <div className="space-y-3 leading-relaxed">
+                <p>Questa tabella mostra il calcolo delle portate di mandata (G<sub>mandata</sub>) per ciascun locale:</p>
+                <ul className="list-disc pl-4 space-y-1.5">
+                  <li><strong>Portata Estiva (G<sub>est</sub>)</strong>: Basata sul carico sensibile estivo.</li>
+                  <li><strong>Portata Invernale (G<sub>inv</sub>)</strong>: Basata sulle dispersioni invernali.</li>
+                  <li><strong>Portata Ricambi (G<sub>ric</sub>)</strong>: Ricambi igienici minimi (Vol × Ricambi).</li>
+                  <li><strong>Mandata Adottata</strong>: Valore massimo tra estiva, invernale e ricambi, arrotondato ai 10 m³/h superiori.</li>
+                </ul>
+              </div>
+            </div>
           </div>
         )}
 
         {/* TAB 3: Bilancio Pressioni e Trafilamenti */}
         {activeTab === 'leakage' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:block">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 print:block">
               {/* Rooms panel */}
               <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4 print:hidden">
                 <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide border-b border-slate-100 pb-2">Seleziona Locale</h4>
@@ -1461,13 +1496,29 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                   })()}
                 </div>
               ) : null}
+
+              {/* Help Sidebar */}
+              <div className="lg:col-span-1 bg-amber-50/60 border border-amber-200/60 rounded-3xl p-5 space-y-4 print:hidden self-start shadow-sm text-xs text-slate-650">
+                <h5 className="font-bold text-amber-900 flex items-center gap-1.5 uppercase tracking-wide text-[10px]">
+                  💡 Guida: Trafilamenti
+                </h5>
+                <div className="space-y-3 leading-relaxed">
+                  <p>In questa sezione configuri i trafilamenti d'aria attraverso le porte:</p>
+                  <ul className="list-disc pl-4 space-y-1.5">
+                    <li><strong>ΔP (Pa)</strong>: Pressione locale - Pressione confine. Se negativo, l'aria entra (Infiltrazione). Se positivo, l'aria esce (Trafilamento).</li>
+                    <li><strong>Aria Calcolata (m³/h)</strong>: Portata passante per le fessure (2mm std) basata su perimetro porta e ΔP.</li>
+                    <li><strong>Bilancio Ripresa</strong>: G<sub>ripresa</sub> = G<sub>mandata</sub> + Infiltrazioni - Espulsione - Trafilamenti.</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
         {/* TAB 4: Batterie di Post */}
         {activeTab === 'reheat' && (
-          <div className="space-y-6 bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 print:block">
+            <div className="lg:col-span-3 bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-6 print:w-full">
             <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
               <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
                 Calcolo Dimensionamento Batterie di Post-Riscaldamento (RC)
@@ -1569,11 +1620,28 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
               </ul>
             </div>
           </div>
+          {/* Help Sidebar */}
+            <div className="lg:col-span-1 bg-amber-50/60 border border-amber-200/60 rounded-3xl p-5 space-y-4 print:hidden self-start shadow-sm text-xs text-slate-650">
+              <h5 className="font-bold text-amber-900 flex items-center gap-1.5 uppercase tracking-wide text-[10px]">
+                💡 Guida: Batterie di Post
+              </h5>
+              <div className="space-y-3 leading-relaxed">
+                <p>Questa tabella mostra il dimensionamento delle batterie di post-riscaldamento locali per l'inverno:</p>
+                <ul className="list-disc pl-4 space-y-1.5">
+                  <li><strong>T. Monte Batteria</strong>: Temperatura dell'aria in ingresso.</li>
+                  <li><strong>T. Valle Batteria</strong>: Temperatura di immissione invernale desiderata.</li>
+                  <li><strong>Potenza di Progetto (kW)</strong>: Potenza termica comprensiva del sovradimensionamento impostato.</li>
+                  <li><strong>Portata Acqua (l/h)</strong>: Calcolata sul salto termico dell'acqua (ΔT H₂O).</li>
+                </ul>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* TAB 5: Riepilogo Consumi */}
         {activeTab === 'summary' && (
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 print:block">
+            <div className="lg:col-span-3 space-y-6 print:w-full">
             {/* System aggregate summary card */}
             <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
               <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide border-b border-slate-100 pb-2">
@@ -1706,6 +1774,22 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                 >
                   🖨️ Stampa / Salva in PDF
                 </button>
+            </div>
+          </div>
+        </div>
+        {/* Help Sidebar */}
+            <div className="lg:col-span-1 bg-amber-50/60 border border-amber-200/60 rounded-3xl p-5 space-y-4 print:hidden self-start shadow-sm text-xs text-slate-650">
+              <h5 className="font-bold text-amber-900 flex items-center gap-1.5 uppercase tracking-wide text-[10px]">
+                💡 Guida: Riepilogo Consumi
+              </h5>
+              <div className="space-y-3 leading-relaxed">
+                <p>Questa scheda presenta il dimensionamento finale di progetto:</p>
+                <ul className="list-disc pl-4 space-y-1.5">
+                  <li><strong>Consumi Totali UTA</strong>: Portate globali e potenza totale delle batterie di post per macchina.</li>
+                  <li><strong>Diametro Tubazione DN</strong>: Calcolato per mantenere le velocità dell'acqua entro i limiti.</li>
+                  <li><strong>Valvola Consigliata</strong>: Suggerisce il Kvs per le valvole modulanti.</li>
+                  <li><strong>Dettaglio Locali</strong>: Tabella di riepilogo stanza per stanza per la stampa.</li>
+                </ul>
               </div>
             </div>
           </div>
