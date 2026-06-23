@@ -1635,6 +1635,64 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
               </div>
             </div>
 
+            {/* Dettaglio Singolo Locale Summary Card */}
+            <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide border-b border-slate-100 pb-2">
+                Dettaglio Calcoli e Dimensionamento per Singolo Locale
+              </h4>
+              <div className="overflow-x-auto text-[10px]">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[9px] bg-slate-50/50">
+                      <th className="py-2.5 px-2">Cod. Locale</th>
+                      <th className="py-2.5 px-2">Descrizione</th>
+                      <th className="py-2.5 px-2">Sistema</th>
+                      <th className="py-2.5 px-2 font-mono text-right">Vol (m³)</th>
+                      <th className="py-2.5 px-2 text-center">Ricambi (1/h)</th>
+                      <th className="py-2.5 px-2 font-mono text-right">Mandata (m³/h)</th>
+                      <th className="py-2.5 px-2 font-mono text-right">Infilt. / Traf. (m³/h)</th>
+                      <th className="py-2.5 px-2 font-mono text-right">Ripresa (m³/h)</th>
+                      <th className="py-2.5 px-2 text-center">Pressione (Pa)</th>
+                      <th className="py-2.5 px-2 font-mono text-right text-blue-800">Post (kW)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {roomCalculations.map(c => {
+                      const netLeakage = c.infiltrationFlow - c.exfiltrationFlow;
+                      const leakageText = netLeakage > 0 
+                        ? `+${netLeakage}` 
+                        : netLeakage < 0 
+                          ? `${netLeakage}` 
+                          : '0';
+                      return (
+                        <tr key={c.room.id} className="border-b border-slate-100 hover:bg-slate-50/45">
+                          <td className="py-2.5 px-2 font-bold font-mono">{c.room.code}</td>
+                          <td className="py-2.5 px-2 text-slate-600">{c.room.description || '-'}</td>
+                          <td className="py-2.5 px-2 font-mono text-slate-500">{c.room.systemId}</td>
+                          <td className="py-2.5 px-2 font-mono text-right">{formatNumber(c.volume, 1)}</td>
+                          <td className="py-2.5 px-2 text-center font-mono">{c.room.ricambiApp}</td>
+                          <td className="py-2.5 px-2 font-mono text-right">{formatNumber(c.adoptedFlow, 0)}</td>
+                          <td className="py-2.5 px-2 font-mono text-right text-slate-500">{leakageText}</td>
+                          <td className="py-2.5 px-2 font-mono text-right">{formatNumber(c.adoptedRipresaFlow, 0)}</td>
+                          <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-700">
+                            {c.room.pressure_Pa > 0 ? `+${c.room.pressure_Pa}` : c.room.pressure_Pa} Pa
+                          </td>
+                          <td className="py-2.5 px-2 font-mono text-right text-blue-700 font-bold">{formatNumber(c.reheatDesignPower_kW, 2)}</td>
+                        </tr>
+                      );
+                    })}
+                    {roomCalculations.length === 0 && (
+                      <tr>
+                        <td colSpan={10} className="text-center py-4 text-slate-450 italic">
+                          Nessun locale inserito nel progetto.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             {/* Print Friendly Project summary Card */}
             <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4 print:hidden">
               <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide border-b border-slate-100 pb-2">

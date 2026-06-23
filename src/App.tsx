@@ -527,7 +527,7 @@ export default function App() {
                         {appMode === 'gas' && <>💨 <span className="bg-gradient-to-r from-purple-600 to-fuchsia-600 bg-clip-text text-transparent">Dimensionamento Gas</span></>}
                         {appMode === 'calcoli_vari' && <>🛠️ <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Calcoli Rapidi & Utilità</span></>}
                         {appMode === 'calcoli_elettrici' && <>⚡ <span className="bg-gradient-to-r from-amber-500 to-yellow-600 bg-clip-text text-transparent">Calcoli Elettrici Rapidi</span></>}
-                        {appMode === 'hvac' && <>🌀 <span className="inline-block pb-1 pr-2 bg-gradient-to-r from-blue-600 to-cyan-650 bg-clip-text text-transparent">Dimensionamento HVAC</span></>}
+                        {appMode === 'hvac' && <>🌀 <span className="inline-block pb-1 pr-2 bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">Dimensionamento HVAC</span></>}
                     </h1>
                 </div>
             )}
