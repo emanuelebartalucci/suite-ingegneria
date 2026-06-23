@@ -26,3 +26,36 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Antigravity & Gemini Agent sessions and history
+.gemini/
+.gemini
+*.pb
+.agents-workspaces/
+.agents/scratch/
+.agents/logs/
+scratch/
+antigravity.db
+
+# Caches and temporary directories
+.eslintcache
+.cache/
+.vite/
+.tmp/
+tmp/
+temp/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Testing and Coverage
+coverage/
+.nyc_output/
+.pytest_cache/
+
+# OS-specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+

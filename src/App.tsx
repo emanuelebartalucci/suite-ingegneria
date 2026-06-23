@@ -12,6 +12,7 @@ import { ToolVerificaLinee } from './tools/ToolVerificaLinee';
 import { ToolDimensionamentoGas } from './tools/ToolDimensionamentoGas';
 import { ToolCalcoliElettrici } from './tools/ToolCalcoliElettrici';
 import { ToolCalcoliVari } from './tools/ToolCalcoliVari';
+import { ToolHVAC } from './tools/ToolHVAC';
 import { IconWaves, IconFlame, IconThermometer, IconArrowUp, IconWind } from './components/Icons';
 import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap, Scale } from 'lucide-react';
 
@@ -526,6 +527,7 @@ export default function App() {
                         {appMode === 'gas' && <>💨 <span className="bg-gradient-to-r from-purple-600 to-fuchsia-600 bg-clip-text text-transparent">Dimensionamento Gas</span></>}
                         {appMode === 'calcoli_vari' && <>🛠️ <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Calcoli Rapidi & Utilità</span></>}
                         {appMode === 'calcoli_elettrici' && <>⚡ <span className="bg-gradient-to-r from-amber-500 to-yellow-600 bg-clip-text text-transparent">Calcoli Elettrici Rapidi</span></>}
+                        {appMode === 'hvac' && <>🌀 <span className="bg-gradient-to-r from-blue-600 to-cyan-650 bg-clip-text text-transparent">Dimensionamento HVAC</span></>}
                     </h1>
                 </div>
             )}
@@ -594,7 +596,7 @@ export default function App() {
                                     <div className="w-[84px] hidden sm:block" /> {/* Bilanciamento spaziale */}
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 text-left">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-6 text-left">
                                     {/* 1. Profilo Idraulico */}
                                     <button onClick={() => setAppMode('idraulico')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-brand-500 hover:bg-brand-50 transition-all text-left cursor-pointer w-full">
                                         <div className="w-14 h-14 bg-blue-100 text-brand-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconWaves /></div>
@@ -630,7 +632,14 @@ export default function App() {
                                         <p className="text-[11px] text-slate-500 text-center leading-relaxed">Dimensionamento reti gas metano, azoto o ossigeno, con dislivelli geodetici ed accessori.</p>
                                     </button>
 
-                                    {/* 6. Calcoli Vari & Utilità */}
+                                    {/* 6. Dimensionamento HVAC */}
+                                    <button onClick={() => setAppMode('hvac')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left cursor-pointer w-full">
+                                        <div className="w-14 h-14 bg-blue-100 text-blue-650 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><IconWind className="w-7 h-7" /></div>
+                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Dimensionamento HVAC</h2>
+                                        <p className="text-[11px] text-slate-500 text-center leading-relaxed">Bilanci aeraulici, portate UTA, trafilamenti e batterie post-riscaldo.</p>
+                                    </button>
+
+                                    {/* 7. Calcoli Vari & Utilità */}
                                     <button onClick={() => setAppMode('calcoli_vari')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left cursor-pointer w-full">
                                         <div className="w-14 h-14 bg-blue-100 text-blue-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><Scale className="w-7 h-7" /></div>
                                         <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Calcoli Rapidi & Utilità</h2>
@@ -677,6 +686,7 @@ export default function App() {
                 {appMode === 'gas' && <ToolDimensionamentoGas projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 {appMode === 'calcoli_vari' && <ToolCalcoliVari projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 {appMode === 'calcoli_elettrici' && <ToolCalcoliElettrici projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
+                {appMode === 'hvac' && <ToolHVAC projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
 
             </div>
 
