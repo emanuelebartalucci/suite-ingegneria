@@ -106,7 +106,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
 
     const addLoad = () => {
         const newId = loads.length > 0 ? Math.max(...loads.map(l => l.id)) + 1 : 1;
-        setLoads([...loads, { id: newId, name: `Utenza ${newId}`, mode: 'power', inputVal: 300, material: 'Acciaio', DN: '50', PN: 'NORM' }]);
+        setLoads([...loads, { id: newId, name: `Utenza ${newId}`, mode: 'power', inputVal: '', material: 'Acciaio', DN: '50', PN: 'NORM' }]);
     };
 
     const duplicateLoad = (id: number) => {

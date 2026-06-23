@@ -29,15 +29,15 @@ const defaultData: CalcoliElettriciData = {
   activeSubTool: 'sezione',
   sezioneCorrente: '2', // Monofase default
   sezioneTensione: '230',
-  sezionePotenza: '3000',
+  sezionePotenza: '',
   sezioneCaduta: '9.2', // ~4% di 230V
-  sezioneLunghezza: '50',
+  sezioneLunghezza: '',
   
   cadutaCorrente: '2',
   cadutaTensione: '230',
-  cadutaPotenza: '3000',
+  cadutaPotenza: '',
   cadutaSezione: '2.5',
-  cadutaLunghezza: '50'
+  cadutaLunghezza: ''
 };
 
 const SEZIONI_COMMERCIALI = [1.5, 2.5, 4, 6, 10, 16, 25, 35, 50, 70, 95, 120, 150];

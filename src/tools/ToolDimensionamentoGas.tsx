@@ -470,7 +470,7 @@ export function ToolDimensionamentoGas({
     setUtilities([...utilities, {
       id: newId,
       name: `Utenza ${newId}`,
-      flowRate: 10,
+      flowRate: '',
       pOper: 1.02,
       tOper: 20,
       pMinRichiesta: 1.02,
@@ -493,7 +493,7 @@ export function ToolDimensionamentoGas({
     setBranches([...branches, {
       id: newId,
       parentId: defaultParent,
-      length: 10,
+      length: '',
       hMonte: 0,
       hValle: 0,
       material: 'Acciaio',

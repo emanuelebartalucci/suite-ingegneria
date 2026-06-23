@@ -48,7 +48,7 @@ interface ChartIdraulicoProps {
 }
 
 export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }: ToolProfiloIdraulicoProps) {
-    const [flowRate, setFlowRate] = useState<number | ''>(25);
+    const [flowRate, setFlowRate] = useState<number | ''>('');
     const [recircFactor, setRecircFactor] = useState<number | ''>(1);
     const [referenceElevation, setReferenceElevation] = useState<number | ''>(0);
     const [waterTemp, setWaterTemp] = useState<number | ''>(15);
@@ -97,10 +97,10 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
     const addElement = (type: 'weir' | 'pipe' | 'channel' | 'custom') => {
         const newId = elements.length > 0 ? Math.max(...elements.map(e => e.id)) + 1 : 1;
         let newEl: HydraulicElement = { id: newId, type, name: type === 'weir' ? 'Stramazzo (Sottile)' : type === 'pipe' ? 'Tubazione' : type === 'channel' ? 'Canale' : 'Perdita Fissa' };
-        if (type === 'weir') newEl = { ...newEl, L: 1.0, weirType: 'sottile' };
-        if (type === 'pipe') newEl = { ...newEl, L: 10, material: 'manuale', D: 200, roughness: 0.02, localLosses: [] };
-        if (type === 'channel') newEl = { ...newEl, L: 5, slope: 0.005 };
-        if (type === 'custom') newEl = { ...newEl, loss: 0.05 };
+        if (type === 'weir') newEl = { ...newEl, L: '', weirType: 'sottile' };
+        if (type === 'pipe') newEl = { ...newEl, L: '', material: 'manuale', D: '', roughness: 0.02, localLosses: [] };
+        if (type === 'channel') newEl = { ...newEl, L: '', slope: 0.005 };
+        if (type === 'custom') newEl = { ...newEl, loss: '' };
         setElements([...elements, newEl]);
     };
 

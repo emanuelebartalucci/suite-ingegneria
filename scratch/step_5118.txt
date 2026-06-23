@@ -1,0 +1,303 @@
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1 ml-1">Da Unità</label>
+                      <select
+                        value={data.convUnitSorgente}
+                        onChange={e => updateField('convUnitSorgente', e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      >
+                        {data.convCategory === 'pressione' && (
+                          <>
+                            <option value="bar">bar</option>
+                            <option value="mbar">mbar</option>
+                            <option value="Pa">Pa</option>
+                            <option value="kPa">kPa</option>
+                            <option value="MPa">MPa</option>
+                            <option value="atm">atm</option>
+                            <option value="mH2O">m H₂O</option>
+                            <option value="psi">psi</option>
+                          </>
+                        )}
+                        {data.convCategory === 'temperatura' && (
+                          <>
+                            <option value="C">°C</option>
+                            <option value="F">°F</option>
+                            <option value="K">K</option>
+                          </>
+                        )}
+                        {data.convCategory === 'portata' && (
+                          <>
+                            <option value="m3_h">m³/h</option>
+                            <option value="l_min">l/min</option>
+                            <option value="l_s">l/s</option>
+                            <option value="m3_s">m³/s</option>
+                            <option value="gpm">gpm (USA)</option>
+                          </>
+                        )}
+                        {data.convCategory === 'lunghezza' && (
+                          <>
+                            <option value="m">m</option>
+                            <option value="mm">mm</option>
+                            <option value="cm">cm</option>
+                            <option value="km">km</option>
+                            <option value="in">in (pollici)</option>
+                            <option value="ft">ft (piedi)</option>
+                            <option value="yd">yd (iarde)</option>
+                            <option value="mi">mi (miglia)</option>
+                          </>
+                        )}
+                        {data.convCategory === 'potenza' && (
+                          <>
+                            <option value="W">W</option>
+                            <option value="kW">kW</option>
+                            <option value="MW">MW</option>
+                            <option value="cv">cv (Cavalli metrici)</option>
+                            <option value="hp">hp (Horsepower)</option>
+                            <option value="kcal_h">kcal/h</option>
+                            <option value="btu_h">BTU/h</option>
+                          </>
+                        )}
+                        {data.convCategory === 'superficie' && (
+                          <>
+                            <option value="m2">m²</option>
+                            <option value="mm2">mm²</option>
+                            <option value="cm2">cm²</option>
+                            <option value="km2">km²</option>
+                            <option value="he">he (ettari)</option>
+                            <option value="are">are</option>
+                            <option value="in2">in² (pollici²)</option>
+                            <option value="ft2">ft² (piedi²)</option>
+                            <option value="ac">ac (acri)</option>
+                          </>
+                        )}
+                        {data.convCategory === 'energia' && (
+                          <>
+                            <option value="J">J</option>
+                            <option value="kJ">kJ</option>
+                            <option value="MJ">MJ</option>
+                            <option value="GJ">GJ</option>
+                            <option value="cal">cal</option>
+                            <option value="kcal">kcal</option>
+                            <option value="Wh">Wh</option>
+                            <option value="kWh">kWh</option>
+                            <option value="MWh">MWh</option>
+                            <option value="btu">BTU</option>
+                            <option value="kgm">kg·m (chilogrammetri)</option>
+                          </>
+                        )}
+                        {data.convCategory === 'velocita' && (
+                          <>
+                            <option value="m_s">m/s</option>
+                            <option value="km_h">km/h</option>
+                            <option value="mph">mph (miglia/h)</option>
+                            <option value="kn">kn (nodi)</option>
+                            <option value="ft_s">ft/s (piedi/s)</option>
+                          </>
+                        )}
+                        {data.convCategory === 'volume' && (
+                          <>
+                            <option value="m3">m³</option>
+                            <option value="dm3">dm³ (litri)</option>
+                            <option value="cm3">cm³ (ml)</option>
+                            <option value="mm3">mm³</option>
+                            <option value="in3">in³ (pollici³)</option>
+                            <option value="ft3">ft³ (piedi³)</option>
+                            <option value="gal_us">gal (USA)</option>
+                            <option value="gal_uk">gal (UK)</option>
+                          </>
+                        )}
+                        {data.convCategory === 'densita' && (
+                          <>
+                            <option value="kg_m3">kg/m³</option>
+                            <option value="g_cm3">g/cm³ (kg/l)</option>
+                            <option value="lb_ft3">lb/ft³</option>
+                            <option value="lb_in3">lb/in³</option>
+                          </>
+                        )}
+                        {data.convCategory === 'accelerazione' && (
+                          <>
+                            <option value="m_s2">m/s²</option>
+                            <option value="g">g (gravità stand.)</option>
+                            <option value="cm_s2">cm/s² (Gal)</option>
+                            <option value="ft_s2">ft/s²</option>
+                          </>
+                        )}
+                        {data.convCategory === 'forza_massa' && (
+                          <>
+                            <option value="N">Newton (N)</option>
+                            <option value="kN">Kilonewton (kN)</option>
+                            <option value="daN">Decanewton (daN)</option>
+                            <option value="kgf">Chilogrammo (kg / kgf)</option>
+                            <option value="t">Tonnellata (t / tf)</option>
+                            <option value="g">Grammo (g / gf)</option>
+                            <option value="lbf">Libbra (lb / lbf)</option>
+                            <option value="oz">Oncia (oz)</option>
+                          </>
+                        )}
+                        {data.convCategory === 'angolo' && (
+                          <>
+                            <option value="deg">deg (gradi °)</option>
+                            <option value="rad">rad (radianti)</option>
+                            <option value="grad">grad (gon / centesimali)</option>
+                            <option value="arcmin">arcmin (primi ')</option>
+                            <option value="arcsec">arcsec (secondi ")</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1 ml-1">A Unità</label>
+                      <select
+                        value={data.convUnitDestinazione}
+                        onChange={e => updateField('convUnitDestinazione', e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      >
+                        {data.convCategory === 'pressione' && (
+                          <>
+                            <option value="bar">bar</option>
+                            <option value="mbar">mbar</option>
+                            <option value="Pa">Pa</option>
+                            <option value="kPa">kPa</option>
+                            <option value="MPa">MPa</option>
+                            <option value="atm">atm</option>
+                            <option value="mH2O">m H₂O</option>
+                            <option value="psi">psi</option>
+                          </>
+                        )}
+                        {data.convCategory === 'temperatura' && (
+                          <>
+                            <option value="C">°C</option>
+                            <option value="F">°F</option>
+                            <option value="K">K</option>
+                          </>
+                        )}
+                        {data.convCategory === 'portata' && (
+                          <>
+                            <option value="m3_h">m³/h</option>
+                            <option value="l_min">l/min</option>
+                            <option value="l_s">l/s</option>
+                            <option value="m3_s">m³/s</option>
+                            <option value="gpm">gpm (USA)</option>
+                          </>
+                        )}
+                        {data.convCategory === 'lunghezza' && (
+                          <>
+                            <option value="m">m</option>
+                            <option value="mm">mm</option>
+                            <option value="cm">cm</option>
+                            <option value="km">km</option>
+                            <option value="in">in (pollici)</option>
+                            <option value="ft">ft (piedi)</option>
+                            <option value="yd">yd (iarde)</option>
+                            <option value="mi">mi (miglia)</option>
+                          </>
+                        )}
+                        {data.convCategory === 'potenza' && (
+                          <>
+                            <option value="W">W</option>
+                            <option value="kW">kW</option>
+                            <option value="MW">MW</option>
+                            <option value="cv">cv (Cavalli metrici)</option>
+                            <option value="hp">hp (Horsepower)</option>
+                            <option value="kcal_h">kcal/h</option>
+                            <option value="btu_h">BTU/h</option>
+                          </>
+                        )}
+                        {data.convCategory === 'superficie' && (
+                          <>
+                            <option value="m2">m²</option>
+                            <option value="mm2">mm²</option>
+                            <option value="cm2">cm²</option>
+                            <option value="km2">km²</option>
+                            <option value="he">he (ettari)</option>
+                            <option value="are">are</option>
+                            <option value="in2">in² (pollici²)</option>
+                            <option value="ft2">ft² (piedi²)</option>
+                            <option value="ac">ac (acri)</option>
+                          </>
+                        )}
+                        {data.convCategory === 'energia' && (
+                          <>
+                            <option value="J">J</option>
+                            <option value="kJ">kJ</option>
+                            <option value="MJ">MJ</option>
+                            <option value="GJ">GJ</option>
+                            <option value="cal">cal</option>
+                            <option value="kcal">kcal</option>
+                            <option value="Wh">Wh</option>
+                            <option value="kWh">kWh</option>
+                            <option value="MWh">MWh</option>
+                            <option value="btu">BTU</option>
+                            <option value="kgm">kg·m (chilogrammetri)</option>
+                          </>
+                        )}
+                        {data.convCategory === 'velocita' && (
+                          <>
+                            <option value="m_s">m/s</option>
+                            <option value="km_h">km/h</option>
+                            <option value="mph">mph (miglia/h)</option>
+                            <option value="kn">kn (nodi)</option>
+                            <option value="ft_s">ft/s (piedi/s)</option>
+                          </>
+                        )}
+                        {data.convCategory === 'volume' && (
+                          <>
+                            <option value="m3">m³</option>
+                            <option value="dm3">dm³ (litri)</option>
+                            <option value="cm3">cm³ (ml)</option>
+                            <option value="mm3">mm³</option>
+                            <option value="in3">in³ (pollici³)</option>
+                            <option value="ft3">ft³ (piedi³)</option>
+                            <option value="gal_us">gal (USA)</option>
+                            <option value="gal_uk">gal (UK)</option>
+                          </>
+                        )}
+                        {data.convCategory === 'densita' && (
+                          <>
+                            <option value="kg_m3">kg/m³</option>
+                            <option value="g_cm3">g/cm³ (kg/l)</option>
+                            <option value="lb_ft3">lb/ft³</option>
+                            <option value="lb_in3">lb/in³</option>
+                          </>
+                        )}
+                        {data.convCategory === 'accelerazione' && (
+                          <>
+                            <option value="m_s2">m/s²</option>
+                            <option value="g">g (gravità stand.)</option>
+                            <option value="cm_s2">cm/s² (Gal)</option>
+                            <option value="ft_s2">ft/s²</option>
+                          </>
+                        )}
+                        {data.convCategory === 'forza_massa' && (
+                          <>
+                            <option value="N">Newton (N)</option>
+                            <option value="kN">Kilonewton (kN)</option>
+                            <option value="daN">Decanewton (daN)</option>
+                            <option value="kgf">Chilogrammo (kg / kgf)</option>
+                            <option value="t">Tonnellata (t / tf)</option>
+                            <option value="g">Grammo (g / gf)</option>
+                            <option value="lbf">Libbra (lb / lbf)</option>
+                            <option value="oz">Oncia (oz)</option>
+                          </>
+                        )}
+                        {data.convCategory === 'angolo' && (
+                          <>
+                            <option value="deg">deg (gradi °)</option>
+                            <option value="rad">rad (radianti)</option>
+                            <option value="grad">grad (gon / centesimali)</option>
+                            <option value="arcmin">arcmin (primi ')</option>
+                            <option value="arcsec">arcsec (secondi ")</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabella di riepilogo in stampa (sostituisce gli input) */}
+                <div className="hidden print:block border border-slate-200 rounded-2xl p-4 space-y-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide border-b pb-1 mb-2">Dati di Ingresso</p>
+                  <div className="grid grid-cols-2 gap-y-1.5 text-[11px] text-slate-650">
+                    <div><strong>Categoria:</strong></div>
+                    <div>{CATEGORY_LABELS[data.convCategory] || data.convCategory}</div>

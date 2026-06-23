@@ -497,7 +497,7 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }: Too
 
     const addLine = () => {
         const newId = lines.length > 0 ? Math.max(...lines.map(l => l.id)) + 1 : 1;
-        const newLines = [...lines, { id: newId, name: `Tratto ${newId}`, length: 100, material: 'Acciaio', DN: '100', PN: 'NORM', isoType: 'pur', isoLambda: 0.025, isoThick: 60 }];
+        const newLines = [...lines, { id: newId, name: `Tratto ${newId}`, length: '', material: 'Acciaio', DN: '100', PN: 'NORM', isoType: 'pur', isoLambda: 0.025, isoThick: 60 }];
         setLines(newLines);
         setSelectedLineId(newId);
     };

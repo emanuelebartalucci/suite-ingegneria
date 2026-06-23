@@ -1,0 +1,109 @@
+                <p><strong>Descrizione:</strong> Converte in tempo reale valori tra diverse unità di misura fisiche (Pressione, Temperatura, Portata, Lunghezza, Potenza, Superficie, Energia, Velocità, Volume, Densità, Accelerazione, Forza/Massa, Angolo) basate sugli standard scientifici internazionali.</p>
+                <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                  <p className="font-bold text-slate-700 mb-2 text-[11px] uppercase tracking-wide">Formule di conversione applicate:</p>
+                  <div className="space-y-3 font-serif pl-2">
+                    <div className="flex items-center gap-1.5 text-sm">
+                      <span>• Lineare (Pressione, Portata, Lunghezza, Potenza, ecc.):</span>
+                      <span className="font-bold text-slate-800">V<sub>dest</sub> = V<sub>sorg</sub> ×</span>
+                      <span className="inline-flex flex-col items-center align-middle mx-1 text-xs">
+                        <span className="border-b border-slate-400 px-2 pb-0.5 text-center font-bold">F<sub>sorg</sub></span>
+                        <span className="px-2 pt-0.5 text-center font-bold">F<sub>dest</sub></span>
+                      </span>
+                    </div>
+                    <div className="text-sm">
+                      • Temperatura: 
+                      <span className="font-bold text-slate-800 ml-2">T<sub>°F</sub> = T<sub>°C</sub> × 1.8 + 32</span>
+                      <span className="mx-2">|</span>
+                      <span className="font-bold text-slate-800">T<sub>K</sub> = T<sub>°C</sub> + 273.15</span>
+                    </div>
+                  </div>
+                  <p className="text-slate-400 text-[9px] mt-3 italic font-sans border-t border-slate-100 pt-2">* Dove F rappresenta il fattore di conversione lineare rispetto all'unità base del Sistema Internazionale (SI).</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 print:grid-cols-2">
+                {/* Inputs */}
+                <div className="space-y-4 print:hidden">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1 ml-1">Categoria di Misura</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button 
+                        onClick={() => updateField('convCategory', 'pressione')}
+                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-all ${data.convCategory === 'pressione' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                      >
+                        Pressione
+                      </button>
+                      <button 
+                        onClick={() => updateField('convCategory', 'temperatura')}
+                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-all ${data.convCategory === 'temperatura' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                      >
+                        Temperatura
+                      </button>
+                      <button 
+                        onClick={() => updateField('convCategory', 'portata')}
+                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-all ${data.convCategory === 'portata' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                      >
+                        Portata
+                      </button>
+                      <button 
+                        onClick={() => updateField('convCategory', 'lunghezza')}
+                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-all ${data.convCategory === 'lunghezza' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                      >
+                        Lunghezza
+                      </button>
+                      <button 
+                        onClick={() => updateField('convCategory', 'potenza')}
+                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-all ${data.convCategory === 'potenza' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                      >
+                        Potenza
+                      </button>
+                      <button 
+                        onClick={() => updateField('convCategory', 'superficie')}
+                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-all ${data.convCategory === 'superficie' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                      >
+                        Superficie
+                      </button>
+                      <button 
+                        onClick={() => updateField('convCategory', 'energia')}
+                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-all ${data.convCategory === 'energia' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                      >
+                        Energia
+                      </button>
+                      <button 
+                        onClick={() => updateField('convCategory', 'velocita')}
+                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-all ${data.convCategory === 'velocita' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                      >
+                        Velocità
+                      </button>
+                      <button 
+                        onClick={() => updateField('convCategory', 'volume')}
+                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-all ${data.convCategory === 'volume' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                      >
+                        Volume
+                      </button>
+                      <button 
+                        onClick={() => updateField('convCategory', 'densita')}
+                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-all ${data.convCategory === 'densita' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                      >
+                        Densità
+                      </button>
+                      <button 
+                        onClick={() => updateField('convCategory', 'accelerazione')}
+                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-all ${data.convCategory === 'accelerazione' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                      >
+                        Accelerazione
+                      </button>
+                      <button 
+                        onClick={() => updateField('convCategory', 'forza_massa')}
+                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-all ${data.convCategory === 'forza_massa' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                      >
+                        Forza · Massa
+                      </button>
+                      <button 
+                        onClick={() => updateField('convCategory', 'angolo')}
+                        className={`px-2.5 py-1.5 text-xs font-bold rounded-lg border transition-all ${data.convCategory === 'angolo' ? 'bg-blue-600 text-white border-blue-600 shadow' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                      >
+                        Angolo
+                      </button>
+                    </div>
+                  </div>
