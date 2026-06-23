@@ -535,7 +535,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
         const xPr = (Number(glycolPrPercent) || 0) / 100;
 
         // Proprietà di base dell'acqua pura alla temperatura T
-        const rho_water = 1000 - 0.22 * T - 0.003 * Math.pow(T, 2);
+        const rho_water = 1000 * (1 - ((T + 288.9414) / (508929.2 * (T + 68.12963))) * Math.pow(T - 3.9863, 2));
         const visc_water = 0.00179 / (1 + 0.0337 * T + 0.00022 * Math.pow(T, 2));
 
         // Incrementi di densità dovuti ai due glicoli

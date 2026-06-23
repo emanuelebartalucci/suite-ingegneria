@@ -50,7 +50,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
         const xPr = (Number(glycolPrPercent) || 0) / 100;
 
         if (fluidType === 'automatico') {
-            const rho_water = 1000 - 0.22 * T - 0.003 * Math.pow(T, 2);
+            const rho_water = 1000 * (1 - ((T + 288.9414) / (508929.2 * (T + 68.12963))) * Math.pow(T - 3.9863, 2));
             const cp_water = 4.186 + 0.0009 * T;
 
             const delta_rho_et = xEt * (160 - 0.35 * T) + Math.pow(xEt, 2) * 30;
