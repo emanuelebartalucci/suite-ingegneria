@@ -533,13 +533,15 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
       />
       
       {/* Persistence / Cloud Storage */}
-      <ProjectStorage 
-        toolType="hvac"
-        currentData={getCloudSaveData()}
-        onLoadProject={handleLoadCloudProject}
-        projectInfo={projectData}
-        setProjectInfo={setProjectData}
-      />
+      <div className="print:hidden">
+        <ProjectStorage 
+          toolType="hvac"
+          currentData={getCloudSaveData()}
+          onLoadProject={handleLoadCloudProject}
+          projectInfo={projectData}
+          setProjectInfo={setProjectData}
+        />
+      </div>
 
       {/* Box Informativo con Formule */}
       <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
@@ -644,7 +646,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-200 pb-2">
+      <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-200 pb-2 print:hidden">
         <button
           onClick={() => setActiveTab('criteria')}
           className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
@@ -707,14 +709,14 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
         {/* TAB 1: Locali e Criteri di Design */}
         {activeTab === 'criteria' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:block">
               {/* Left pane: Systems and Room Tree */}
-              <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+              <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4 print:hidden">
                 <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                   <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Sistemi e Locali</h4>
                   <button 
                     onClick={handleAddSystem}
-                    className="p-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
+                    className="p-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer print:hidden"
                     title="Aggiungi Sistema UTA"
                   >
                     <Plus className="w-4 h-4" />
@@ -728,17 +730,17 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                       <div key={sys.id} className="border border-slate-150 rounded-2xl p-3 bg-slate-50/50">
                         <div className="flex justify-between items-center mb-2">
                           <span className="text-xs font-black text-slate-800">{sys.id}</span>
-                          <div className="flex gap-1">
+                          <div className="flex gap-1 print:hidden">
                             <button 
                               onClick={() => handleAddRoom(sys.id)}
-                              className="p-1 text-slate-600 hover:text-blue-600 hover:bg-white rounded-md transition-colors cursor-pointer"
+                              className="p-1 text-slate-600 hover:text-blue-600 hover:bg-white rounded-md transition-colors cursor-pointer print:hidden"
                               title="Aggiungi Locale"
                             >
                               <Plus className="w-3.5 h-3.5" />
                             </button>
                             <button 
                               onClick={() => handleRemoveSystem(sys.id)}
-                              className="p-1 text-slate-400 hover:text-red-650 hover:bg-white rounded-md transition-colors cursor-pointer"
+                              className="p-1 text-slate-400 hover:text-red-650 hover:bg-white rounded-md transition-colors cursor-pointer print:hidden"
                               title="Elimina Sistema"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -782,7 +784,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
 
               {/* Right pane: Room Settings and Loads */}
               {selectedRoom ? (
-                <div className="lg:col-span-2 space-y-6">
+                <div className="lg:col-span-2 space-y-6 print:w-full">
                   {/* Room Metadata card */}
                   <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
                     <div className="flex justify-between items-start border-b border-slate-100 pb-3">
@@ -793,16 +795,16 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                         </div>
                         <p className="text-[10px] text-slate-400 mt-1">Associato a: <strong className="font-mono text-slate-600">{selectedRoom.systemId}</strong></p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 print:hidden">
                         <button 
                           onClick={() => handleDuplicateRoom(selectedRoom)}
-                          className="px-2.5 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold rounded-xl flex items-center gap-1 transition-colors cursor-pointer"
+                          className="px-2.5 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold rounded-xl flex items-center gap-1 transition-colors cursor-pointer print:hidden"
                         >
                           <IconCopy /> Duplica
                         </button>
                         <button 
                           onClick={() => handleRemoveRoom(selectedRoom.id)}
-                          className="px-2.5 py-1.5 bg-red-50 text-red-650 hover:bg-red-100 text-xs font-bold rounded-xl flex items-center gap-1 transition-colors cursor-pointer"
+                          className="px-2.5 py-1.5 bg-red-50 text-red-650 hover:bg-red-100 text-xs font-bold rounded-xl flex items-center gap-1 transition-colors cursor-pointer print:hidden"
                         >
                           <Trash2 className="w-3.5 h-3.5" /> Elimina
                         </button>
@@ -1045,7 +1047,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                       </h4>
                       <button
                         onClick={() => handleAddEquipment(selectedRoom.id)}
-                        className="px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                        className="px-2 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer print:hidden"
                       >
                         <Plus className="w-3.5 h-3.5" /> Aggiungi Apparecchio
                       </button>
@@ -1061,7 +1063,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                             <th className="py-2">Coeff. Utilizzo (%)</th>
                             <th className="py-2">Coeff. Dissipazione (%)</th>
                             <th className="py-2">Carico Dissipato (W)</th>
-                            <th className="py-2 text-right">Azioni</th>
+                            <th className="py-2 text-right print:hidden">Azioni</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1112,10 +1114,10 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                               <td className="py-1.5 font-bold font-mono text-slate-700">
                                 {formatNumber(eq.power_W * eq.quantity * eq.usageFactor * eq.dissipationFactor, 0)} W
                               </td>
-                              <td className="py-1.5 text-right">
+                              <td className="py-1.5 text-right print:hidden">
                                 <button
                                   onClick={() => handleRemoveEquipment(selectedRoom.id, eq.id)}
-                                  className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                  className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer print:hidden"
                                   title="Elimina apparecchiatura"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -1270,9 +1272,9 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
         {/* TAB 3: Bilancio Pressioni e Trafilamenti */}
         {activeTab === 'leakage' && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:block">
               {/* Rooms panel */}
-              <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+              <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4 print:hidden">
                 <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide border-b border-slate-100 pb-2">Seleziona Locale</h4>
                 <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
                   {rooms.map(r => {
@@ -1308,7 +1310,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
 
               {/* Doors Config & Flow calculations */}
               {selectedRoom ? (
-                <div className="lg:col-span-2 space-y-6">
+                <div className="lg:col-span-2 space-y-6 print:w-full">
                   {/* configurator */}
                   <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
                     <div className="flex justify-between items-center border-b border-slate-100 pb-2">
@@ -1320,7 +1322,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                       </div>
                       <button
                         onClick={() => handleAddDoor(selectedRoom.id)}
-                        className="px-2 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                        className="px-2 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer print:hidden"
                       >
                         <Plus className="w-3.5 h-3.5" /> Aggiungi Porta
                       </button>
@@ -1336,7 +1338,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                             <th className="py-2 font-mono">ΔP (Pa)</th>
                             <th className="py-2">Flusso</th>
                             <th className="py-2 text-right">Aria Calcolata (m³/h)</th>
-                            <th className="py-2 text-right">Azioni</th>
+                            <th className="py-2 text-right print:hidden">Azioni</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1393,10 +1395,10 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                                 <td className="py-1.5 text-right font-bold font-mono text-slate-800">
                                   {flow} m³/h
                                 </td>
-                                <td className="py-1.5 text-right">
+                                <td className="py-1.5 text-right print:hidden">
                                   <button
                                     onClick={() => handleRemoveDoor(selectedRoom.id, door.id)}
-                                    className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                    className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer print:hidden"
                                     title="Rimuovi porta"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -1634,7 +1636,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
             </div>
 
             {/* Print Friendly Project summary Card */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+            <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4 print:hidden">
               <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide border-b border-slate-100 pb-2">
                 Generatore di Report di Progetto
               </h4>
