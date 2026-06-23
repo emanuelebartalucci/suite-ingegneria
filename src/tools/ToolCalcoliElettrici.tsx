@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
+import { formatNumber } from '../utils/format';
 import { Zap, Calculator, Table, Printer } from 'lucide-react';
 
 interface ToolCalcoliElettriciProps {
@@ -323,13 +324,13 @@ export function ToolCalcoliElettrici({ projectData, setProjectData, setAppMode }
                       <div><strong>Tipo Corrente:</strong></div>
                       <div>{data.sezioneCorrente === '1' ? 'Continua' : data.sezioneCorrente === '2' ? 'Monofase' : 'Trifase'}</div>
                       <div><strong>Tensione:</strong></div>
-                      <div>{parseFloat(data.sezioneTensione).toFixed(0)} V</div>
+                      <div>{formatNumber(data.sezioneTensione, 0)} V</div>
                       <div><strong>Potenza Apparecchio:</strong></div>
-                      <div>{parseFloat(data.sezionePotenza).toLocaleString('it-IT')} W</div>
+                      <div>{formatNumber(data.sezionePotenza, 0)} W</div>
                       <div><strong>Caduta di Tensione Limite:</strong></div>
-                      <div>{parseFloat(data.sezioneCaduta).toFixed(1)} V</div>
+                      <div>{formatNumber(data.sezioneCaduta, 1)} V</div>
                       <div><strong>Lunghezza Condotta:</strong></div>
-                      <div>{parseFloat(data.sezioneLunghezza).toFixed(1)} m</div>
+                      <div>{formatNumber(data.sezioneLunghezza, 1)} m</div>
                     </div>
                   </div>
 
@@ -341,18 +342,18 @@ export function ToolCalcoliElettrici({ projectData, setProjectData, setAppMode }
                       <div className="space-y-4">
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Sezione Teorica Calcolata</p>
-                          <p className="text-3xl font-mono font-black text-slate-800">{sezioneResults.sezioneTeorica.toFixed(3)} <span className="text-sm font-sans font-normal text-slate-450">mm²</span></p>
+                          <p className="text-3xl font-mono font-black text-slate-800">{formatNumber(sezioneResults.sezioneTeorica, 3)} <span className="text-sm font-sans font-normal text-slate-450">mm²</span></p>
                         </div>
 
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Sezione Commerciale Consigliata</p>
-                          <p className="text-4xl font-mono font-black text-amber-600">{sezioneResults.sezioneCommerciale.toFixed(1)} <span className="text-base font-sans font-normal text-slate-450">mm²</span></p>
+                          <p className="text-4xl font-mono font-black text-amber-600">{formatNumber(sezioneResults.sezioneCommerciale, 1)} <span className="text-base font-sans font-normal text-slate-450">mm²</span></p>
                         </div>
                       </div>
                     </div>
 
                     <div className="mt-6 pt-4 border-t border-amber-200/50 text-[11px] text-slate-600 space-y-1">
-                      <p><strong>Corrente di impiego (Ib):</strong> {sezioneResults.corrente.toFixed(2)} A</p>
+                      <p><strong>Corrente di impiego (Ib):</strong> {formatNumber(sezioneResults.corrente, 2)} A</p>
                       <p><strong>Costante di resistività rame:</strong> 0.0178 Ω·mm²/m</p>
                       <p className="text-[10px] text-slate-400 leading-normal mt-2 italic print:hidden">
                         * Nota: Il calcolo è basato sulla formula della resistenza a incognita libera del rame a 20°C con fattore di potenza cosφ = 0.9 per i calcoli in alternata.
@@ -504,13 +505,13 @@ export function ToolCalcoliElettrici({ projectData, setProjectData, setAppMode }
                       <div><strong>Tipo Corrente:</strong></div>
                       <div>{data.cadutaCorrente === '1' ? 'Continua' : data.cadutaCorrente === '2' ? 'Monofase' : 'Trifase'}</div>
                       <div><strong>Tensione:</strong></div>
-                      <div>{parseFloat(data.cadutaTensione).toFixed(0)} V</div>
+                      <div>{formatNumber(data.cadutaTensione, 0)} V</div>
                       <div><strong>Potenza Apparecchio:</strong></div>
-                      <div>{parseFloat(data.cadutaPotenza).toLocaleString('it-IT')} W</div>
+                      <div>{formatNumber(data.cadutaPotenza, 0)} W</div>
                       <div><strong>Sezione Tubo/Cavo:</strong></div>
-                      <div>{parseFloat(data.cadutaSezione).toFixed(1)} mm²</div>
+                      <div>{formatNumber(data.cadutaSezione, 1)} mm²</div>
                       <div><strong>Lunghezza Condotta:</strong></div>
-                      <div>{parseFloat(data.cadutaLunghezza).toFixed(1)} m</div>
+                      <div>{formatNumber(data.cadutaLunghezza, 1)} m</div>
                     </div>
                   </div>
 
@@ -522,20 +523,20 @@ export function ToolCalcoliElettrici({ projectData, setProjectData, setAppMode }
                       <div className="space-y-4">
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Caduta di Tensione Totale</p>
-                          <p className="text-3xl font-mono font-black text-slate-800">{cadutaResults.cadutaVolt.toFixed(2)} <span className="text-sm font-sans font-normal text-slate-450">V</span></p>
+                          <p className="text-3xl font-mono font-black text-slate-800">{formatNumber(cadutaResults.cadutaVolt, 2)} <span className="text-sm font-sans font-normal text-slate-450">V</span></p>
                         </div>
 
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Caduta di Tensione Percentuale</p>
                           <p className={`text-4xl font-mono font-black ${cadutaResults.cadutaPerc > 4 ? 'text-red-600' : 'text-emerald-600'}`}>
-                            {cadutaResults.cadutaPerc.toFixed(2)} %
+                            {formatNumber(cadutaResults.cadutaPerc, 2)} %
                           </p>
                         </div>
                       </div>
                     </div>
 
                     <div className="mt-6 pt-4 border-t border-amber-200/50 text-[11px] text-slate-600 space-y-1">
-                      <p><strong>Corrente calcolata (Ib):</strong> {cadutaResults.corrente.toFixed(2)} A</p>
+                      <p><strong>Corrente calcolata (Ib):</strong> {formatNumber(cadutaResults.corrente, 2)} A</p>
                       <p><strong>Stato verifica (Limite 4%):</strong> {cadutaResults.cadutaPerc <= 4 ? (
                         <span className="text-emerald-600 font-bold">✓ OK (Normativo)</span>
                       ) : (

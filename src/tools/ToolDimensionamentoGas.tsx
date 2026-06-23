@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
+import { formatNumber } from '../utils/format';
 import TopologicalTree, { TrattoNode } from '../components/TopologicalTree';
 import { PIPE_CATALOG, getExternalDiameter } from '../data/pipeCatalog';
 import { getGasEquivalentLength, GAS_FITTINGS_PRESETS } from '../data/gasEquivalentLengths';
@@ -107,7 +108,7 @@ export function ToolDimensionamentoGas({
     
     let x = 1 / Math.sqrt(f);
     for (let i = 0; i < 20; i++) {
-      const term = relRoughness / 3.71 + 2.52 / (Re * x);
+      const term = relRoughness / 3.71 + 2.51 / (Re * x);
       if (term <= 0) break;
       x = -2 * Math.log10(term);
     }
@@ -631,7 +632,7 @@ export function ToolDimensionamentoGas({
     } else {
       const dIntVal = selectedBranchFull.dInt || 50;
       const eqLen = getGasEquivalentLength(type, dIntVal);
-      return ` (da tab: ${eqLen.toFixed(1)}m)`;
+      return ` (da tab: ${formatNumber(eqLen, 1)}m)`;
     }
   };
 
@@ -655,23 +656,23 @@ export function ToolDimensionamentoGas({
           <tbody>
             <tr className="border-b border-slate-100 hover:bg-slate-100/50">
               <td className="py-0.5">Valvola a sfera</td>
-              <td className="py-0.5 text-right font-bold">{getGasEquivalentLength('valvola_sfera', selectedBranchFull.dInt).toFixed(1)} m</td>
+              <td className="py-0.5 text-right font-bold">{formatNumber(getGasEquivalentLength('valvola_sfera', selectedBranchFull.dInt), 1)} m</td>
             </tr>
             <tr className="border-b border-slate-100 hover:bg-slate-100/50">
               <td className="py-0.5">Gomito 90°</td>
-              <td className="py-0.5 text-right font-bold">{getGasEquivalentLength('angolo_90', selectedBranchFull.dInt).toFixed(1)} m</td>
+              <td className="py-0.5 text-right font-bold">{formatNumber(getGasEquivalentLength('angolo_90', selectedBranchFull.dInt), 1)} m</td>
             </tr>
             <tr className="border-b border-slate-100 hover:bg-slate-100/50">
               <td className="py-0.5">T pass. diretto</td>
-              <td className="py-0.5 text-right font-bold">{getGasEquivalentLength('tee_diretto', selectedBranchFull.dInt).toFixed(1)} m</td>
+              <td className="py-0.5 text-right font-bold">{formatNumber(getGasEquivalentLength('tee_diretto', selectedBranchFull.dInt), 1)} m</td>
             </tr>
             <tr className="border-b border-slate-100 hover:bg-slate-100/50">
               <td className="py-0.5">T pass. laterale</td>
-              <td className="py-0.5 text-right font-bold">{getGasEquivalentLength('tee_laterale', selectedBranchFull.dInt).toFixed(1)} m</td>
+              <td className="py-0.5 text-right font-bold">{formatNumber(getGasEquivalentLength('tee_laterale', selectedBranchFull.dInt), 1)} m</td>
             </tr>
             <tr className="hover:bg-slate-100/50">
               <td className="py-0.5">Riduzione/Nipplo</td>
-              <td className="py-0.5 text-right font-bold">{getGasEquivalentLength('nipplo_riduzione', selectedBranchFull.dInt).toFixed(1)} m</td>
+              <td className="py-0.5 text-right font-bold">{formatNumber(getGasEquivalentLength('nipplo_riduzione', selectedBranchFull.dInt), 1)} m</td>
             </tr>
           </tbody>
         </table>
@@ -690,6 +691,62 @@ export function ToolDimensionamentoGas({
         projectInfo={projectData}
         setProjectInfo={setProjectData}
       />
+
+      {/* Spiegazione & Formula */}
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+        <p>
+          <strong>Descrizione:</strong> Esegue il dimensionamento e la verifica delle reti di condotte per fluidi comprimibili (Gas Metano, Azoto, Ossigeno o fluidi personalizzati), determinando la caduta di pressione e calcolando le perdite concentrate tramite coefficienti di forma analitici (K) o lunghezze equivalenti tabellari del catalogo commerciale.
+        </p>
+        <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+          <p className="font-bold text-slate-700 mb-2.5 text-[11px] uppercase tracking-wide">Formule applicate per il moto del gas comprimibile:</p>
+          <div className="space-y-4 pl-2 text-xs">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span>• Numero di Reynolds:</span>
+              <span className="font-serif font-bold text-slate-800 flex items-center">
+                Re = 
+                <span className="inline-flex flex-col items-center align-middle mx-1.5 text-center text-[10px]">
+                  <span className="border-b border-slate-400 px-1 pb-0.5">ρ × v × D<sub>int</sub></span>
+                  <span className="px-1 pt-0.5">μ</span>
+                </span>
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span>• Coefficiente d'Attrito (Colebrook-White):</span>
+              <span className="font-serif font-bold text-slate-800 flex items-center">
+                <span className="inline-flex flex-col items-center align-middle mx-1 text-center text-[10px] leading-tight">
+                  <span className="border-b border-slate-400 px-0.5">1</span>
+                  <span className="px-0.5">√λ</span>
+                </span>
+                = -2 log<sub>10</sub> 
+                <span className="inline-flex items-center ml-1">
+                  (
+                  <span className="inline-flex flex-col items-center align-middle text-[10px] leading-tight">
+                    <span className="border-b border-slate-400 px-0.5">ε</span>
+                    <span className="px-0.5">3.71 × D<sub>int</sub></span>
+                  </span>
+                  +
+                  <span className="inline-flex flex-col items-center align-middle text-[10px] leading-tight mx-1">
+                    <span className="border-b border-slate-400 px-0.5">2.51</span>
+                    <span className="px-0.5">Re × √λ</span>
+                  </span>
+                  )
+                </span>
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span>• Perdite di Carico Distribuite (Comprimibile):</span>
+              <span className="font-serif font-bold text-slate-800 flex items-center">
+                P₁² - P₂² = λ × 
+                <span className="inline-flex flex-col items-center align-middle mx-1.5 text-center text-[10px]">
+                  <span className="border-b border-slate-400 px-1 pb-0.5">L</span>
+                  <span className="px-1 pt-0.5">D<sub>int</sub></span>
+                </span>
+                × ρ₀ × P₀ × v₀²
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* PARAMETRI GENERALI */}
       <div className="bg-white rounded-2xl shadow-sm p-6 md:pb-9 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0 print:mb-4 animate-slide-in">
@@ -1164,15 +1221,15 @@ export function ToolDimensionamentoGas({
                 <div className="font-bold text-slate-700 mb-1 border-b border-slate-200 pb-1">Dati Calcolati Ramo</div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Portata normale QN:</span>
-                  <span className="font-semibold text-slate-800">{selectedBranchFull.qN_min?.toFixed(3)} Nm³/min</span>
+                  <span className="font-semibold text-slate-800">{formatNumber(selectedBranchFull.qN_min, 3)} Nm³/min</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Portata massica:</span>
-                  <span className="font-semibold text-slate-800">{selectedBranchFull.qMass_min?.toFixed(3)} kg/min</span>
+                  <span className="font-semibold text-slate-800">{formatNumber(selectedBranchFull.qMass_min, 3)} kg/min</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Velocità di picco:</span>
-                  <span className="font-semibold text-slate-800">{selectedBranchFull.vMax?.toFixed(2)} m/s</span>
+                  <span className="font-semibold text-slate-800">{formatNumber(selectedBranchFull.vMax, 2)} m/s</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Numero di Reynolds:</span>
@@ -1180,20 +1237,20 @@ export function ToolDimensionamentoGas({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Coeff. attrito λ:</span>
-                  <span className="font-semibold text-slate-800 font-mono">{selectedBranchFull.lambda?.toFixed(4)}</span>
+                  <span className="font-semibold text-slate-800 font-mono">{formatNumber(selectedBranchFull.lambda, 4)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Lunghezza equival. Leq:</span>
-                  <span className="font-semibold text-slate-800">{selectedBranchFull.lEq?.toFixed(2)} m</span>
+                  <span className="font-semibold text-slate-800">{formatNumber(selectedBranchFull.lEq, 2)} m</span>
                 </div>
                 <div className="flex justify-between border-t border-slate-200 pt-1 mt-1 font-bold">
                   <span className="text-slate-700">Pressione inizio:</span>
-                  <span className="text-slate-800 font-mono">{selectedBranchFull.pStartBar?.toFixed(3)} bar a</span>
+                  <span className="text-slate-800 font-mono">{formatNumber(selectedBranchFull.pStartBar, 3)} bar a</span>
                 </div>
                 <div className="flex justify-between font-bold">
                   <span className="text-slate-700">Pressione fine nodo:</span>
                   <span className={`${selectedBranchFull.status === 'ok' ? 'text-emerald-600' : 'text-orange-650'} font-mono`}>
-                    {selectedBranchFull.pFinalBar?.toFixed(3)} bar a ({selectedBranchFull.pFinalMbarGauge?.toFixed(1)} mbar)
+                    {formatNumber(selectedBranchFull.pFinalBar, 3)} bar a ({formatNumber(selectedBranchFull.pFinalMbarGauge, 1)} mbar)
                   </span>
                 </div>
               </div>
@@ -1242,20 +1299,20 @@ export function ToolDimensionamentoGas({
                 return (
                   <tr key={b.id} className="hover:bg-slate-50/50">
                     <td className="py-2 pr-1 font-bold font-mono text-purple-700">{computedBranchTags[b.id] || b.id}</td>
-                    <td className="py-2 px-1 font-mono text-slate-600">{b.pStartBar?.toFixed(3)}</td>
+                    <td className="py-2 px-1 font-mono text-slate-600">{formatNumber(b.pStartBar, 3)}</td>
                     <td className="py-2 px-1 font-mono text-slate-600">{(Number(b.hValle) || 0) - (Number(b.hMonte) || 0)}</td>
-                    <td className="py-2 px-1 font-mono text-slate-800 font-semibold">{b.qN_min?.toFixed(3)}</td>
+                    <td className="py-2 px-1 font-mono text-slate-800 font-semibold">{formatNumber(b.qN_min, 3)}</td>
                     <td className="py-2 px-1 text-slate-600 font-medium">
                       {b.material === 'manuale' 
                         ? `Manuale (Ø ${b.dInt}mm)` 
                         : `${b.material} DE${b.dExt} (DN${b.DN})`}
                     </td>
                     <td className="py-2 px-1 font-mono text-slate-500">{Math.round(b.Re || 0).toLocaleString('it-IT')}</td>
-                    <td className="py-2 px-1 font-mono text-slate-500">{b.lambda?.toFixed(4)}</td>
-                    <td className="py-2 px-1 text-right font-mono text-slate-650">{b.deltaPDistBar?.toFixed(5)}</td>
-                    <td className="py-2 px-1 text-right font-mono text-slate-650">{b.deltaPConcBar?.toFixed(5)}</td>
-                    <td className="py-2 px-1 text-right font-mono font-bold text-slate-700">{b.pFinalBar?.toFixed(3)}</td>
-                    <td className="py-2 px-1 text-right font-mono font-bold text-slate-855">{b.vMax?.toFixed(2)}</td>
+                    <td className="py-2 px-1 font-mono text-slate-500">{formatNumber(b.lambda, 4)}</td>
+                    <td className="py-2 px-1 text-right font-mono text-slate-650">{formatNumber(b.deltaPDistBar, 5)}</td>
+                    <td className="py-2 px-1 text-right font-mono text-slate-650">{formatNumber(b.deltaPConcBar, 5)}</td>
+                    <td className="py-2 px-1 text-right font-mono font-bold text-slate-700">{formatNumber(b.pFinalBar, 3)}</td>
+                    <td className="py-2 px-1 text-right font-mono font-bold text-slate-855">{formatNumber(b.vMax, 2)}</td>
                     <td className="py-2 px-1 pl-3 text-slate-500 truncate max-w-[150px]" title={b.utenzeLabel}>{b.utenzeLabel}</td>
                     <td className="py-2 pl-1 text-center">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${statusClasses}`} title={b.message}>

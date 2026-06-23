@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
+import { formatNumber } from '../utils/format';
 import TopologicalTree, { TrattoNode } from '../components/TopologicalTree';
 import { PIPE_CATALOG, INSULATION_CATALOG, getExternalDiameter } from '../data/pipeCatalog';
 import { getEquivalentLength } from '../data/equivalentLengths';
@@ -64,10 +65,10 @@ interface TrattoLine {
 
 // Helper per la formattazione e conversione della pressione
 const formatPressureVal = (valPa: number, unit: string): string => {
-  if (unit === 'Pa') return Math.round(valPa).toLocaleString('it-IT');
-  if (unit === 'kPa') return (valPa / 1000).toFixed(2);
-  if (unit === 'mH2O') return (valPa / 9806.65).toFixed(3);
-  return (valPa / 100).toFixed(1);
+  if (unit === 'Pa') return formatNumber(Math.round(valPa), 0);
+  if (unit === 'kPa') return formatNumber(valPa / 1000, 2);
+  if (unit === 'mH2O') return formatNumber(valPa / 9806.65, 3);
+  return formatNumber(valPa / 100, 1);
 };
 
 const getPressureUnitLabel = (unit: string): string => {
@@ -94,7 +95,7 @@ function solveColebrookWhite(Re: number, roughnessRel: number): number {
   // Risoluzione a punto fisso
   let x = 1 / Math.sqrt(f);
   for (let i = 0; i < 20; i++) {
-    const term = (roughnessRel / 3.71) + (2.52 / (Re * x));
+    const term = (roughnessRel / 3.71) + (2.51 / (Re * x));
     if (term <= 0) break;
     x = -2 * Math.log10(term);
   }
@@ -224,9 +225,9 @@ function SVGGradienteSovrapposto({ tratto, fluidTemp }: SVGGradienteSovrappostoP
 
   // Configurazione etichette asse Y
   const yLabelsData: YLabelItem[] = [
-    { id: 'tf', val: tf, label: `${tf.toFixed(0)}°C`, color: '#2563eb', isBold: true, targetY: getY(tf) },
-    { id: 'ts', val: t_s, label: `${t_s.toFixed(1)}°C`, color: '#b91c1c', isBold: true, targetY: getY(t_s) },
-    { id: 'ta', val: ta, label: `${ta.toFixed(0)}°C`, color: '#475569', isBold: false, targetY: getY(ta) }
+    { id: 'tf', val: tf, label: `${formatNumber(tf, 0)}°C`, color: '#2563eb', isBold: true, targetY: getY(tf) },
+    { id: 'ts', val: t_s, label: `${formatNumber(t_s, 1)}°C`, color: '#b91c1c', isBold: true, targetY: getY(t_s) },
+    { id: 'ta', val: ta, label: `${formatNumber(ta, 0)}°C`, color: '#475569', isBold: false, targetY: getY(ta) }
   ];
   yLabelsData.sort((a, b) => a.targetY - b.targetY);
   const [yA_adj, yB_adj, yC_adj] = adjustYLabels(yLabelsData[0].targetY, yLabelsData[1].targetY, yLabelsData[2].targetY, 10);
@@ -430,7 +431,7 @@ function SVGGradienteSovrapposto({ tratto, fluidTemp }: SVGGradienteSovrappostoP
       <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-[10px] text-slate-600 font-semibold px-2 print:justify-start print:px-0">
         <div className="flex items-center space-x-1 shrink-0">
           <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: '#2563eb' }}></span>
-          <span>Fluido ({tf.toFixed(0)}°C)</span>
+          <span>Fluido ({formatNumber(tf, 0)}°C)</span>
         </div>
         <div className="flex items-center space-x-1 shrink-0">
           <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: '#475569' }}></span>
@@ -444,11 +445,11 @@ function SVGGradienteSovrapposto({ tratto, fluidTemp }: SVGGradienteSovrappostoP
         )}
         <div className="flex items-center space-x-1 shrink-0">
           <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: '#b91c1c' }}></span>
-          <span>Superficie ({t_s.toFixed(1)}°C)</span>
+          <span>Superficie ({formatNumber(t_s, 1)}°C)</span>
         </div>
         <div className="flex items-center space-x-1 shrink-0">
           <span className="w-2.5 h-0.5 border-t border-dashed border-slate-400 inline-block"></span>
-          <span className="text-slate-400 italic">Aria Ambiente ({ta.toFixed(0)}°C)</span>
+          <span className="text-slate-400 italic">Aria Ambiente ({formatNumber(ta, 0)}°C)</span>
         </div>
       </div>
     </div>
@@ -919,6 +920,67 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                 setProjectInfo={setProjectData}
             />
 
+            {/* Spiegazione & Formula */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+              <p>
+                <strong>Descrizione:</strong> Esegue il calcolo e la verifica idraulica e termica delle linee di tubazione per liquidi (acqua o miscele acqua-glicole), determinando le perdite di carico distribuite (Darcy-Weisbach) e concentrate (metodo delle lunghezze equivalenti degli accessori) e tracciando lo schema topologico ad albero.
+              </p>
+              <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                <p className="font-bold text-slate-700 mb-2.5 text-[11px] uppercase tracking-wide">Formule applicate per il moto dei liquidi:</p>
+                <div className="space-y-4 pl-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <span>• Numero di Reynolds (Re):</span>
+                    <span className="font-serif font-bold text-slate-800 flex items-center">
+                      Re = 
+                      <span className="inline-flex flex-col items-center align-middle mx-1.5 text-center text-[10px]">
+                        <span className="border-b border-slate-400 px-1 pb-0.5">ρ × v × D<sub>int</sub></span>
+                        <span className="px-1 pt-0.5">μ</span>
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <span>• Coefficiente d'Attrito (Colebrook-White):</span>
+                    <span className="font-serif font-bold text-slate-800 flex items-center">
+                      <span className="inline-flex flex-col items-center align-middle mx-1 text-center text-[10px] leading-tight">
+                        <span className="border-b border-slate-400 px-0.5">1</span>
+                        <span className="px-0.5">√λ</span>
+                      </span>
+                      = -2 log<sub>10</sub> 
+                      <span className="inline-flex items-center ml-1">
+                        (
+                        <span className="inline-flex flex-col items-center align-middle text-[10px] leading-tight">
+                          <span className="border-b border-slate-400 px-0.5">ε</span>
+                          <span className="px-0.5">3.71 × D<sub>int</sub></span>
+                        </span>
+                        +
+                        <span className="inline-flex flex-col items-center align-middle text-[10px] leading-tight mx-1">
+                          <span className="border-b border-slate-400 px-0.5">2.51</span>
+                          <span className="px-0.5">Re × √λ</span>
+                        </span>
+                        )
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <span>• Perdite Distribuite Darcy-Weisbach (J):</span>
+                    <span className="font-serif font-bold text-slate-800 flex items-center">
+                      J = λ × 
+                      <span className="inline-flex flex-col items-center align-middle mx-1.5 text-center text-[10px]">
+                        <span className="border-b border-slate-400 px-1 pb-0.5">L</span>
+                        <span className="px-1 pt-0.5">D<sub>int</sub></span>
+                      </span>
+                      × 
+                      <span className="inline-flex flex-col items-center align-middle mx-1.5 text-center text-[10px]">
+                        <span className="border-b border-slate-400 px-1 pb-0.5">v²</span>
+                        <span className="px-1 pt-0.5">2g</span>
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-sans font-normal ml-1"> [m.c.a./m]</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Parametri Fluidi */}
             <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0">
                 <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-2 print:border-b print:border-slate-800 print:pb-1">
@@ -988,12 +1050,12 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                     <div className="col-span-2 bg-brand-50 border border-brand-100 rounded-lg p-3 flex justify-around items-center text-xs">
                         <div>
                             <p className="text-[9px] font-bold text-brand-600 uppercase">Densità Calcolata</p>
-                            <p className="font-mono font-bold text-brand-800 text-sm">{activeRho.toFixed(1)} kg/m³</p>
+                            <p className="font-mono font-bold text-brand-800 text-sm">{formatNumber(activeRho, 1)} kg/m³</p>
                         </div>
                         <div className="w-px h-6 bg-brand-200"></div>
                         <div>
                             <p className="text-[9px] font-bold text-brand-600 uppercase">Viscosità Dinamica</p>
-                            <p className="font-mono font-bold text-brand-800 text-sm">{activeVisc.toFixed(6)} Pa·s</p>
+                            <p className="font-mono font-bold text-brand-800 text-sm">{formatNumber(activeVisc, 6)} Pa·s</p>
                         </div>
                     </div>
                 </div>
@@ -1015,11 +1077,11 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                     </div>
                     <div>
                         <p className="text-[9px] font-bold text-slate-500 uppercase">Densità Calcolata</p>
-                        <p className="font-mono font-semibold text-slate-800">{activeRho.toFixed(1)} kg/m³</p>
+                        <p className="font-mono font-semibold text-slate-800">{formatNumber(activeRho, 1)} kg/m³</p>
                     </div>
                     <div>
                         <p className="text-[9px] font-bold text-slate-500 uppercase">Viscosità Dinamica</p>
-                        <p className="font-mono font-semibold text-slate-800">{activeVisc.toFixed(6)} Pa·s</p>
+                        <p className="font-mono font-semibold text-slate-800">{formatNumber(activeVisc, 6)} Pa·s</p>
                     </div>
                 </div>
             </div>
@@ -1136,20 +1198,20 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                         ) : <span className="text-slate-400">-</span> }
                                         {t.leq_tot && t.leq_tot > 0 ? (
                                             <div className="text-[8px] text-brand-600 font-bold mt-0.5">
-                                              L_eq = +{t.leq_tot.toFixed(1)} m
+                                              L_eq = +{formatNumber(t.leq_tot, 1)} m
                                             </div>
                                         ) : null}
                                     </td>
 
                                     {/* Velocità */}
                                     <td className="py-2.5 px-2 print:p-1 font-mono text-[11px] font-bold">
-                                        {(t.velocity || 0).toFixed(2)} m/s
+                                        {formatNumber(t.velocity || 0, 2)} m/s
                                     </td>
 
                                     {/* Reynolds e Lambda */}
                                     <td className="py-2.5 px-2 print:p-1 font-mono text-[10px] space-y-0.5">
                                         <div>Re: {Math.round(t.Re || 0).toLocaleString()}</div>
-                                        <div className="font-bold text-brand-600">λ: {(t.lambda || 0).toFixed(4)}</div>
+                                        <div className="font-bold text-brand-600">λ: {formatNumber(t.lambda || 0, 4)}</div>
                                     </td>
 
                                     {/* Perdite Distrib. */}
@@ -1311,7 +1373,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                     <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-200/60 space-y-3">
                                         <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-wider flex justify-between items-center">
                                             <span>2. Pezzi Speciali & Accessori (K)</span>
-                                            {activeTratto.leq_tot && activeTratto.leq_tot > 0 ? <span className="text-[8px] text-brand-600 font-bold font-mono">L_eq = +{activeTratto.leq_tot.toFixed(1)} m</span> : null}
+                                            {activeTratto.leq_tot && activeTratto.leq_tot > 0 ? <span className="text-[8px] text-brand-600 font-bold font-mono">L_eq = +{formatNumber(activeTratto.leq_tot, 1)} m</span> : null}
                                         </h5>
                                         <div className="grid grid-cols-4 gap-2">
                                             <div>
@@ -1402,10 +1464,10 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                             <span>Riepilogo Calcoli</span>
                                             <span className="text-[8px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-sans uppercase">Output</span>
                                         </h6>
-                                        <div>Øi / Øe: <strong>{activeTratto.d_int?.toFixed(1)} / {activeTratto.d_ext?.toFixed(1)} mm</strong></div>
-                                        <div>Velocità: <strong>{activeTratto.velocity?.toFixed(2)} m/s</strong></div>
+                                        <div>Øi / Øe: <strong>{formatNumber(activeTratto.d_int, 1)} / {formatNumber(activeTratto.d_ext, 1)} mm</strong></div>
+                                        <div>Velocità: <strong>{formatNumber(activeTratto.velocity, 2)} m/s</strong></div>
                                         <div>Reynolds: <strong>{Math.round(activeTratto.Re || 0).toLocaleString()}</strong></div>
-                                        <div className="text-red-600 font-bold">T. Sup. Est.: {activeTratto.t_surf?.toFixed(1)} °C</div>
+                                        <div className="text-red-600 font-bold">T. Sup. Est.: {formatNumber(activeTratto.t_surf, 1)} °C</div>
                                         <div className="font-bold text-brand-600 border-t border-slate-200/80 pt-1.5 mt-1">∆P Tratto: {formatPressureVal(activeTratto.loss_tot_Pa || 0, pressureUnit)} {getPressureUnitLabel(pressureUnit)}</div>
                                     </div>
                                 </div>
@@ -1499,12 +1561,12 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                 </h4>
                                 <div className="text-[9px] leading-snug space-y-1 text-slate-700">
                                     <p><strong>Conduttura:</strong> {t.material === 'manuale' ? 'Manuale' : t.material} DN{t.DN} {t.PN !== 'NORM' ? t.PN : ''}</p>
-                                    <p><strong>Geometria:</strong> Øi {t.d_int?.toFixed(1)} mm | Øe {t.d_ext?.toFixed(1)} mm</p>
+                                    <p><strong>Geometria:</strong> Øi {formatNumber(t.d_int, 1)} mm | Øe {formatNumber(t.d_ext, 1)} mm</p>
                                     <p><strong>Isolamento:</strong> {INSULATION_CATALOG.find(i => i.id === t.isoType)?.name || 'Nessuno'} ({t.isoThick} mm)</p>
                                     <p><strong>Conduttività Termica (&lambda;):</strong> {t.isoLambda} W/mK</p>
-                                    <p><strong>Dati Fluido:</strong> Portata {t.portata} m³/h | Velocità {t.velocity?.toFixed(2)} m/s</p>
+                                    <p><strong>Dati Fluido:</strong> Portata {formatNumber(t.portata, 2)} m³/h | Velocità {formatNumber(t.velocity, 2)} m/s</p>
                                     <p><strong>Temperature:</strong> Fluido {fluidTemp} °C | Ambiente {t.tAmb} °C</p>
-                                    <p className="text-red-700 font-bold text-[9px]">Temp. Sup. Esterna: {t.t_surf?.toFixed(1)} °C</p>
+                                    <p className="text-red-700 font-bold text-[9px]">Temp. Sup. Esterna: {formatNumber(t.t_surf, 1)} °C</p>
                                 </div>
                             </div>
                             <div className="w-[180px] mx-auto mt-2 shrink-0">

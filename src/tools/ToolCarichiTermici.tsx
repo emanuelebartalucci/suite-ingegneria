@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
+import { formatNumber } from '../utils/format';
 import { PIPE_CATALOG } from '../data/pipeCatalog';
 import { 
   IconFlame, 
@@ -256,7 +257,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                             )}
                             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                                 <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400">Totale</span>
-                                <span className="text-xs font-black text-slate-800 font-mono">{totalKW.toFixed(1)} kW</span>
+                                <span className="text-xs font-black text-slate-800 font-mono">{formatNumber(totalKW, 1)} kW</span>
                             </div>
                         </div>
                         <div className="flex-1 flex flex-col justify-center space-y-1.5 w-full max-h-32 overflow-y-auto pr-1">
@@ -267,7 +268,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                                             <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: slice.color }}></span>
                                             <span className="truncate font-semibold">{slice.name}</span>
                                         </div>
-                                        <span className="font-mono font-bold text-slate-700 shrink-0 ml-2">{slice.power.toFixed(1)} kW ({slice.percent.toFixed(0)}%)</span>
+                                        <span className="font-mono font-bold text-slate-700 shrink-0 ml-2">{formatNumber(slice.power, 1)} kW ({formatNumber(slice.percent, 0)}%)</span>
                                     </div>
                                 ))
                             ) : (
@@ -301,14 +302,14 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                                                 return (
                                                     <g key={v}>
                                                         <line x1={x} y1="10" x2={x} y2={chartHeight - 15} stroke="#e2e8f0" strokeDasharray="2 2" />
-                                                        <text x={x} y={chartHeight - 4} textAnchor="middle" fontSize="7" fill="#94a3b8" className="font-mono">{v.toFixed(1)}</text>
+                                                        <text x={x} y={chartHeight - 4} textAnchor="middle" fontSize="7" fill="#94a3b8" className="font-mono">{formatNumber(v, 1)}</text>
                                                     </g>
                                                 );
                                             })}
 
                                             {/* Linea Target Velocità */}
                                             <line x1={targetX} y1="10" x2={targetX} y2={chartHeight - 15} stroke="#f97316" strokeWidth="1" strokeDasharray="3 3" />
-                                            <text x={targetX} y="8" textAnchor="middle" fontSize="7" fontWeight="bold" fill="#f97316" className="font-sans">{targetVal.toFixed(1)} m/s</text>
+                                            <text x={targetX} y="8" textAnchor="middle" fontSize="7" fontWeight="bold" fill="#f97316" className="font-sans">{formatNumber(targetVal, 1)} m/s</text>
 
                                             {/* Barre per ogni carico */}
                                             {processedLoads.map((load, idx) => {
@@ -334,7 +335,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                                                         <rect x={leftMargin} y={y} width={Math.max(0, barW)} height="10" rx="2" fill={barColor} />
                                                         {/* Valore numerico della velocità */}
                                                         <text x={leftMargin + Math.max(0, barW) + 4} y={y + 8} fontSize="8" fontWeight="bold" fill="#334155" className="font-mono">
-                                                            {(load.realVelocity || 0).toFixed(2)} m/s
+                                                            {formatNumber(load.realVelocity || 0, 2)} m/s
                                                         </text>
                                                     </g>
                                                 );
@@ -355,11 +356,11 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                              </div>
                              <div className="flex items-center gap-1">
                                  <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ backgroundColor: '#10b981' }}></span> 
-                                 <span>Ottimale (0.4 - {((Number(vTarget) || 1.0) * 1.3).toFixed(1)} m/s)</span>
+                                 <span>Ottimale (0.4 - {formatNumber((Number(vTarget) || 1.0) * 1.3, 1)} m/s)</span>
                              </div>
                              <div className="flex items-center gap-1">
                                  <span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ backgroundColor: '#ef4444' }}></span> 
-                                 <span>Alta (&gt;{((Number(vTarget) || 1.0) * 1.3).toFixed(1)} m/s)</span>
+                                 <span>Alta (&gt;{formatNumber((Number(vTarget) || 1.0) * 1.3, 1)} m/s)</span>
                              </div>
                          </div>
                     </div>
@@ -379,6 +380,55 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                 projectInfo={projectData}
                 setProjectInfo={setProjectData}
             />
+
+            {/* Spiegazione & Formula */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+              <p>
+                <strong>Descrizione:</strong> Calcola la portata volumetrica e massica del fluido termovettore (acqua o miscele acqua-glicole) necessarie per soddisfare la potenza termica di ciascuna utenza, dimensionando il diametro interno teorico dei tubi in base alla velocità target impostata.
+              </p>
+              <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                <p className="font-bold text-slate-700 mb-2.5 text-[11px] uppercase tracking-wide">Formule applicate:</p>
+                <div className="space-y-3.5 pl-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <span>• Portata Massica:</span>
+                    <span className="font-serif font-bold text-slate-800 flex items-center">
+                      ṁ = 
+                      <span className="inline-flex flex-col items-center align-middle mx-1.5 text-center text-[10px]">
+                        <span className="border-b border-slate-400 px-1 pb-0.5">P</span>
+                        <span className="px-1 pt-0.5">C<sub>p</sub> × ΔT</span>
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-sans font-normal ml-1"> [kg/s]</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <span>• Portata Volumetrica:</span>
+                    <span className="font-serif font-bold text-slate-800 flex items-center">
+                      Q = 
+                      <span className="inline-flex flex-col items-center align-middle mx-1.5 text-center text-[10px]">
+                        <span className="border-b border-slate-400 px-1 pb-0.5">ṁ</span>
+                        <span className="px-1 pt-0.5">ρ</span>
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-sans font-normal ml-1"> [m³/s]</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <span>• Diametro Interno Teorico:</span>
+                    <span className="font-serif font-bold text-slate-800 flex items-center">
+                      D<sub>teo</sub> = 
+                      <span className="inline-flex items-center mx-1 font-bold">
+                        √<span className="border-t border-slate-800 px-1 mt-0.5">
+                          <span className="inline-flex flex-col items-center align-middle text-[10px] leading-tight">
+                            <span className="border-b border-slate-400 px-0.5">4 × Q</span>
+                            <span className="px-0.5">π × v<sub>target</sub></span>
+                          </span>
+                        </span>
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-sans font-normal ml-1"> [m]</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* Pannello Fluidi Dinamico (Glicole) */}
             <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0">
@@ -491,12 +541,12 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                         <div className="col-span-2 bg-brand-50 border border-brand-100 rounded-lg p-2 flex justify-around items-center text-xs print:bg-transparent">
                             <div>
                                 <p className="text-[9px] font-bold text-brand-600 uppercase">Cp Calc</p>
-                                <p className="font-mono font-bold text-brand-800 text-sm">{activeCp.toFixed(3)} kJ/kgK</p>
+                                <p className="font-mono font-bold text-brand-800 text-sm">{formatNumber(activeCp, 3)} kJ/kgK</p>
                             </div>
                             <div className="w-px h-6 bg-brand-200"></div>
                             <div>
                                 <p className="text-[9px] font-bold text-brand-600 uppercase">Densità Calc</p>
-                                <p className="font-mono font-bold text-brand-800 text-sm">{activeRho.toFixed(1)} kg/m³</p>
+                                <p className="font-mono font-bold text-brand-800 text-sm">{formatNumber(activeRho, 1)} kg/m³</p>
                             </div>
                         </div>
                     )}
@@ -566,15 +616,15 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                             <div className="grid grid-cols-2 gap-2">
                                 <div className="bg-orange-50 p-2 rounded-lg border border-orange-100">
                                     <p className="text-[9px] font-bold text-orange-600 uppercase">Portata Fluido</p>
-                                    <p className="font-mono font-bold text-orange-800 text-base">{(load.calcFlow_m3h || 0).toFixed(2)} m³/h</p>
+                                    <p className="font-mono font-bold text-orange-800 text-base">{formatNumber(load.calcFlow_m3h || 0, 2)} m³/h</p>
                                 </div>
                                 <div className="bg-orange-50 p-2 rounded-lg border border-orange-100">
                                     <p className="text-[9px] font-bold text-orange-600 uppercase">Potenza Termica</p>
-                                    <p className="font-mono font-bold text-orange-800 text-base">{(load.calcPower_kW || 0).toFixed(1)} kWt</p>
+                                    <p className="font-mono font-bold text-orange-800 text-base">{formatNumber(load.calcPower_kW || 0, 1)} kWt</p>
                                 </div>
                                 <div className="bg-slate-50 p-2 rounded-lg border border-slate-200 col-span-2">
                                     <p className="text-[9px] font-bold text-slate-500 uppercase">Portata Massica Equivalente</p>
-                                    <p className="font-mono font-bold text-slate-700 text-sm">{(load.calcFlow_kgh || 0).toFixed(1)} kg/h</p>
+                                    <p className="font-mono font-bold text-slate-700 text-sm">{formatNumber(load.calcFlow_kgh || 0, 1)} kg/h</p>
                                 </div>
                             </div>
                         </div>
@@ -583,7 +633,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                         <div className="flex-1 space-y-3 pl-4 border-l border-slate-100">
                             <div className="flex justify-between items-center">
                               <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Dimensionamento Tubo</h4>
-                              <span className="text-[9px] text-slate-400 font-mono">Ø Teorico: {load.d_teorico_mm?.toFixed(1)} mm</span>
+                              <span className="text-[9px] text-slate-400 font-mono">Ø Teorico: {formatNumber(load.d_teorico_mm, 1)} mm</span>
                             </div>
                             <div className="grid grid-cols-3 gap-2">
                                 <div className="col-span-3">
@@ -625,8 +675,8 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                                         <p className="font-bold text-slate-800 text-base">DN {load.DN}</p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-[9px] text-slate-500 font-mono">Ø Int: {load.realD?.toFixed(1)} mm</p>
-                                        <p className={`text-xs font-bold ${(load.realVelocity || 0) > Number(vTarget) * 1.4 ? 'text-red-600' : 'text-orange-600'}`}>v = {(load.realVelocity || 0).toFixed(2)} m/s</p>
+                                        <p className="text-[9px] text-slate-500 font-mono">Ø Int: {formatNumber(load.realD, 1)} mm</p>
+                                        <p className={`text-xs font-bold ${(load.realVelocity || 0) > Number(vTarget) * 1.4 ? 'text-red-600' : 'text-orange-600'}`}>v = {formatNumber(load.realVelocity || 0, 2)} m/s</p>
                                     </div>
                                 </div>
                             </div>
@@ -678,12 +728,12 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                         {processedLoads.map(l => (
                             <tr key={l.id} className="border-b border-slate-100">
                                 <td className="py-1 font-bold">{l.name}</td>
-                                <td className="py-1 font-mono">{(l.calcPower_kW || 0).toFixed(1)}</td>
-                                <td className="py-1 font-mono">{(l.calcFlow_m3h || 0).toFixed(2)}</td>
+                                <td className="py-1 font-mono">{formatNumber(l.calcPower_kW || 0, 1)}</td>
+                                <td className="py-1 font-mono">{formatNumber(l.calcFlow_m3h || 0, 2)}</td>
                                 <td className="py-1">{l.material}</td>
                                 <td className="py-1 font-bold">DN {l.DN} - {l.PN}</td>
-                                <td className="py-1 font-mono">{l.realD?.toFixed(1)}</td>
-                                <td className="py-1 text-right font-mono">{(l.realVelocity || 0).toFixed(2)} m/s</td>
+                                <td className="py-1 font-mono">{formatNumber(l.realD, 1)}</td>
+                                <td className="py-1 text-right font-mono">{formatNumber(l.realVelocity || 0, 2)} m/s</td>
                             </tr>
                         ))}
                     </tbody>
@@ -695,11 +745,11 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                 <div className="flex gap-4 mt-8 mx-auto max-w-lg">
                     <div className="flex-1 p-3 rounded-lg border-2 border-slate-800 text-center">
                         <p className="text-[10px] font-bold uppercase text-slate-650 mb-1">Totale Potenza Termica</p>
-                        <p className="text-2xl font-mono font-black">{totalKW.toFixed(1)} kW</p>
+                        <p className="text-2xl font-mono font-black">{formatNumber(totalKW, 1)} kW</p>
                     </div>
                     <div className="flex-1 p-3 rounded-lg border-2 border-slate-800 text-center">
                         <p className="text-[10px] font-bold uppercase text-slate-650 mb-1">Totale Portata Flusso</p>
-                        <p className="text-2xl font-mono font-black">{totalM3H.toFixed(1)} m³/h</p>
+                        <p className="text-2xl font-mono font-black">{formatNumber(totalM3H, 1)} m³/h</p>
                     </div>
                 </div>
             </div>
@@ -707,12 +757,12 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
             <div className="mt-6 bg-slate-800 text-white p-4 rounded-xl flex justify-around items-center print-hide shadow-lg">
                 <div className="text-center">
                     <p className="text-xs text-slate-300 uppercase font-bold tracking-wide">Potenza Totale Rete</p>
-                    <p className="text-2xl font-mono font-black">{totalKW.toFixed(1)} <span className="text-sm font-sans font-normal">kWt</span></p>
+                    <p className="text-2xl font-mono font-black">{formatNumber(totalKW, 1)} <span className="text-sm font-sans font-normal">kWt</span></p>
                 </div>
                 <div className="w-px h-10 bg-slate-600"></div>
                 <div className="text-center">
                     <p className="text-xs text-slate-300 uppercase font-bold tracking-wide">Portata Totale Rete</p>
-                    <p className="text-2xl font-mono font-black">{totalM3H.toFixed(1)} <span className="text-sm font-sans font-normal">m³/h</span></p>
+                    <p className="text-2xl font-mono font-black">{formatNumber(totalM3H, 1)} <span className="text-sm font-sans font-normal">m³/h</span></p>
                 </div>
             </div>
         </div>

@@ -4,6 +4,7 @@ import ProjectStorage from '../components/ProjectStorage';
 import { Scale, Ruler, Database, Wind, Printer, Waves, Clock, Droplet } from 'lucide-react';
 import { BEAM_CATALOG } from '../data/beamCatalog';
 import { PIPE_CATALOG, getExternalDiameter } from '../data/pipeCatalog';
+import { formatNumber } from '../utils/format';
 
 interface ToolCalcoliVariProps {
   projectData: ProjectData;
@@ -1020,7 +1021,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
             const QMax = plcKsVal * Math.pow(RhMax, 2/3) * Math.pow(plcIVal, 0.5) * areaMax;
 
             if (plcQVal > QMax) {
-              plcErrorMessage = `La portata inserita (${plcQVal.toFixed(4)} m³/s) supera la capacità idraulica a pelo libero max della condotta (${QMax.toFixed(4)} m³/s al 93.8% di riempimento).`;
+              plcErrorMessage = `La portata inserita (${formatNumber(plcQVal, 4)} m³/s) supera la capacità idraulica a pelo libero max della condotta (${formatNumber(QMax, 4)} m³/s al 93.8% di riempimento).`;
               plcIncognita = 'invalid';
             } else {
               let low = 0.01;
@@ -1812,7 +1813,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                     <div><strong>Categoria:</strong></div>
                     <div>{CATEGORY_LABELS[data.convCategory] || data.convCategory}</div>
                     <div><strong>Valore inserito:</strong></div>
-                    <div>{parseFloat(data.convValSorgente).toFixed(4)} {data.convUnitSorgente}</div>
+                    <div>{formatNumber(data.convValSorgente, 4)} {data.convUnitSorgente}</div>
                   </div>
                 </div>
 
@@ -2144,13 +2145,13 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                     <div><strong>Materiale:</strong></div>
                     <div className="capitalize">{data.appoggiMateriale}</div>
                     <div><strong>Geometria Tubo:</strong></div>
-                    <div>Øe {parseFloat(data.appoggiDEst).toFixed(1)} mm | sp. {parseFloat(data.appoggiSpessore).toFixed(1)} mm</div>
+                    <div>Øe {formatNumber(data.appoggiDEst, 1)} mm | sp. {formatNumber(data.appoggiSpessore, 1)} mm</div>
                     <div><strong>Massa Fluido:</strong></div>
-                    <div>{parseFloat(data.appoggiPFluido).toFixed(2)} kg/m</div>
+                    <div>{formatNumber(data.appoggiPFluido, 2)} kg/m</div>
                     <div><strong>Massa Isolante:</strong></div>
-                    <div>{parseFloat(data.appoggiPIsolante).toFixed(2)} kg/m</div>
+                    <div>{formatNumber(data.appoggiPIsolante, 2)} kg/m</div>
                     <div><strong>Limite Freccia:</strong></div>
-                    <div>{parseFloat(data.appoggiLimiteFreccia).toFixed(1)} mm</div>
+                    <div>{formatNumber(data.appoggiLimiteFreccia, 1)} mm</div>
                   </div>
                 </div>
 
@@ -2163,26 +2164,26 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                       <div>
                         <p className="text-slate-500 text-[10px] uppercase font-bold">L Consigliata (Spaziatura Massima)</p>
                         <p className="text-4xl font-mono font-black text-blue-700">
-                          {appoggiResults.distConsigliata.toFixed(3)} <span className="text-base font-sans font-normal text-slate-450">m</span>
+                          {formatNumber(appoggiResults.distConsigliata, 3)} <span className="text-base font-sans font-normal text-slate-450">m</span>
                         </p>
                       </div>
 
                       <div className="grid grid-cols-2 gap-4 text-xs text-slate-600 border-t border-blue-200/40 pt-4">
                         <div>
                           <p className="text-slate-400 text-[9px] uppercase font-bold">Limite Flessione</p>
-                          <p className="font-mono font-bold">{appoggiResults.distTensione.toFixed(3)} m</p>
+                          <p className="font-mono font-bold">{formatNumber(appoggiResults.distTensione, 3)} m</p>
                         </div>
                         <div>
                           <p className="text-slate-400 text-[9px] uppercase font-bold">Limite Freccia</p>
-                          <p className="font-mono font-bold">{appoggiResults.distFreccia.toFixed(3)} m</p>
+                          <p className="font-mono font-bold">{formatNumber(appoggiResults.distFreccia, 3)} m</p>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-6 pt-4 border-t border-blue-200/50 text-[10.5px] text-slate-550 space-y-1">
-                    <p><strong>Massa condotto vuoto:</strong> {appoggiResults.pesoTubo.toFixed(2)} kg/m</p>
-                    <p><strong>Massa totale gravante:</strong> {appoggiResults.pesoTot.toFixed(2)} kg/m</p>
+                    <p><strong>Massa condotto vuoto:</strong> {formatNumber(appoggiResults.pesoTubo, 2)} kg/m</p>
+                    <p><strong>Massa totale gravante:</strong> {formatNumber(appoggiResults.pesoTot, 2)} kg/m</p>
                     <p className="text-[9px] text-slate-450 leading-normal pt-2 italic print:hidden">
                       * Nota: Il calcolo considera la trave appoggiata agli estremi con carico distribuito ($w$).
                     </p>
@@ -2318,15 +2319,15 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                     <div><strong>Tipo Serbatoio:</strong></div>
                     <div className="capitalize">{data.volumeTipo === 'cilindrico' ? 'Cilindrico Orizzontale' : 'Sferico'}</div>
                     <div><strong>Diametro:</strong></div>
-                    <div>{parseFloat(data.volumeDiametro).toFixed(2)} m</div>
+                    <div>{formatNumber(data.volumeDiametro, 2)} m</div>
                     {data.volumeTipo === 'cilindrico' && (
                       <>
                         <div><strong>Lunghezza:</strong></div>
-                        <div>{parseFloat(data.volumeLunghezza).toFixed(2)} m</div>
+                        <div>{formatNumber(data.volumeLunghezza, 2)} m</div>
                       </>
                     )}
                     <div><strong>Altezza Liquido:</strong></div>
-                    <div>{parseFloat(data.volumeAltezzaLiq).toFixed(2)} m</div>
+                    <div>{formatNumber(data.volumeAltezzaLiq, 2)} m</div>
                   </div>
                 </div>
 
@@ -2339,10 +2340,10 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                       <div>
                         <p className="text-slate-500 text-[10px] uppercase font-bold">Volume Effettivo</p>
                         <p className="text-3xl font-mono font-black text-slate-800">
-                          {volumeResult.volumeM3.toFixed(3)} <span className="text-sm font-sans font-normal text-slate-450">m³</span>
+                          {formatNumber(volumeResult.volumeM3, 3)} <span className="text-sm font-sans font-normal text-slate-450">m³</span>
                         </p>
                         <p className="text-2xl font-mono font-black text-blue-700 mt-1">
-                          {volumeResult.volumeLitri.toLocaleString('it-IT', { maximumFractionDigits: 1 })} <span className="text-xs font-sans font-normal text-slate-450">litri</span>
+                          {formatNumber(volumeResult.volumeLitri, 1)} <span className="text-xs font-sans font-normal text-slate-450">litri</span>
                         </p>
                       </div>
 
@@ -2352,7 +2353,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                           <div className="flex-1 bg-slate-200 h-2.5 rounded-full overflow-hidden">
                             <div className="bg-blue-600 h-full rounded-full" style={{ width: `${Math.min(volumeResult.volumePerc, 100)}%` }}></div>
                           </div>
-                          <span className="font-mono font-bold text-xs text-slate-700">{volumeResult.volumePerc.toFixed(1)} %</span>
+                          <span className="font-mono font-bold text-xs text-slate-700">{formatNumber(volumeResult.volumePerc, 1)} %</span>
                         </div>
                       </div>
                     </div>
@@ -2451,11 +2452,11 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide border-b pb-1 mb-2">Dati di Ingresso</p>
                   <div className="grid grid-cols-2 gap-y-1.5 text-[11px] text-slate-650">
                     <div><strong>Portata Q:</strong></div>
-                    <div>{data.psvQ !== '' ? `${parseFloat(data.psvQ).toFixed(2)} m³/h` : 'INCOGNITA'}</div>
+                    <div>{data.psvQ !== '' ? `${formatNumber(data.psvQ, 2)} m³/h` : 'INCOGNITA'}</div>
                     <div><strong>Diametro Interno d:</strong></div>
-                    <div>{data.psvD !== '' ? `${parseFloat(data.psvD).toFixed(1)} mm` : 'INCOGNITA'}</div>
+                    <div>{data.psvD !== '' ? `${formatNumber(data.psvD, 1)} mm` : 'INCOGNITA'}</div>
                     <div><strong>Velocità v:</strong></div>
-                    <div>{data.psvV !== '' ? `${parseFloat(data.psvV).toFixed(2)} m/s` : 'INCOGNITA'}</div>
+                    <div>{data.psvV !== '' ? `${formatNumber(data.psvV, 2)} m/s` : 'INCOGNITA'}</div>
                   </div>
                 </div>
 
@@ -2468,19 +2469,19 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                       <div>
                         <p className="text-slate-400 text-[10px] uppercase font-bold">Portata Risultante (Q)</p>
                         <p className={`text-2xl font-mono font-black ${psvResults.activeIncognita === 'Q' ? 'text-blue-700' : 'text-slate-800'}`}>
-                          {psvResults.computedQ.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m³/h</span>
+                          {formatNumber(psvResults.computedQ, 3)} <span className="text-xs font-sans font-normal text-slate-450">m³/h</span>
                         </p>
                       </div>
                       <div>
                         <p className="text-slate-400 text-[10px] uppercase font-bold">Diametro Interno Risultante (d)</p>
                         <p className={`text-2xl font-mono font-black ${psvResults.activeIncognita === 'd' ? 'text-blue-700' : 'text-slate-800'}`}>
-                          {psvResults.computedD.toFixed(2)} <span className="text-xs font-sans font-normal text-slate-450">mm</span>
+                          {formatNumber(psvResults.computedD, 2)} <span className="text-xs font-sans font-normal text-slate-450">mm</span>
                         </p>
                       </div>
                       <div>
                         <p className="text-slate-400 text-[10px] uppercase font-bold">Velocità Risultante (v)</p>
                         <p className={`text-2xl font-mono font-black ${psvResults.activeIncognita === 'v' ? 'text-blue-700' : 'text-slate-800'}`}>
-                          {psvResults.computedV.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m/s</span>
+                          {formatNumber(psvResults.computedV, 3)} <span className="text-xs font-sans font-normal text-slate-450">m/s</span>
                         </p>
                       </div>
                     </div>
@@ -2812,45 +2813,45 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                     {(data.foroTipo === 'circolare' || data.foroTipo === 'tubo_interno' || data.foroTipo === 'tubo_esterno') && (
                       <>
                         <div><strong>Portata Q:</strong></div>
-                        <div>{data.fcQ !== '' ? `${parseFloat(data.fcQ).toFixed(4)} m³/s` : `INCOGNITA (Calcolato: ${foronomiaResults.computedFcQ.toFixed(4)} m³/s)`}</div>
+                        <div>{data.fcQ !== '' ? `${formatNumber(data.fcQ, 4)} m³/s` : `INCOGNITA (Calcolato: ${formatNumber(foronomiaResults.computedFcQ, 4)} m³/s)`}</div>
                         <div><strong>Carico h:</strong></div>
-                        <div>{data.fcH !== '' ? `${parseFloat(data.fcH).toFixed(3)} m` : `INCOGNITA (Calcolato: ${foronomiaResults.computedFcH.toFixed(3)} m)`}</div>
+                        <div>{data.fcH !== '' ? `${formatNumber(data.fcH, 3)} m` : `INCOGNITA (Calcolato: ${formatNumber(foronomiaResults.computedFcH, 3)} m)`}</div>
                         <div><strong>Diametro D:</strong></div>
-                        <div>{data.fcD !== '' ? `${parseFloat(data.fcD).toFixed(3)} m` : `INCOGNITA (Calcolato: ${foronomiaResults.computedFcD.toFixed(3)} m)`}</div>
+                        <div>{data.fcD !== '' ? `${formatNumber(data.fcD, 3)} m` : `INCOGNITA (Calcolato: ${formatNumber(foronomiaResults.computedFcD, 3)} m)`}</div>
                       </>
                     )}
                     {data.foroTipo === 'rettangolare' && (
                       <>
                         <div><strong>Portata Q:</strong></div>
-                        <div>{data.frQ !== '' ? `${parseFloat(data.frQ).toFixed(4)} m³/s` : `INCOGNITA (Calcolato: ${foronomiaResults.computedFrQ.toFixed(4)} m³/s)`}</div>
+                        <div>{data.frQ !== '' ? `${formatNumber(data.frQ, 4)} m³/s` : `INCOGNITA (Calcolato: ${formatNumber(foronomiaResults.computedFrQ, 4)} m³/s)`}</div>
                         <div><strong>Battente sup. h₁:</strong></div>
-                        <div>{data.frH1 !== '' ? `${parseFloat(data.frH1).toFixed(3)} m` : `INCOGNITA (Calcolato: ${foronomiaResults.computedFrH1.toFixed(3)} m)`}</div>
+                        <div>{data.frH1 !== '' ? `${formatNumber(data.frH1, 3)} m` : `INCOGNITA (Calcolato: ${formatNumber(foronomiaResults.computedFrH1, 3)} m)`}</div>
                         <div><strong>Battente inf. h₂:</strong></div>
-                        <div>{data.frH2 !== '' ? `${parseFloat(data.frH2).toFixed(3)} m` : `INCOGNITA (Calcolato: ${foronomiaResults.computedFrH2.toFixed(3)} m)`}</div>
+                        <div>{data.frH2 !== '' ? `${formatNumber(data.frH2, 3)} m` : `INCOGNITA (Calcolato: ${formatNumber(foronomiaResults.computedFrH2, 3)} m)`}</div>
                         <div><strong>Larghezza b:</strong></div>
-                        <div>{data.frB !== '' ? `${parseFloat(data.frB).toFixed(3)} m` : `INCOGNITA (Calcolato: ${foronomiaResults.computedFrB.toFixed(3)} m)`}</div>
+                        <div>{data.frB !== '' ? `${formatNumber(data.frB, 3)} m` : `INCOGNITA (Calcolato: ${formatNumber(foronomiaResults.computedFrB, 3)} m)`}</div>
                       </>
                     )}
                     {data.foroTipo === 'stramazzo_grossa' && (
                       <>
                         <div><strong>Portata Q:</strong></div>
-                        <div>{data.sgQ !== '' ? `${parseFloat(data.sgQ).toFixed(4)} m³/s` : `INCOGNITA (Calcolato: ${foronomiaResults.computedSgQ.toFixed(4)} m³/s)`}</div>
+                        <div>{data.sgQ !== '' ? `${formatNumber(data.sgQ, 4)} m³/s` : `INCOGNITA (Calcolato: ${formatNumber(foronomiaResults.computedSgQ, 4)} m³/s)`}</div>
                         <div><strong>Larghezza b:</strong></div>
-                        <div>{data.sgB !== '' ? `${parseFloat(data.sgB).toFixed(3)} m` : `INCOGNITA (Calcolato: ${foronomiaResults.computedSgB.toFixed(3)} m)`}</div>
+                        <div>{data.sgB !== '' ? `${formatNumber(data.sgB, 3)} m` : `INCOGNITA (Calcolato: ${formatNumber(foronomiaResults.computedSgB, 3)} m)`}</div>
                         <div><strong>Carico monte H:</strong></div>
-                        <div>{data.sgH !== '' ? `${parseFloat(data.sgH).toFixed(3)} m` : `INCOGNITA (Calcolato: ${foronomiaResults.computedSgH.toFixed(3)} m)`}</div>
+                        <div>{data.sgH !== '' ? `${formatNumber(data.sgH, 3)} m` : `INCOGNITA (Calcolato: ${formatNumber(foronomiaResults.computedSgH, 3)} m)`}</div>
                       </>
                     )}
                     {data.foroTipo === 'stramazzo_sottile' && (
                       <>
                         <div><strong>Portata Q:</strong></div>
-                        <div>{data.ssQ !== '' ? `${parseFloat(data.ssQ).toFixed(4)} m³/s` : `INCOGNITA (Calcolato: ${foronomiaResults.computedSsQ.toFixed(4)} m³/s)`}</div>
+                        <div>{data.ssQ !== '' ? `${formatNumber(data.ssQ, 4)} m³/s` : `INCOGNITA (Calcolato: ${formatNumber(foronomiaResults.computedSsQ, 4)} m³/s)`}</div>
                         <div><strong>Larghezza b:</strong></div>
-                        <div>{data.ssB !== '' ? `${parseFloat(data.ssB).toFixed(3)} m` : `INCOGNITA (Calcolato: ${foronomiaResults.computedSsB.toFixed(3)} m)`}</div>
+                        <div>{data.ssB !== '' ? `${formatNumber(data.ssB, 3)} m` : `INCOGNITA (Calcolato: ${formatNumber(foronomiaResults.computedSsB, 3)} m)`}</div>
                         <div><strong>Battente h:</strong></div>
-                        <div>{parseFloat(data.ssH).toFixed(3)} m</div>
+                        <div>{formatNumber(data.ssH, 3)} m</div>
                         <div><strong>Altezza p:</strong></div>
-                        <div>{parseFloat(data.ssP).toFixed(3)} m</div>
+                        <div>{formatNumber(data.ssP, 3)} m</div>
                       </>
                     )}
                   </div>
@@ -2866,23 +2867,23 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Portata (Q)</p>
                           <p className={`text-2xl font-mono font-black ${foronomiaResults.fcIncognita === 'Q' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {foronomiaResults.computedFcQ.toFixed(4)} <span className="text-xs font-sans font-normal text-slate-450">m³/s</span>
+                            {formatNumber(foronomiaResults.computedFcQ, 4)} <span className="text-xs font-sans font-normal text-slate-450">m³/s</span>
                           </p>
                         </div>
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Diametro (D)</p>
                           <p className={`text-2xl font-mono font-black ${foronomiaResults.fcIncognita === 'D' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {foronomiaResults.computedFcD.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
+                            {formatNumber(foronomiaResults.computedFcD, 3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
                           </p>
                         </div>
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Carico Baricentrico (h)</p>
                           <p className={`text-2xl font-mono font-black ${foronomiaResults.fcIncognita === 'h' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {foronomiaResults.computedFcH.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
+                            {formatNumber(foronomiaResults.computedFcH, 3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
                           </p>
                         </div>
                         <div className="border-t border-blue-200/35 pt-3 text-[11px] text-slate-650 leading-relaxed">
-                          <strong>Velocità vena contratta v:</strong> {foronomiaResults.computedFcV.toFixed(3)} m/s
+                          <strong>Velocità vena contratta v:</strong> {formatNumber(foronomiaResults.computedFcV, 3)} m/s
                         </div>
                       </div>
                     )}
@@ -2892,25 +2893,25 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Portata (Q)</p>
                           <p className={`text-2xl font-mono font-black ${foronomiaResults.frIncognita === 'Q' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {foronomiaResults.computedFrQ.toFixed(4)} <span className="text-xs font-sans font-normal text-slate-450">m³/s</span>
+                            {formatNumber(foronomiaResults.computedFrQ, 4)} <span className="text-xs font-sans font-normal text-slate-450">m³/s</span>
                           </p>
                         </div>
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Larghezza Luce (b)</p>
                           <p className={`text-2xl font-mono font-black ${foronomiaResults.frIncognita === 'b' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {foronomiaResults.computedFrB.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
+                            {formatNumber(foronomiaResults.computedFrB, 3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
                           </p>
                         </div>
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Battente superiore (h₁)</p>
                           <p className={`text-2xl font-mono font-black ${foronomiaResults.frIncognita === 'h1' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {foronomiaResults.computedFrH1.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
+                            {formatNumber(foronomiaResults.computedFrH1, 3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
                           </p>
                         </div>
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Battente inferiore (h₂)</p>
                           <p className={`text-2xl font-mono font-black ${foronomiaResults.frIncognita === 'h2' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {foronomiaResults.computedFrH2.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
+                            {formatNumber(foronomiaResults.computedFrH2, 3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
                           </p>
                         </div>
                       </div>
@@ -2921,23 +2922,23 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Portata (Q)</p>
                           <p className={`text-2xl font-mono font-black ${foronomiaResults.sgIncognita === 'Q' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {foronomiaResults.computedSgQ.toFixed(4)} <span className="text-xs font-sans font-normal text-slate-450">m³/s</span>
+                            {formatNumber(foronomiaResults.computedSgQ, 4)} <span className="text-xs font-sans font-normal text-slate-450">m³/s</span>
                           </p>
                         </div>
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Larghezza Soglia (b)</p>
                           <p className={`text-2xl font-mono font-black ${foronomiaResults.sgIncognita === 'b' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {foronomiaResults.computedSgB.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
+                            {formatNumber(foronomiaResults.computedSgB, 3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
                           </p>
                         </div>
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Carico Idraulico Monte (H)</p>
                           <p className={`text-2xl font-mono font-black ${foronomiaResults.sgIncognita === 'H' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {foronomiaResults.computedSgH.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
+                            {formatNumber(foronomiaResults.computedSgH, 3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
                           </p>
                         </div>
                         <div className="border-t border-blue-200/35 pt-3 text-[11px] text-slate-650 leading-relaxed">
-                          <strong>Altezza vena fluida h (2/3 H):</strong> {foronomiaResults.computedSgHv.toFixed(3)} m
+                          <strong>Altezza vena fluida h (2/3 H):</strong> {formatNumber(foronomiaResults.computedSgHv, 3)} m
                         </div>
                       </div>
                     )}
@@ -2947,18 +2948,18 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Portata (Q)</p>
                           <p className={`text-2xl font-mono font-black ${foronomiaResults.ssIncognita === 'Q' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {foronomiaResults.computedSsQ.toFixed(4)} <span className="text-xs font-sans font-normal text-slate-450">m³/s</span>
+                            {formatNumber(foronomiaResults.computedSsQ, 4)} <span className="text-xs font-sans font-normal text-slate-450">m³/s</span>
                           </p>
                         </div>
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Larghezza Soglia (b)</p>
                           <p className={`text-2xl font-mono font-black ${foronomiaResults.ssIncognita === 'b' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {foronomiaResults.computedSsB.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
+                            {formatNumber(foronomiaResults.computedSsB, 3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
                           </p>
                         </div>
                         <div className="border-t border-blue-200/35 pt-3 text-[11px] text-slate-650 space-y-1.5">
-                          <div><strong>Coefficiente efflusso Bazin (μ):</strong> {foronomiaResults.computedSsMu.toFixed(4)}</div>
-                          <div><strong>Carico monte totale H (h+p):</strong> {(parseFloat(data.ssH) + parseFloat(data.ssP)).toFixed(3)} m</div>
+                          <div><strong>Coefficiente efflusso Bazin (μ):</strong> {formatNumber(foronomiaResults.computedSsMu, 4)}</div>
+                          <div><strong>Carico monte totale H (h+p):</strong> {formatNumber(parseFloat(data.ssH) + parseFloat(data.ssP), 3)} m</div>
                         </div>
                       </div>
                     )}
@@ -3139,19 +3140,19 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                     <div><strong>Geometria serbatoio:</strong></div>
                     <div className="capitalize">{data.svTipo.replace('_', ' ')}</div>
                     <div><strong>Diametro serbatoio D:</strong></div>
-                    <div>{data.svD !== '' ? `${parseFloat(data.svD).toFixed(2)} m` : `INCOGNITA (Calcolato: ${svuotamentoResults.computedD.toFixed(3)} m)`}</div>
+                    <div>{data.svD !== '' ? `${formatNumber(data.svD, 2)} m` : `INCOGNITA (Calcolato: ${formatNumber(svuotamentoResults.computedD, 3)} m)`}</div>
                     <div><strong>Foro scarico d:</strong></div>
-                    <div>{data.svOrificeD !== '' ? `${(parseFloat(data.svOrificeD)*1000).toFixed(0)} mm` : `INCOGNITA (Calcolato: ${(svuotamentoResults.computedOrificeD*1000).toFixed(1)} mm)`}</div>
+                    <div>{data.svOrificeD !== '' ? `${formatNumber(parseFloat(data.svOrificeD)*1000, 0)} mm` : `INCOGNITA (Calcolato: ${formatNumber(svuotamentoResults.computedOrificeD*1000, 1)} mm)`}</div>
                     <div><strong>Altezza acqua H:</strong></div>
-                    <div>{data.svH !== '' ? `${parseFloat(data.svH).toFixed(2)} m` : `INCOGNITA (Calcolato: ${svuotamentoResults.computedH.toFixed(3)} m)`}</div>
+                    <div>{data.svH !== '' ? `${formatNumber(data.svH, 2)} m` : `INCOGNITA (Calcolato: ${formatNumber(svuotamentoResults.computedH, 3)} m)`}</div>
                     {data.svTipo === 'cilindrico_oriz' && (
                       <>
                         <div><strong>Lunghezza L:</strong></div>
-                        <div>{data.svL !== '' ? `${parseFloat(data.svL).toFixed(2)} m` : `INCOGNITA (Calcolato: ${svuotamentoResults.computedL.toFixed(3)} m)`}</div>
+                        <div>{data.svL !== '' ? `${formatNumber(data.svL, 2)} m` : `INCOGNITA (Calcolato: ${formatNumber(svuotamentoResults.computedL, 3)} m)`}</div>
                       </>
                     )}
                     <div><strong>Tempo svuotamento T:</strong></div>
-                    <div>{data.svT !== '' ? `${parseFloat(data.svT).toFixed(1)} s` : `INCOGNITA (Calcolato: ${svuotamentoResults.computedT.toFixed(1)} s)`}</div>
+                    <div>{data.svT !== '' ? `${formatNumber(data.svT, 1)} s` : `INCOGNITA (Calcolato: ${formatNumber(svuotamentoResults.computedT, 1)} s)`}</div>
                   </div>
                 </div>
 
@@ -3164,31 +3165,31 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                       <div>
                         <p className="text-slate-500 text-[10px] uppercase font-bold">Tempo di Svuotamento (T)</p>
                         <p className={`text-2xl font-mono font-black ${svuotamentoResults.svIncognita === 'T' ? 'text-blue-700' : 'text-slate-800'}`}>
-                          {svuotamentoResults.computedT.toFixed(1)} <span className="text-xs font-sans font-normal text-slate-450">s</span>
+                          {formatNumber(svuotamentoResults.computedT, 1)} <span className="text-xs font-sans font-normal text-slate-450">s</span>
                         </p>
                         <p className="text-xs text-slate-500 font-mono">
-                          ≈ {(svuotamentoResults.computedT / 60).toFixed(2)} minuti
+                          ≈ {formatNumber(svuotamentoResults.computedT / 60, 2)} minuti
                         </p>
                       </div>
 
                       <div>
                         <p className="text-slate-500 text-[10px] uppercase font-bold">Diametro Serbatoio (D)</p>
                         <p className={`text-2xl font-mono font-black ${svuotamentoResults.svIncognita === 'D' ? 'text-blue-700' : 'text-slate-800'}`}>
-                          {svuotamentoResults.computedD.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
+                          {formatNumber(svuotamentoResults.computedD, 3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
                         </p>
                       </div>
 
                       <div>
                         <p className="text-slate-500 text-[10px] uppercase font-bold">Foro di Scarico (d)</p>
                         <p className={`text-2xl font-mono font-black ${svuotamentoResults.svIncognita === 'd' ? 'text-blue-700' : 'text-slate-800'}`}>
-                          {(svuotamentoResults.computedOrificeD * 1000).toFixed(1)} <span className="text-xs font-sans font-normal text-slate-450">mm</span>
+                          {formatNumber(svuotamentoResults.computedOrificeD * 1000, 1)} <span className="text-xs font-sans font-normal text-slate-450">mm</span>
                         </p>
                       </div>
 
                       <div>
                         <p className="text-slate-500 text-[10px] uppercase font-bold">Livello Acqua Iniziale (H)</p>
                         <p className={`text-2xl font-mono font-black ${svuotamentoResults.svIncognita === 'H' ? 'text-blue-700' : 'text-slate-800'}`}>
-                          {svuotamentoResults.computedH.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
+                          {formatNumber(svuotamentoResults.computedH, 3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
                         </p>
                       </div>
 
@@ -3196,7 +3197,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Lunghezza Cilindro (L)</p>
                           <p className={`text-2xl font-mono font-black ${svuotamentoResults.svIncognita === 'L' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {svuotamentoResults.computedL.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
+                            {formatNumber(svuotamentoResults.computedL, 3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
                           </p>
                         </div>
                       )}
@@ -3471,22 +3472,22 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                       <div>Condotta Circolare (Strickler)</div>
                       
                       <div><strong>Diametro D:</strong></div>
-                      <div>{data.plcD !== '' ? `${parseFloat(data.plcD).toFixed(3)} m` : `INCOGNITA (Calcolato: ${peloLiberoResults.computedPlcD.toFixed(3)} m)`}</div>
+                      <div>{data.plcD !== '' ? `${formatNumber(data.plcD, 3)} m` : `INCOGNITA (Calcolato: ${formatNumber(peloLiberoResults.computedPlcD, 3)} m)`}</div>
                       
                       <div><strong>Grado Riempimento:</strong></div>
-                      <div>{data.plcGrado !== '' ? `${parseFloat(data.plcGrado).toFixed(1)} %` : `INCOGNITA (Calcolato: ${peloLiberoResults.computedPlcGrado.toFixed(1)} %)`}</div>
+                      <div>{data.plcGrado !== '' ? `${formatNumber(data.plcGrado, 1)} %` : `INCOGNITA (Calcolato: ${formatNumber(peloLiberoResults.computedPlcGrado, 1)} %)`}</div>
                       
                       <div><strong>Pendenza i:</strong></div>
-                      <div>{data.plcI !== '' ? `${parseFloat(data.plcI).toFixed(5)} m/m` : `INCOGNITA (Calcolato: ${peloLiberoResults.computedPlcI.toFixed(5)} m/m)`}</div>
+                      <div>{data.plcI !== '' ? `${formatNumber(data.plcI, 5)} m/m` : `INCOGNITA (Calcolato: ${formatNumber(peloLiberoResults.computedPlcI, 5)} m/m)`}</div>
                       
                       <div><strong>Coeff. Strickler Ks:</strong></div>
-                      <div>{data.plcKs !== '' ? `${parseFloat(data.plcKs).toFixed(1)}` : `INCOGNITA (Calcolato: ${peloLiberoResults.computedPlcKs.toFixed(1)})`}</div>
+                      <div>{data.plcKs !== '' ? `${formatNumber(data.plcKs, 1)}` : `INCOGNITA (Calcolato: ${formatNumber(peloLiberoResults.computedPlcKs, 1)})`}</div>
 
                       <div><strong>Portata Q:</strong></div>
-                      <div>{data.plcQ !== '' ? `${parseFloat(data.plcQ).toFixed(4)} m³/s` : `INCOGNITA (Calcolato: ${peloLiberoResults.computedPlcQ.toFixed(4)} m³/s)`}</div>
+                      <div>{data.plcQ !== '' ? `${formatNumber(data.plcQ, 4)} m³/s` : `INCOGNITA (Calcolato: ${formatNumber(peloLiberoResults.computedPlcQ, 4)} m³/s)`}</div>
 
                       <div><strong>Velocità V:</strong></div>
-                      <div>{peloLiberoResults.computedPlcV.toFixed(3)} m/s</div>
+                      <div>{formatNumber(peloLiberoResults.computedPlcV, 3)} m/s</div>
                     </div>
                   )}
 
@@ -3496,28 +3497,28 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                       <div>Canale Rettangolare (Bazin)</div>
                       
                       <div><strong>Larghezza b:</strong></div>
-                      <div>{(parseFloat(data.plrB) || 0).toFixed(3)} m</div>
+                      <div>{formatNumber(parseFloat(data.plrB) || 0, 3)} m</div>
                       
                       <div><strong>Altezza h:</strong></div>
-                      <div>{(parseFloat(data.plrH) || 0).toFixed(3)} m</div>
+                      <div>{formatNumber(parseFloat(data.plrH) || 0, 3)} m</div>
                       
                       <div><strong>Pendenza p:</strong></div>
-                      <div>{(parseFloat(data.plrI) || 0).toFixed(5)} m/m</div>
+                      <div>{formatNumber(parseFloat(data.plrI) || 0, 5)} m/m</div>
                       
                       <div><strong>Scabrezza Bazin c:</strong></div>
-                      <div>{(parseFloat(data.plrC) || 0).toFixed(2)}</div>
+                      <div>{formatNumber(parseFloat(data.plrC) || 0, 2)}</div>
 
                       <div><strong>Portata Q:</strong></div>
-                      <div>{peloLiberoResults.computedPlrQ.toFixed(4)} m³/s (≈ {(peloLiberoResults.computedPlrQ * 1000).toFixed(2)} l/s)</div>
+                      <div>{formatNumber(peloLiberoResults.computedPlrQ, 4)} m³/s (≈ {formatNumber(peloLiberoResults.computedPlrQ * 1000, 2)} l/s)</div>
 
                       <div><strong>Velocità V:</strong></div>
-                      <div>{peloLiberoResults.computedPlrV.toFixed(3)} m/s</div>
+                      <div>{formatNumber(peloLiberoResults.computedPlrV, 3)} m/s</div>
 
                       <div><strong>Raggio Idraulico Rh:</strong></div>
-                      <div>{peloLiberoResults.plrRh.toFixed(4)} m</div>
+                      <div>{formatNumber(peloLiberoResults.plrRh, 4)} m</div>
 
                       <div><strong>Coeff. Chézy χ:</strong></div>
-                      <div>{peloLiberoResults.plrChi.toFixed(2)}</div>
+                      <div>{formatNumber(peloLiberoResults.plrChi, 2)}</div>
                     </div>
                   )}
 
@@ -3527,13 +3528,13 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                       <div>Canale Khafagi-Venturi (Stoccarda)</div>
 
                       <div><strong>Larghezza B:</strong></div>
-                      <div>{data.pkvB !== '' ? `${parseFloat(data.pkvB).toFixed(3)} m` : `INCOGNITA (Calcolato: ${peloLiberoResults.computedPkvB.toFixed(3)} m)`}</div>
+                      <div>{data.pkvB !== '' ? `${formatNumber(data.pkvB, 3)} m` : `INCOGNITA (Calcolato: ${formatNumber(peloLiberoResults.computedPkvB, 3)} m)`}</div>
 
                       <div><strong>Carico h:</strong></div>
-                      <div>{data.pkvH !== '' ? `${parseFloat(data.pkvH).toFixed(3)} m` : `INCOGNITA (Calcolato: ${peloLiberoResults.computedPkvH.toFixed(3)} m)`}</div>
+                      <div>{data.pkvH !== '' ? `${formatNumber(data.pkvH, 3)} m` : `INCOGNITA (Calcolato: ${formatNumber(peloLiberoResults.computedPkvH, 3)} m)`}</div>
 
                       <div><strong>Portata Q:</strong></div>
-                      <div>{data.pkvQ !== '' ? `${parseFloat(data.pkvQ).toFixed(4)} m³/s` : `INCOGNITA (Calcolato: ${peloLiberoResults.computedPkvQ.toFixed(4)} m³/s)`}</div>
+                      <div>{data.pkvQ !== '' ? `${formatNumber(data.pkvQ, 4)} m³/s` : `INCOGNITA (Calcolato: ${formatNumber(peloLiberoResults.computedPkvQ, 4)} m³/s)`}</div>
                     </div>
                   )}
                 </div>
@@ -3548,40 +3549,40 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Portata (Q)</p>
                           <p className={`text-2xl font-mono font-black ${peloLiberoResults.plcIncognita === 'Q' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {peloLiberoResults.computedPlcQ.toFixed(4)} <span className="text-xs font-sans font-normal text-slate-450">m³/s</span>
+                            {formatNumber(peloLiberoResults.computedPlcQ, 4)} <span className="text-xs font-sans font-normal text-slate-450">m³/s</span>
                           </p>
                         </div>
 
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Diametro (D)</p>
                           <p className={`text-2xl font-mono font-black ${peloLiberoResults.plcIncognita === 'D' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {peloLiberoResults.computedPlcD.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
+                            {formatNumber(peloLiberoResults.computedPlcD, 3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
                           </p>
                         </div>
 
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Grado Riempimento (w)</p>
                           <p className={`text-2xl font-mono font-black ${peloLiberoResults.plcIncognita === 'grado' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {peloLiberoResults.computedPlcGrado.toFixed(1)} <span className="text-xs font-sans font-normal text-slate-450">%</span>
+                            {formatNumber(peloLiberoResults.computedPlcGrado, 1)} <span className="text-xs font-sans font-normal text-slate-450">%</span>
                           </p>
                         </div>
 
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Pendenza (i)</p>
                           <p className={`text-2xl font-mono font-black ${peloLiberoResults.plcIncognita === 'i' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {peloLiberoResults.computedPlcI.toFixed(5)} <span className="text-xs font-sans font-normal text-slate-450">m/m</span>
+                            {formatNumber(peloLiberoResults.computedPlcI, 5)} <span className="text-xs font-sans font-normal text-slate-450">m/m</span>
                           </p>
                         </div>
 
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Scabrezza (Ks)</p>
                           <p className={`text-2xl font-mono font-black ${peloLiberoResults.plcIncognita === 'Ks' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {peloLiberoResults.computedPlcKs.toFixed(1)} <span className="text-xs font-sans font-normal text-slate-450">m¹/³/s</span>
+                            {formatNumber(peloLiberoResults.computedPlcKs, 1)} <span className="text-xs font-sans font-normal text-slate-450">m¹/³/s</span>
                           </p>
                         </div>
 
                         <div className="border-t border-blue-200/35 pt-3 text-[11px] text-slate-655 leading-relaxed">
-                          <strong>Velocità del flusso (V):</strong> {peloLiberoResults.computedPlcV.toFixed(3)} m/s
+                          <strong>Velocità del flusso (V):</strong> {formatNumber(peloLiberoResults.computedPlcV, 3)} m/s
                         </div>
                       </div>
                     )}
@@ -3591,40 +3592,40 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Portata (Q)</p>
                           <p className="text-2xl font-mono font-black text-slate-800">
-                            {peloLiberoResults.computedPlrQ.toFixed(4)} <span className="text-xs font-sans font-normal text-slate-450">m³/s</span>
+                            {formatNumber(peloLiberoResults.computedPlrQ, 4)} <span className="text-xs font-sans font-normal text-slate-450">m³/s</span>
                           </p>
                           <p className="text-xs text-slate-500 font-mono">
-                            ≈ {(peloLiberoResults.computedPlrQ * 1000).toFixed(2)} l/s
+                            ≈ {formatNumber(peloLiberoResults.computedPlrQ * 1000, 2)} l/s
                           </p>
                           <p className="text-xs text-slate-550 font-mono">
-                            ≈ {(peloLiberoResults.computedPlrQ * 3600).toFixed(1)} m³/h
+                            ≈ {formatNumber(peloLiberoResults.computedPlrQ * 3600, 1)} m³/h
                           </p>
                         </div>
 
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Velocità del flusso (V)</p>
                           <p className="text-2xl font-mono font-black text-slate-800">
-                            {peloLiberoResults.computedPlrV.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m/s</span>
+                            {formatNumber(peloLiberoResults.computedPlrV, 3)} <span className="text-xs font-sans font-normal text-slate-450">m/s</span>
                           </p>
                         </div>
 
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Raggio Idraulico (R<sub>h</sub>)</p>
                           <p className="text-2xl font-mono font-black text-slate-800">
-                            {peloLiberoResults.plrRh.toFixed(4)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
+                            {formatNumber(peloLiberoResults.plrRh, 4)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
                           </p>
                         </div>
 
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Coeff. di Chézy (χ)</p>
                           <p className="text-2xl font-mono font-black text-slate-800">
-                            {peloLiberoResults.plrChi.toFixed(2)}
+                            {formatNumber(peloLiberoResults.plrChi, 2)}
                           </p>
                         </div>
 
                         <div className="border-t border-blue-200/35 pt-3 text-[11px] text-slate-655 leading-relaxed space-y-1">
-                          <div><strong>Area bagnata (A):</strong> {peloLiberoResults.plrArea.toFixed(4)} m²</div>
-                          <div><strong>Perimetro bagnato (P):</strong> {peloLiberoResults.plrPerimeter.toFixed(3)} m</div>
+                          <div><strong>Area bagnata (A):</strong> {formatNumber(peloLiberoResults.plrArea, 4)} m²</div>
+                          <div><strong>Perimetro bagnato (P):</strong> {formatNumber(peloLiberoResults.plrPerimeter, 3)} m</div>
                         </div>
                       </div>
                     )}
@@ -3634,24 +3635,24 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Portata (Q)</p>
                           <p className={`text-2xl font-mono font-black ${peloLiberoResults.pkvIncognita === 'Q' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {peloLiberoResults.computedPkvQ.toFixed(4)} <span className="text-xs font-sans font-normal text-slate-450">m³/s</span>
+                            {formatNumber(peloLiberoResults.computedPkvQ, 4)} <span className="text-xs font-sans font-normal text-slate-450">m³/s</span>
                           </p>
                           <p className="text-xs text-slate-500 font-mono">
-                            ≈ {(peloLiberoResults.computedPkvQ * 3600).toFixed(1)} m³/h
+                            ≈ {formatNumber(peloLiberoResults.computedPkvQ * 3600, 1)} m³/h
                           </p>
                         </div>
 
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Larghezza Canale (B)</p>
                           <p className={`text-2xl font-mono font-black ${peloLiberoResults.pkvIncognita === 'B' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {peloLiberoResults.computedPkvB.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
+                            {formatNumber(peloLiberoResults.computedPkvB, 3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
                           </p>
                         </div>
 
                         <div>
                           <p className="text-slate-500 text-[10px] uppercase font-bold">Altezza Misurata a Monte (h)</p>
                           <p className={`text-2xl font-mono font-black ${peloLiberoResults.pkvIncognita === 'h' ? 'text-blue-700' : 'text-slate-800'}`}>
-                            {peloLiberoResults.computedPkvH.toFixed(3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
+                            {formatNumber(peloLiberoResults.computedPkvH, 3)} <span className="text-xs font-sans font-normal text-slate-450">m</span>
                           </p>
                         </div>
                       </div>
@@ -3938,29 +3939,29 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                       <div className="capitalize">{data.traviTipo.replace(/_/g, ' ')}</div>
 
                       <div><strong>Luce trave L:</strong></div>
-                      <div>{traviLVal.toFixed(2)} m</div>
+                      <div>{formatNumber(traviLVal, 2)} m</div>
 
                       {(data.traviTipo === 'appoggiata_concentrato' || data.traviTipo === 'doppio_incastrata_concentrato') && (
                         <>
                           <div><strong>Distanza carico L1:</strong></div>
-                          <div>{traviL1Val.toFixed(2)} m</div>
+                          <div>{formatNumber(traviL1Val, 2)} m</div>
                         </>
                       )}
 
                       {(data.traviTipo === 'incastrata_concentrato' || data.traviTipo === 'appoggiata_concentrato' || data.traviTipo === 'doppio_incastrata_concentrato') ? (
                         <>
                           <div><strong>Carico concentrato P:</strong></div>
-                          <div>{traviPVal.toFixed(0)} kg</div>
+                          <div>{formatNumber(traviPVal, 0)} kg</div>
                         </>
                       ) : (
                         <>
                           <div><strong>Carico distribuito q:</strong></div>
-                          <div>{traviqVal.toFixed(1)} kg/m</div>
+                          <div>{formatNumber(traviqVal, 1)} kg/m</div>
                         </>
                       )}
 
                       <div><strong>Tensione amm. σ:</strong></div>
-                      <div>{traviSigmaVal.toFixed(0)} kg/cm²</div>
+                      <div>{formatNumber(traviSigmaVal, 0)} kg/cm²</div>
                     </div>
                   </div>
                 </div>
@@ -3974,14 +3975,14 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                       <div>
                         <p className="text-slate-500 text-[10px] uppercase font-bold">Momento Flettente Max (M<sub>max</sub>)</p>
                         <p className="text-2xl font-mono font-black text-slate-800">
-                          {beamSizingResults.Mmax.toFixed(1)} <span className="text-xs font-sans font-normal text-slate-450">kg·m</span>
+                          {formatNumber(beamSizingResults.Mmax, 1)} <span className="text-xs font-sans font-normal text-slate-450">kg·m</span>
                         </p>
                       </div>
 
                       <div>
                         <p className="text-slate-500 text-[10px] uppercase font-bold">Modulo Resistenza Min (W<sub>min</sub>)</p>
                         <p className="text-2xl font-mono font-black text-blue-700">
-                          {beamSizingResults.Wmin.toFixed(1)} <span className="text-xs font-sans font-normal text-slate-450">cm³</span>
+                          {formatNumber(beamSizingResults.Wmin, 1)} <span className="text-xs font-sans font-normal text-slate-450">cm³</span>
                         </p>
                       </div>
                     </div>
@@ -4037,16 +4038,16 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                       </tr>
                       <tr className="bg-slate-50/20">
                         <td className="p-3 font-sans font-bold text-slate-600 bg-slate-50/50">W<sub>max</sub> [cm³]</td>
-                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.ipe.w === 'number' ? (beamSizingResults.selectedProfiles.ipe.w as number).toFixed(2) : '-'}</td>
-                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.hea.w === 'number' ? (beamSizingResults.selectedProfiles.hea.w as number).toFixed(2) : '-'}</td>
-                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.heb.w === 'number' ? (beamSizingResults.selectedProfiles.heb.w as number).toFixed(2) : '-'}</td>
-                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.hem.w === 'number' ? (beamSizingResults.selectedProfiles.hem.w as number).toFixed(2) : '-'}</td>
-                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.upn.w === 'number' ? (beamSizingResults.selectedProfiles.upn.w as number).toFixed(2) : '-'}</td>
-                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.t.w === 'number' ? (beamSizingResults.selectedProfiles.t.w as number).toFixed(2) : '-'}</td>
-                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.l.w === 'number' ? (beamSizingResults.selectedProfiles.l.w as number).toFixed(2) : '-'}</td>
-                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.tubo_quadro.w === 'number' ? (beamSizingResults.selectedProfiles.tubo_quadro.w as number).toFixed(2) : '-'}</td>
-                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.tubo_rettang.w === 'number' ? (beamSizingResults.selectedProfiles.tubo_rettang.w as number).toFixed(2) : '-'}</td>
-                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.tubo_circ.w === 'number' ? (beamSizingResults.selectedProfiles.tubo_circ.w as number).toFixed(2) : '-'}</td>
+                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.ipe.w === 'number' ? formatNumber(beamSizingResults.selectedProfiles.ipe.w, 2) : '-'}</td>
+                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.hea.w === 'number' ? formatNumber(beamSizingResults.selectedProfiles.hea.w, 2) : '-'}</td>
+                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.heb.w === 'number' ? formatNumber(beamSizingResults.selectedProfiles.heb.w, 2) : '-'}</td>
+                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.hem.w === 'number' ? formatNumber(beamSizingResults.selectedProfiles.hem.w, 2) : '-'}</td>
+                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.upn.w === 'number' ? formatNumber(beamSizingResults.selectedProfiles.upn.w, 2) : '-'}</td>
+                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.t.w === 'number' ? formatNumber(beamSizingResults.selectedProfiles.t.w, 2) : '-'}</td>
+                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.l.w === 'number' ? formatNumber(beamSizingResults.selectedProfiles.l.w, 2) : '-'}</td>
+                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.tubo_quadro.w === 'number' ? formatNumber(beamSizingResults.selectedProfiles.tubo_quadro.w, 2) : '-'}</td>
+                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.tubo_rettang.w === 'number' ? formatNumber(beamSizingResults.selectedProfiles.tubo_rettang.w, 2) : '-'}</td>
+                        <td className="p-3 text-center text-slate-500">{typeof beamSizingResults.selectedProfiles.tubo_circ.w === 'number' ? formatNumber(beamSizingResults.selectedProfiles.tubo_circ.w, 2) : '-'}</td>
                       </tr>
                     </tbody>
                   </table>

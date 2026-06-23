@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
+import { formatNumber } from '../utils/format';
 import { PIPE_CATALOG, K_PRESETS } from '../data/pipeCatalog';
 import { 
   IconArrowUp, 
@@ -258,7 +259,7 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
                                 fontFamily="monospace"
                                 fontWeight="bold"
                             >
-                                {t.val.toFixed(3)} m
+                                {formatNumber(t.val, 3)} m
                             </text>
                         </g>
                     ))}
@@ -359,7 +360,7 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
         );
     };
 
-    const format = (v: number | string) => displayUnit === 'cm' ? (Number(v)*100).toFixed(1) + ' cm' : Number(v).toFixed(3) + ' m';
+    const format = (v: number | string) => displayUnit === 'cm' ? formatNumber(Number(v)*100, 1) + ' cm' : formatNumber(v, 3) + ' m';
     const toU = (v: number | string) => displayUnit === 'cm' ? +(Number(v)*100).toFixed(4) : v;
     const frmU = (v: number | string) => displayUnit === 'cm' ? Number(v)/100 : Number(v);
 
@@ -398,6 +399,42 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
                 setProjectInfo={setProjectData}
             />
 
+            {/* Spiegazione & Formula */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+              <p>
+                <strong>Descrizione:</strong> Calcola e traccia il profilo idraulico (linea dell'energia e del pelo libero) risalendo la corrente da valle a monte, gestendo passaggi in condotte, canali e bocche di stramazzo.
+              </p>
+              <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                <p className="font-bold text-slate-700 mb-2.5 text-[11px] uppercase tracking-wide">Formule applicate per il calcolo idraulico:</p>
+                <div className="space-y-4 pl-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <span>• Carico Idraulico Totale (H):</span>
+                    <span className="font-serif font-bold text-slate-800 flex items-center">
+                      H = z + h + 
+                      <span className="inline-flex flex-col items-center align-middle mx-1 text-center text-[10px]">
+                        <span className="border-b border-slate-400 px-1 pb-0.5">v²</span>
+                        <span className="px-1 pt-0.5">2g</span>
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-sans font-normal ml-1"> [m]</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <span>• Stramazzo in Parete Sottile (Bazin):</span>
+                    <span className="font-serif font-bold text-slate-800 flex items-center">
+                      Q = μ × b × √<span className="border-t border-slate-800 px-0.5 mt-0.5">2g</span> × H<sup>1.5</sup>
+                      <span className="text-[11px] text-slate-500 font-sans font-normal ml-2"> (dove μ = 0.405 + 0.003/H)</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <span>• Stramazzo Thompson (triangolare 90°):</span>
+                    <span className="font-serif font-bold text-slate-800 flex items-center">
+                      Q = 1.4 × H<sup>2.5</sup>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0">
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-sm font-bold text-slate-700">Dati Idraulici Base</h3>
@@ -407,7 +444,7 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
                     </div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4 print:grid-cols-5 print:gap-2">
-                    {[{l: 'Portata Base (m³/h)', v: flowRate, set: setFlowRate}, {l: 'Ricircolo Fanghi', v: recircFactor, set: setRecircFactor, sub: `Q. Calc: ${((Number(flowRate) || 0) * (Number(recircFactor) || 0)).toFixed(1)} m³/h`}, {l: 'Temp. Acqua (°C)', v: waterTemp, set: setWaterTemp}, {l: 'Altitudine (m s.l.m.)', v: altitude, set: setAltitude}].map((f, i) => (
+                    {[{l: 'Portata Base (m³/h)', v: flowRate, set: setFlowRate}, {l: 'Ricircolo Fanghi', v: recircFactor, set: setRecircFactor, sub: `Q. Calc: ${formatNumber((Number(flowRate) || 0) * (Number(recircFactor) || 0), 1)} m³/h`}, {l: 'Temp. Acqua (°C)', v: waterTemp, set: setWaterTemp}, {l: 'Altitudine (m s.l.m.)', v: altitude, set: setAltitude}].map((f, i) => (
                         <div key={i} className="bg-slate-50 p-3 rounded-lg border border-slate-200 print:bg-transparent print:border-none print:p-0">
                             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">{f.l}</label>
                             <input 
@@ -476,7 +513,7 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
                                             <>
                                                 <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">DN</label><select value={el.DN} onChange={e => updateElement(el.id, 'DN', e.target.value)} className="w-full p-1 bg-white border border-slate-300 rounded text-sm outline-none">{Object.keys(PIPE_CATALOG[el.material || ''].specs).map(dn=><option key={dn} value={dn}>{dn}</option>)}</select></div>
                                                 <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Classe</label><select value={el.PN} onChange={e => updateElement(el.id, 'PN', e.target.value)} className="w-full p-1 bg-white border border-slate-300 rounded text-sm outline-none">{Object.keys(PIPE_CATALOG[el.material || ''].specs[el.DN || '']||{}).map(pn=><option key={pn} value={pn}>{pn}</option>)}</select></div>
-                                                <div><label className="block text-[10px] font-bold text-brand-500 uppercase mb-1">D. Int. (mm)</label><div className="w-full p-1 bg-brand-50 border border-brand-200 rounded text-sm text-brand-700 font-mono text-center font-bold">{Number(el.D || 0).toFixed(1)}</div></div>
+                                                <div><label className="block text-[10px] font-bold text-brand-500 uppercase mb-1">D. Int. (mm)</label><div className="w-full p-1 bg-brand-50 border border-brand-200 rounded text-sm text-brand-700 font-mono text-center font-bold">{formatNumber(el.D || 0, 1)}</div></div>
                                             </>
                                         ) : (
                                             <>
@@ -532,7 +569,7 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
                                 <div key={res.id} className="flex justify-between items-end print:border-b print:border-slate-100 print:pb-1 text-sm">
                                     <div>
                                         <p className="font-bold text-slate-700 flex items-center"><span className="bg-slate-100 rounded px-1 text-[10px] mr-1">{i + 1}</span> {res.name}</p>
-                                        <p className="text-[10px] text-slate-500 ml-5">∆h = +{format(res.headLoss || 0)} {res.type==='pipe'&&(res.totalKCalculated || 0)>0&&`(K=${res.totalKCalculated?.toFixed(2)})`}</p>
+                                        <p className="text-[10px] text-slate-500 ml-5">∆h = +{format(res.headLoss || 0)} {res.type==='pipe'&&(res.totalKCalculated || 0)>0&&`(K=${formatNumber(res.totalKCalculated, 2)})`}</p>
                                     </div>
                                     <p className="font-mono font-bold text-brand-600 print:text-slate-900">{format(res.elevation || 0)}</p>
                                 </div>

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
+import { formatNumber } from '../utils/format';
 import { 
   PIPE_CATALOG, 
   INSULATION_CATALOG, 
@@ -146,9 +147,9 @@ function SVGGradienteSovrapposto({ line, tFluidGlobal, tAmbGlobal }: SVGGradient
 
     // Configurazione etichette asse Y
     const yLabelsData: YLabelItem[] = [
-        { id: 'tf', val: tf, label: `${tf.toFixed(0)}°C`, color: '#2563eb', isBold: true, targetY: getY(tf) },
-        { id: 'ts', val: t_s, label: `${t_s.toFixed(1)}°C`, color: '#b91c1c', isBold: true, targetY: getY(t_s) },
-        { id: 'ta', val: ta, label: `${ta.toFixed(0)}°C`, color: '#475569', isBold: false, targetY: getY(ta) }
+        { id: 'tf', val: tf, label: `${formatNumber(tf, 0)}°C`, color: '#2563eb', isBold: true, targetY: getY(tf) },
+        { id: 'ts', val: t_s, label: `${formatNumber(t_s, 1)}°C`, color: '#b91c1c', isBold: true, targetY: getY(t_s) },
+        { id: 'ta', val: ta, label: `${formatNumber(ta, 0)}°C`, color: '#475569', isBold: false, targetY: getY(ta) }
     ];
     yLabelsData.sort((a, b) => a.targetY - b.targetY);
     const [yA_adj, yB_adj, yC_adj] = adjustYLabels(yLabelsData[0].targetY, yLabelsData[1].targetY, yLabelsData[2].targetY, 10);
@@ -371,7 +372,7 @@ function SVGGradienteSovrapposto({ line, tFluidGlobal, tAmbGlobal }: SVGGradient
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-[10px] text-slate-600 font-semibold px-2 print:justify-start print:px-0">
                 <div className="flex items-center space-x-1 shrink-0">
                     <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: '#2563eb' }}></span>
-                    <span>Fluido ({tf.toFixed(0)}°C)</span>
+                    <span>Fluido ({formatNumber(tf, 0)}°C)</span>
                 </div>
                 <div className="flex items-center space-x-1 shrink-0">
                     <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: '#475569' }}></span>
@@ -385,11 +386,11 @@ function SVGGradienteSovrapposto({ line, tFluidGlobal, tAmbGlobal }: SVGGradient
                 )}
                 <div className="flex items-center space-x-1 shrink-0">
                     <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: '#b91c1c' }}></span>
-                    <span>Superficie ({t_s.toFixed(1)}°C)</span>
+                    <span>Superficie ({formatNumber(t_s, 1)}°C)</span>
                 </div>
                 <div className="flex items-center space-x-1 shrink-0">
                     <span className="w-2.5 h-0.5 border-t border-dashed border-slate-400 inline-block"></span>
-                    <span className="text-slate-400 italic">Aria Ambiente ({ta.toFixed(0)}°C)</span>
+                    <span className="text-slate-400 italic">Aria Ambiente ({formatNumber(ta, 0)}°C)</span>
                 </div>
             </div>
         </div>
@@ -578,6 +579,66 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }: Too
                 setProjectInfo={setProjectData}
             />
 
+            {/* Spiegazione & Formula */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+              <p>
+                <strong>Descrizione:</strong> Calcola le dispersioni termiche lineari totali e al metro per tubazioni coibentate o nude, determinando il gradiente di temperatura radiale radice-fluido-parete-isolante-aria e stimando la temperatura sulla superficie esterna del coibente.
+              </p>
+              <div className="bg-white border border-slate-200/60 rounded-xl p-4 text-slate-600">
+                <p className="font-bold text-slate-700 mb-2.5 text-[11px] uppercase tracking-wide">Formule applicate per lo scambio termico radiale:</p>
+                <div className="space-y-4 pl-2 text-xs">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <span>• Trasmittanza Termica Lineare (U):</span>
+                    <span className="font-serif font-bold text-slate-800 flex items-center">
+                      U = 
+                      <span className="inline-flex flex-col items-center align-middle mx-1.5 text-center text-[10px] leading-tight">
+                        <span className="border-b border-slate-400 px-1 pb-0.5">1</span>
+                        <span className="px-1 pt-0.5">
+                          <span className="inline-flex flex-col items-center align-middle text-[9px] leading-none">
+                            <span className="border-b border-slate-400 px-0.5">1</span>
+                            <span className="px-0.5">π × d<sub>int</sub> × α₁</span>
+                          </span>
+                          +
+                          <span className="inline-flex flex-col items-center align-middle text-[9px] leading-none mx-1">
+                            <span className="border-b border-slate-400 px-0.5">ln(d<sub>ext</sub>/d<sub>int</sub>)</span>
+                            <span className="px-0.5">2π × λ<sub>tubo</sub></span>
+                          </span>
+                          +
+                          <span className="inline-flex flex-col items-center align-middle text-[9px] leading-none">
+                            <span className="border-b border-slate-400 px-0.5">ln(d<sub>iso</sub>/d<sub>ext</sub>)</span>
+                            <span className="px-0.5">2π × λ<sub>iso</sub></span>
+                          </span>
+                          +
+                          <span className="inline-flex flex-col items-center align-middle text-[9px] leading-none ml-1">
+                            <span className="border-b border-slate-400 px-0.5">1</span>
+                            <span className="px-0.5">π × d<sub>iso</sub> × α₂</span>
+                          </span>
+                        </span>
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-sans font-normal ml-1"> [W/mK]</span>
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <span>• Flusso Termico Disperso al metro (q):</span>
+                    <span className="font-serif font-bold text-slate-800">
+                      q = U × (T<sub>fluido</sub> - T<sub>ambiente</sub>) &nbsp; [W/m]
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <span>• Temperatura Superficiale Esterna (T_surf):</span>
+                    <span className="font-serif font-bold text-slate-800 flex items-center">
+                      T<sub>surf</sub> = T<sub>ambiente</sub> + 
+                      <span className="inline-flex flex-col items-center align-middle mx-1.5 text-center text-[10px]">
+                        <span className="border-b border-slate-400 px-1 pb-0.5">q</span>
+                        <span className="px-1 pt-0.5">π × d<sub>iso</sub> × α₂</span>
+                      </span>
+                      <span className="text-[11px] text-slate-500 font-sans font-normal ml-1"> [°C]</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0">
                 <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2 print:border-slate-800">
                     <h3 className="text-sm font-bold text-slate-700">Temperature e Fattori Ambientali</h3>
@@ -728,22 +789,22 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }: Too
                                 <div className="bg-redbrand-50/45 border border-redbrand-100 p-3 rounded-xl flex justify-between items-center text-xs">
                                     <div>
                                         <p className="text-[8px] font-bold text-redbrand-600 uppercase">Q unitario</p>
-                                        <p className="font-mono font-black text-xs text-redbrand-800">{(line.calcQ_Wm || 0).toFixed(2)} W/m</p>
+                                        <p className="font-mono font-black text-xs text-redbrand-800">{formatNumber(line.calcQ_Wm || 0, 2)} W/m</p>
                                     </div>
                                     <div className="w-px h-6 bg-redbrand-200"></div>
                                     <div>
                                         <p className="text-[8px] font-bold text-redbrand-600 uppercase">Q totale</p>
-                                        <p className="font-mono font-black text-xs text-redbrand-800">{(line.calcQ_tot_kW || 0).toFixed(3)} kW</p>
+                                        <p className="font-mono font-black text-xs text-redbrand-800">{formatNumber(line.calcQ_tot_kW || 0, 3)} kW</p>
                                     </div>
                                     <div className="w-px h-6 bg-redbrand-200"></div>
                                     <div>
                                         <p className="text-[8px] font-bold text-redbrand-600 uppercase font-sans">Øi / Øe</p>
-                                        <p className="font-mono font-bold text-[11px] text-slate-700">{line.d_int_mm?.toFixed(1)} / {line.d_ext_mm?.toFixed(1)} mm</p>
+                                        <p className="font-mono font-bold text-[11px] text-slate-700">{formatNumber(line.d_int_mm, 1)} / {formatNumber(line.d_ext_mm, 1)} mm</p>
                                     </div>
                                     <div className="w-px h-6 bg-redbrand-200"></div>
                                     <div>
                                         <p className="text-[8px] font-bold text-redbrand-600 uppercase">T. Superficie</p>
-                                        <p className="font-mono font-black text-xs text-red-650">{line.t_surf?.toFixed(1)} °C</p>
+                                        <p className="font-mono font-black text-xs text-red-650">{formatNumber(line.t_surf, 1)} °C</p>
                                     </div>
                                 </div>
                             </div>
@@ -781,12 +842,12 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }: Too
                             <tr key={l.id} className="border-b border-slate-100">
                                 <td className="py-1 font-bold">{l.name}</td>
                                 <td className="py-1">{l.material} DN{l.DN}</td>
-                                <td className="py-1 font-mono">{l.d_int_mm?.toFixed(1)} / {l.d_ext_mm?.toFixed(1)}</td>
+                                <td className="py-1 font-mono">{formatNumber(l.d_int_mm, 1)} / {formatNumber(l.d_ext_mm, 1)}</td>
                                 <td className="py-1">{INSULATION_CATALOG.find(i=>i.id===l.isoType)?.name} ({l.isoThick}mm)</td>
                                 <td className="py-1 text-right font-mono">{l.length}</td>
-                                <td className="py-1 text-right font-mono">{(l.calcQ_Wm || 0).toFixed(1)}</td>
-                                <td className="py-1 text-right font-mono font-bold text-red-600">{(l.t_surf || 0).toFixed(1)}</td>
-                                <td className="py-1 text-right font-mono font-bold">{(l.calcQ_tot_kW || 0).toFixed(2)}</td>
+                                <td className="py-1 text-right font-mono">{formatNumber(l.calcQ_Wm || 0, 1)}</td>
+                                <td className="py-1 text-right font-mono font-bold text-red-600">{formatNumber(l.t_surf || 0, 1)}</td>
+                                <td className="py-1 text-right font-mono font-bold">{formatNumber(l.calcQ_tot_kW || 0, 2)}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -809,11 +870,11 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }: Too
                                         </h4>
                                         <div className="text-[9px] leading-snug space-y-1 text-slate-700">
                                             <p><strong>Conduttura:</strong> {l.material} DN{l.DN} {l.PN !== 'NORM' ? l.PN : ''}</p>
-                                            <p><strong>Geometria:</strong> Øi {l.d_int_mm?.toFixed(1)} mm | Øe {l.d_ext_mm?.toFixed(1)} mm</p>
+                                            <p><strong>Geometria:</strong> Øi {formatNumber(l.d_int_mm, 1)} mm | Øe {formatNumber(l.d_ext_mm, 1)} mm</p>
                                             <p><strong>Isolamento:</strong> {INSULATION_CATALOG.find(i=>i.id===l.isoType)?.name || 'Nessuno'} ({l.isoThick} mm)</p>
-                                            <p><strong>Dati Fluido:</strong> Temp. Fluido {(Number(tFluidGlobal) || 55).toFixed(0)} °C | Q Unitario {l.calcQ_Wm?.toFixed(1)} W/m</p>
-                                            <p><strong>Ambiente:</strong> Temp. Ambiente {(Number(tAmbGlobal) || -5).toFixed(0)} °C</p>
-                                            <p className="text-red-700 font-bold text-[9px]">Temp. Superficie: {l.t_surf?.toFixed(1)} °C</p>
+                                            <p><strong>Dati Fluido:</strong> Temp. Fluido {formatNumber(Number(tFluidGlobal) || 55, 0)} °C | Q Unitario {formatNumber(l.calcQ_Wm, 1)} W/m</p>
+                                            <p><strong>Ambiente:</strong> Temp. Ambiente {formatNumber(Number(tAmbGlobal) || -5, 0)} °C</p>
+                                            <p className="text-red-700 font-bold text-[9px]">Temp. Superficie: {formatNumber(l.t_surf, 1)} °C</p>
                                         </div>
                                     </div>
                                     <div className="w-[180px] mx-auto mt-2 shrink-0">
@@ -827,14 +888,14 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }: Too
                 
                 <div className="mt-8 mx-auto max-w-sm p-4 rounded-xl border-2 border-slate-800 text-center break-inside-avoid">
                     <p className="text-[10px] font-bold uppercase text-slate-600 mb-1">Totale Dispersione Rete</p>
-                    <p className="text-3xl font-mono font-black">{totalLossKW.toFixed(2)} kW</p>
+                    <p className="text-3xl font-mono font-black">{formatNumber(totalLossKW, 2)} kW</p>
                 </div>
             </div>
 
             <div className="mt-6 bg-slate-800 text-white p-4 rounded-xl flex justify-center items-center print:hidden shadow-lg">
                 <div className="text-center">
                     <p className="text-xs text-slate-300 uppercase font-bold tracking-wide">La dispersione termica totale dell'impianto</p>
-                    <p className="text-3xl font-mono font-black text-redbrand-400">{totalLossKW.toFixed(2)} <span className="text-sm font-sans font-normal text-white">kW</span></p>
+                    <p className="text-3xl font-mono font-black text-redbrand-400">{formatNumber(totalLossKW, 2)} <span className="text-sm font-sans font-normal text-white">kW</span></p>
                 </div>
             </div>
         </div>
