@@ -96,9 +96,19 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
   const [rooms, setRooms] = useState<HVACRoom[]>(DEFAULT_ROOMS);
   
   // UI states for editing/adding
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(rooms[0]?.id || null);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [showEqModal, setShowEqModal] = useState<boolean>(false);
   const [eqRoomId, setEqRoomId] = useState<string | null>(null);
+
+  // Custom modal states for adding systems & rooms
+  const [showAddSystemModal, setShowAddSystemModal] = useState<boolean>(false);
+  const [newSystemCode, setNewSystemCode] = useState<string>('');
+  const [newSystemDesc, setNewSystemDesc] = useState<string>('');
+
+  const [showAddRoomModal, setShowAddRoomModal] = useState<boolean>(false);
+  const [addRoomSystemId, setAddRoomSystemId] = useState<string | null>(null);
+  const [newRoomCode, setNewRoomCode] = useState<string>('');
+  const [newRoomDesc, setNewRoomDesc] = useState<string>('');
 
   const selectedRoom = useMemo(() => {
     return rooms.find(r => r.id === selectedRoomId) || null;
@@ -307,30 +317,34 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
 
   // UI Handlers for Systems & Rooms
   const handleAddSystem = () => {
+    setNewSystemCode('');
+    setNewSystemDesc('');
+    setShowAddSystemModal(true);
+  };
+
+  const confirmAddSystem = () => {
+    const code = newSystemCode.trim();
     const suiteUI = (window as any).suiteUI;
-    const code = prompt("Inserisci il codice del sistema (es. AH-105-01):");
-    if (!code) return;
-    if (systems.some(s => s.id === code)) {
-      if (suiteUI) {
-        suiteUI.toast("Questo sistema esiste già!", "error");
-      } else {
-        alert("Questo sistema esiste già!");
-      }
+    if (!code) {
+      suiteUI?.toast("Il codice del sistema è obbligatorio!", "error");
       return;
     }
-    const desc = prompt("Inserisci una descrizione per il sistema:");
-    const newSystem: HVACSystem = { id: code, name: code, description: desc || '' };
-    setSystems([...systems, newSystem]);
-    if (suiteUI) {
-      suiteUI.toast("Sistema aggiunto con successo", "success");
+    if (systems.some(s => s.id === code)) {
+      suiteUI?.toast("Questo sistema esiste già!", "error");
+      return;
     }
+    const newSystem: HVACSystem = { id: code, name: code, description: newSystemDesc.trim() };
+    setSystems([...systems, newSystem]);
+    setShowAddSystemModal(false);
+    setNewSystemCode('');
+    setNewSystemDesc('');
+    suiteUI?.toast("Sistema aggiunto con successo", "success");
   };
 
   const handleRemoveSystem = async (sysId: string) => {
     const suiteUI = (window as any).suiteUI;
-    const isConfirmed = suiteUI
-      ? await suiteUI.confirm(`Sei sicuro di voler eliminare il sistema ${sysId} e tutti i suoi locali associati?`, "Elimina Sistema")
-      : window.confirm(`Sei sicuro di voler eliminare il sistema ${sysId} e tutti i suoi locali associati?`);
+    if (!suiteUI) return;
+    const isConfirmed = await suiteUI.confirm(`Sei sicuro di voler eliminare il sistema ${sysId} e tutti i suoi locali associati?`, "Elimina Sistema");
     if (isConfirmed) {
       setSystems(prev => prev.filter(s => s.id !== sysId));
       setRooms(prev => prev.filter(r => r.systemId !== sysId));
@@ -338,22 +352,32 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
         const remaining = rooms.filter(r => r.systemId !== sysId);
         return remaining[0]?.id || null;
       });
-      if (suiteUI) {
-        suiteUI.toast("Sistema e locali rimossi", "info");
-      }
+      suiteUI.toast("Sistema e locali rimossi", "info");
     }
   };
 
   const handleAddRoom = (sysId: string) => {
-    const code = prompt("Inserisci il codice del locale (es. A108):");
-    if (!code) return;
-    const desc = prompt("Inserisci la descrizione del locale (es. STORAGE):");
+    setAddRoomSystemId(sysId);
+    setNewRoomCode('');
+    setNewRoomDesc('');
+    setShowAddRoomModal(true);
+  };
+
+  const confirmAddRoom = () => {
+    const code = newRoomCode.trim();
+    const suiteUI = (window as any).suiteUI;
+    if (!code) {
+      suiteUI?.toast("Il codice del locale è obbligatorio!", "error");
+      return;
+    }
+    if (!addRoomSystemId) return;
+
     const newId = `room-${Date.now()}`;
     const newRoom: HVACRoom = {
       id: newId,
-      systemId: sysId,
+      systemId: addRoomSystemId,
       code,
-      description: desc || '',
+      description: newRoomDesc.trim(),
       gmpClass: 'NC',
       bioLevel: 'N.A.',
       ricambiStd: 3,
@@ -379,32 +403,30 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
       doors: [],
       supplyTempSummer: 18,
       supplyTempWinter: 26,
-      reheatZone: `RC-${sysId.split('-').slice(0,2).join('-')}-01`,
+      reheatZone: `RC-${addRoomSystemId.split('-').slice(0,2).join('-')}-01`,
       reheatCoilUpstreamTemp: 18.2
     };
 
     setRooms([...rooms, newRoom]);
     setSelectedRoomId(newId);
-    const suiteUI = (window as any).suiteUI;
-    if (suiteUI) {
-      suiteUI.toast("Locale aggiunto con successo", "success");
-    }
+    setShowAddRoomModal(false);
+    setNewRoomCode('');
+    setNewRoomDesc('');
+    setAddRoomSystemId(null);
+    suiteUI?.toast("Locale aggiunto con successo", "success");
   };
 
   const handleRemoveRoom = async (roomId: string) => {
     const suiteUI = (window as any).suiteUI;
-    const isConfirmed = suiteUI
-      ? await suiteUI.confirm("Sei sicuro di voler rimuovere questo locale?", "Rimuovi Locale")
-      : window.confirm("Sei sicuro di voler rimuovere questo locale?");
+    if (!suiteUI) return;
+    const isConfirmed = await suiteUI.confirm("Sei sicuro di voler rimuovere questo locale?", "Rimuovi Locale");
     if (isConfirmed) {
       const updated = rooms.filter(r => r.id !== roomId);
       setRooms(updated);
       if (selectedRoomId === roomId) {
         setSelectedRoomId(updated[0]?.id || null);
       }
-      if (suiteUI) {
-        suiteUI.toast("Locale rimosso con successo", "info");
-      }
+      suiteUI.toast("Locale rimosso con successo", "info");
     }
   };
 
@@ -1629,6 +1651,111 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
           </div>
         )}
       </div>
+
+      {/* Add System Modal Overlay */}
+      {showAddSystemModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in print:hidden">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-200 shadow-2xl space-y-4">
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+              <span>🌀</span> Aggiungi Nuovo Sistema UTA
+            </h3>
+            <div className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Codice Sistema (es. AH-105-01)</label>
+                <input 
+                  type="text"
+                  value={newSystemCode}
+                  onChange={e => setNewSystemCode(e.target.value)}
+                  placeholder="AH-105-01"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold focus:border-blue-500 font-mono text-slate-800"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Descrizione Sistema</label>
+                <input 
+                  type="text"
+                  value={newSystemDesc}
+                  onChange={e => setNewSystemDesc(e.target.value)}
+                  placeholder="Macchina a parziale ricircolo"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold focus:border-blue-500 text-slate-800"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 text-xs pt-2">
+              <button 
+                onClick={() => {
+                  setShowAddSystemModal(false);
+                  setNewSystemCode('');
+                  setNewSystemDesc('');
+                }}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Annulla
+              </button>
+              <button 
+                onClick={confirmAddSystem}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors cursor-pointer shadow-md shadow-blue-200"
+              >
+                Aggiungi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Room Modal Overlay */}
+      {showAddRoomModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in print:hidden">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-200 shadow-2xl space-y-4">
+            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+              <span>🚪</span> Aggiungi Nuovo Locale
+            </h3>
+            <div className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Codice Locale (es. A108)</label>
+                <input 
+                  type="text"
+                  value={newRoomCode}
+                  onChange={e => setNewRoomCode(e.target.value)}
+                  placeholder="A108"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold focus:border-blue-500 font-mono text-slate-800"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Descrizione Locale</label>
+                <input 
+                  type="text"
+                  value={newRoomDesc}
+                  onChange={e => setNewRoomDesc(e.target.value)}
+                  placeholder="STORAGE"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold focus:border-blue-500 text-slate-800"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 text-xs pt-2">
+              <button 
+                onClick={() => {
+                  setShowAddRoomModal(false);
+                  setNewRoomCode('');
+                  setNewRoomDesc('');
+                  setAddRoomSystemId(null);
+                }}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors cursor-pointer"
+              >
+                Annulla
+              </button>
+              <button 
+                onClick={confirmAddRoom}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors cursor-pointer shadow-md shadow-blue-200"
+              >
+                Aggiungi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
