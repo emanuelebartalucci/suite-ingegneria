@@ -14,7 +14,7 @@ import { ToolCalcoliElettrici } from './tools/ToolCalcoliElettrici';
 import { ToolCalcoliVari } from './tools/ToolCalcoliVari';
 import { ToolHVAC } from './tools/ToolHVAC';
 import { IconWaves, IconFlame, IconThermometer, IconArrowUp, IconWind } from './components/Icons';
-import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap, Scale } from 'lucide-react';
+import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap, Scale, Fan } from 'lucide-react';
 
 import logoImg from './assets/Logo.png';
 
@@ -634,7 +634,7 @@ export default function App() {
 
                                     {/* 6. Dimensionamento HVAC */}
                                     <button onClick={() => setAppMode('hvac')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left cursor-pointer w-full">
-                                        <div className="w-14 h-14 bg-blue-100 text-blue-650 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><IconWind className="w-7 h-7" /></div>
+                                        <div className="w-14 h-14 bg-blue-100 text-blue-650 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><Fan className="w-7 h-7" /></div>
                                         <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Dimensionamento HVAC</h2>
                                         <p className="text-[11px] text-slate-500 text-center leading-relaxed">Bilanci aeraulici, portate UTA, trafilamenti e batterie post-riscaldo.</p>
                                     </button>
