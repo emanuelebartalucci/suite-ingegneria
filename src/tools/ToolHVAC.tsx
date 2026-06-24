@@ -2372,21 +2372,6 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
               </div>
             </div>
 
-            {/* Print Friendly Project summary Card */}
-            <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4 print:hidden">
-              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide border-b border-slate-100 pb-2">
-                Generatore di Report di Progetto
-              </h4>
-              <p className="text-xs text-slate-500">Puoi stampare questo report o salvarlo in PDF. Vengono inclusi i criteri di design, le portate d'aria adottate e i bilanci dei consumi energetici di tutte le stanze.</p>
-              <div>
-                <button
-                  onClick={() => window.print()}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md transition-colors cursor-pointer"
-                >
-                  🖨️ Stampa / Salva in PDF
-                </button>
-            </div>
-          </div>
         </div>
         {/* Help Sidebar */}
             <div className="lg:col-span-1 bg-amber-50/60 border border-amber-200/60 rounded-3xl p-5 space-y-4 print:hidden self-start shadow-sm text-xs text-slate-650">
