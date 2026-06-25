@@ -1,4 +1,4 @@
-// Roughness in mm, lambda in W/(m*K)
+﻿// Roughness in mm, lambda in W/(m*K)
 
 export interface PipeSpec {
     [pn: string]: number;
@@ -11,13 +11,227 @@ export interface PipeMaterial {
 }
 
 export const PIPE_CATALOG: Record<string, PipeMaterial> = {
-    'Acciaio': {
+    'Acciaio al Carbonio': {
         roughness: 0.05, lambda: 50.0,
         specs: {
-            '50': { 'NORM': 54.5 }, '65': { 'NORM': 70.3 }, '80': { 'NORM': 82.5 }, '100': { 'NORM': 107.1 },
-            '125': { 'NORM': 131.7 }, '150': { 'NORM': 160.3 }, '200': { 'NORM': 209.1 }, '250': { 'NORM': 261.8 },
-            '300': { 'NORM': 312.1 }, '350': { 'NORM': 343.0 }, '400': { 'NORM': 393.8 }, '450': { 'NORM': 444.6 },
+            // DN piccoli: ASME Schedule + DIN 2448
+            '6': {
+                'Sch10': 7.82, 'Sch40': 6.84, 'Sch80': 5.48,
+                'DIN s1.6': 7.00, 'DIN s2.0': 6.20
+            },
+            '8': {
+                'Sch10': 10.40, 'Sch40': 9.22, 'Sch80': 7.66,
+                'DIN s1.6': 10.30, 'DIN s2.0': 9.50, 'DIN s2.3': 8.90
+            },
+            '10': {
+                'Sch10': 13.80, 'Sch40': 12.48, 'Sch80': 10.70,
+                'DIN s1.8': 13.60, 'DIN s2.0': 13.20, 'DIN s2.3': 12.60
+            },
+            '15': {
+                'Sch10': 17.08, 'Sch40': 15.76, 'Sch80': 13.84, 'Sch160': 11.74, 'XXS': 6.36,
+                'DIN s2.0': 17.30, 'DIN s2.6': 16.10, 'DIN s3.2': 14.90
+            },
+            '20': {
+                'Sch10': 22.48, 'Sch40': 20.96, 'Sch80': 18.88, 'Sch160': 15.58, 'XXS': 11.06,
+                'DIN s2.3': 22.30, 'DIN s2.6': 21.70, 'DIN s3.2': 20.50
+            },
+            '25': {
+                'Sch10': 27.86, 'Sch40': 26.64, 'Sch80': 24.30, 'Sch160': 20.70, 'XXS': 15.22,
+                'DIN s2.6': 28.50, 'DIN s3.2': 27.30, 'DIN s4.0': 25.70
+            },
+            '32': {
+                'Sch10': 36.66, 'Sch40': 35.08, 'Sch80': 32.50, 'Sch160': 29.50, 'XXS': 22.80,
+                'DIN s2.6': 37.20, 'DIN s3.2': 36.00, 'DIN s4.0': 34.40
+            },
+            '40': {
+                'Sch10': 42.76, 'Sch40': 40.94, 'Sch80': 38.14, 'Sch160': 34.02, 'XXS': 28.00,
+                'DIN s2.6': 43.10, 'DIN s3.2': 41.90, 'DIN s4.0': 40.30, 'DIN s5.0': 38.30
+            },
+            '50': {
+                'NORM': 54.5,
+                'Sch10': 54.76, 'Sch40': 52.48, 'Sch80': 49.22, 'Sch160': 42.82, 'XXS': 38.16,
+                'DIN s2.9': 54.50, 'DIN s3.6': 53.10, 'DIN s4.5': 51.30, 'DIN s5.6': 49.10
+            },
+            '65': {
+                'NORM': 70.3,
+                'Sch10': 66.90, 'Sch40': 62.68, 'Sch80': 58.98, 'Sch160': 53.94, 'XXS': 44.96,
+                'DIN s2.9': 70.30, 'DIN s3.6': 68.90, 'DIN s5.0': 66.10, 'DIN s7.1': 61.90
+            },
+            '80': {
+                'NORM': 82.5,
+                'Sch10': 82.80, 'Sch40': 77.92, 'Sch80': 73.66, 'Sch160': 66.64, 'XXS': 58.42,
+                'DIN s3.2': 82.50, 'DIN s4.0': 80.90, 'DIN s5.6': 77.70, 'DIN s8.0': 72.90
+            },
+            '90': {
+                'Sch10': 95.50, 'Sch40': 90.12, 'Sch80': 85.44
+            },
+            '100': {
+                'NORM': 107.1,
+                'Sch10': 108.20, 'Sch40': 102.26, 'Sch80': 97.18, 'Sch160': 87.32, 'XXS': 80.06,
+                'DIN s3.6': 107.10, 'DIN s4.5': 105.30, 'DIN s6.3': 101.70, 'DIN s8.8': 96.70
+            },
+            '125': {
+                'NORM': 131.7,
+                'Sch10': 134.50, 'Sch40': 128.20, 'Sch80': 122.24, 'Sch160': 109.54, 'XXS': 103.20,
+                'DIN s4.0': 131.70, 'DIN s5.0': 129.70, 'DIN s7.1': 125.50, 'DIN s10.0': 119.70
+            },
+            '150': {
+                'NORM': 160.3,
+                'Sch10': 161.50, 'Sch40': 154.08, 'Sch80': 146.36, 'Sch160': 131.78, 'XXS': 124.40,
+                'DIN s4.5': 159.30, 'DIN s5.6': 157.10, 'DIN s7.1': 154.10, 'DIN s11.0': 146.30
+            },
+            '200': {
+                'NORM': 209.1,
+                'Sch10': 211.58, 'Sch20': 206.40, 'Sch30': 205.02, 'Sch40': 202.74, 'Sch80': 193.70, 'Sch160': 173.08, 'XXS': 174.64,
+                'DIN s4.5': 210.10, 'DIN s6.3': 206.50, 'DIN s8.0': 203.10, 'DIN s12.5': 194.10
+            },
+            '250': {
+                'NORM': 261.8,
+                'Sch10': 264.62, 'Sch20': 260.30, 'Sch30': 257.40, 'Sch40': 254.46, 'Sch80': 242.82, 'Sch160': 215.84, 'XXS': 222.20,
+                'DIN s5.0': 263.00, 'DIN s6.3': 260.40, 'DIN s8.8': 255.40, 'DIN s14.2': 244.60
+            },
+            '300': {
+                'NORM': 312.1,
+                'Sch10': 314.76, 'Sch20': 311.20, 'Sch30': 307.14, 'Sch40': 303.28, 'Sch80': 288.94, 'Sch160': 257.26, 'XXS': 273.10,
+                'DIN s5.6': 312.70, 'DIN s7.1': 309.70, 'DIN s10.0': 303.90, 'DIN s16.0': 291.90
+            },
+            // DN grandi: solo NORM
+            '350': { 'NORM': 343.0 }, '400': { 'NORM': 393.8 }, '450': { 'NORM': 444.6 },
             '500': { 'NORM': 495.4 }, '600': { 'NORM': 597.0 }, '700': { 'NORM': 697.0 }, '800': { 'NORM': 798.6 }, '900': { 'NORM': 896.8 }
+        }
+    },
+    'Acciaio INOX 304-316': {
+        roughness: 0.02, lambda: 16.0,
+        specs: {
+            '6': {
+                'Sch5S': 8.26, 'Sch10S': 7.82, 'Sch40S': 6.84, 'Sch80S': 5.48,
+                'EN S.Leggera': 6.60, 'EN S.Media': 6.20, 'EN S.Pesante': 5.00,
+                'DIN s1.6': 7.00, 'DIN s2.0': 6.20
+            },
+            '8': {
+                'Sch5S': 11.22, 'Sch10S': 10.40, 'Sch40S': 9.22, 'Sch80S': 7.66,
+                'EN S.Leggera': 9.90, 'EN S.Media': 9.50, 'EN S.Pesante': 8.30,
+                'DIN s1.6': 10.30, 'DIN s2.0': 9.50, 'DIN s2.3': 8.90
+            },
+            '10': {
+                'Sch5S': 14.62, 'Sch10S': 13.80, 'Sch40S': 12.48, 'Sch80S': 10.70,
+                'EN S.Leggera': 13.60, 'EN S.Media': 12.60, 'EN S.Pesante': 11.40,
+                'DIN s1.8': 13.60, 'DIN s2.0': 13.20, 'DIN s2.3': 12.60
+            },
+            '15': {
+                'Sch5S': 18.00, 'Sch10S': 17.08, 'Sch40S': 15.76, 'Sch80S': 13.84,
+                'EN S.Leggera': 17.30, 'EN S.Media': 16.10, 'EN S.Pesante': 14.90,
+                'DIN s2.0': 17.30, 'DIN s2.6': 16.10, 'DIN s3.2': 14.90
+            },
+            '20': {
+                'Sch5S': 23.40, 'Sch10S': 22.48, 'Sch40S': 20.96, 'Sch80S': 18.88,
+                'EN S.Leggera': 22.30, 'EN S.Media': 21.70, 'EN S.Pesante': 20.50,
+                'DIN s2.3': 22.30, 'DIN s2.6': 21.70, 'DIN s3.2': 20.50
+            },
+            '25': {
+                'Sch5S': 30.10, 'Sch10S': 27.86, 'Sch40S': 26.64, 'Sch80S': 24.30,
+                'EN S.Leggera': 28.50, 'EN S.Media': 27.30, 'EN S.Pesante': 25.70,
+                'DIN s2.6': 28.50, 'DIN s3.2': 27.30, 'DIN s4.0': 25.70
+            },
+            '32': {
+                'Sch5S': 38.90, 'Sch10S': 36.66, 'Sch40S': 35.08, 'Sch80S': 32.50,
+                'EN S.Leggera': 37.20, 'EN S.Media': 36.00, 'EN S.Pesante': 34.40,
+                'DIN s2.6': 37.20, 'DIN s3.2': 36.00, 'DIN s4.0': 34.40
+            },
+            '40': {
+                'Sch5S': 45.00, 'Sch10S': 42.76, 'Sch40S': 40.94, 'Sch80S': 38.14,
+                'EN S.Leggera': 42.50, 'EN S.Media': 41.90, 'EN S.Pesante': 40.30,
+                'DIN s2.6': 43.10, 'DIN s3.2': 41.90, 'DIN s4.0': 40.30, 'DIN s5.0': 38.30
+            },
+            '50': {
+                'Sch5S': 57.00, 'Sch10S': 54.76, 'Sch40S': 52.48, 'Sch80S': 49.22,
+                'EN S.Leggera': 54.50, 'EN S.Media': 53.10, 'EN S.Pesante': 51.30,
+                'DIN s2.9': 54.50, 'DIN s3.6': 53.10, 'DIN s4.5': 51.30, 'DIN s5.6': 49.10
+            },
+            '65': {
+                'Sch5S': 68.78, 'Sch10S': 66.90, 'Sch40S': 62.68, 'Sch80S': 58.98,
+                'EN S.Leggera': 69.70, 'EN S.Media': 68.90, 'EN S.Pesante': 67.10,
+                'DIN s2.9': 70.30, 'DIN s3.6': 68.90, 'DIN s5.0': 66.10, 'DIN s7.1': 61.90
+            },
+            '80': {
+                'Sch5S': 84.68, 'Sch10S': 82.80, 'Sch40S': 77.92, 'Sch80S': 73.66,
+                'EN S.Leggera': 82.50, 'EN S.Media': 80.90, 'EN S.Pesante': 78.90,
+                'DIN s3.2': 82.50, 'DIN s4.0': 80.90, 'DIN s5.6': 77.70, 'DIN s8.0': 72.90
+            },
+            '90': {
+                'Sch5S': 97.38, 'Sch10S': 95.50, 'Sch40S': 90.12, 'Sch80S': 85.44
+            },
+            '100': {
+                'Sch5S': 110.08, 'Sch10S': 108.20, 'Sch40S': 102.26, 'Sch80S': 97.18,
+                'EN S.Leggera': 107.10, 'EN S.Media': 105.30, 'EN S.Pesante': 103.50,
+                'DIN s3.6': 107.10, 'DIN s4.5': 105.30, 'DIN s6.3': 101.70, 'DIN s8.8': 96.70
+            },
+            '125': {
+                'Sch5S': 135.76, 'Sch10S': 134.50, 'Sch40S': 128.20, 'Sch80S': 122.24,
+                'DIN s4.0': 131.70, 'DIN s5.0': 129.70, 'DIN s7.1': 125.50, 'DIN s10.0': 119.70
+            },
+            '150': {
+                'Sch5S': 162.76, 'Sch10S': 161.50, 'Sch40S': 154.08, 'Sch80S': 146.36,
+                'DIN s4.5': 159.30, 'DIN s5.6': 157.10, 'DIN s7.1': 154.10, 'DIN s11.0': 146.30
+            },
+            '200': {
+                'Sch5S': 213.56, 'Sch10S': 211.58, 'Sch40S': 202.74, 'Sch80S': 193.70,
+                'DIN s4.5': 210.10, 'DIN s6.3': 206.50, 'DIN s8.0': 203.10, 'DIN s12.5': 194.10
+            },
+            '250': {
+                'Sch5S': 266.20, 'Sch10S': 264.62, 'Sch40S': 254.46, 'Sch80S': 247.60,
+                'DIN s5.0': 263.00, 'DIN s6.3': 260.40, 'DIN s8.8': 255.40, 'DIN s14.2': 244.60
+            },
+            '300': {
+                'Sch5S': 315.98, 'Sch10S': 314.76, 'Sch40S': 304.84, 'Sch80S': 298.50,
+                'DIN s5.6': 312.70, 'DIN s7.1': 309.70, 'DIN s10.0': 303.90, 'DIN s16.0': 291.90
+            }
+        }
+    },
+    'Acciaio Zincato': {
+        roughness: 0.15, lambda: 50.0,
+        specs: {
+            '6':   { 'S.Leggera': 6.60,   'S.Media': 6.20,   'S.Pesante': 5.00  },
+            '8':   { 'S.Leggera': 9.90,   'S.Media': 9.50,   'S.Pesante': 8.30  },
+            '10':  { 'S.Leggera': 13.60,  'S.Media': 12.60,  'S.Pesante': 11.40 },
+            '15':  { 'S.Leggera': 17.30,  'S.Media': 16.10,  'S.Pesante': 14.90 },
+            '20':  { 'S.Leggera': 22.30,  'S.Media': 21.70,  'S.Pesante': 20.50 },
+            '25':  { 'S.Leggera': 28.50,  'S.Media': 27.30,  'S.Pesante': 25.70 },
+            '32':  { 'S.Leggera': 37.20,  'S.Media': 36.00,  'S.Pesante': 34.40 },
+            '40':  { 'S.Leggera': 42.50,  'S.Media': 41.90,  'S.Pesante': 40.30 },
+            '50':  { 'S.Leggera': 54.50,  'S.Media': 53.10,  'S.Pesante': 51.30 },
+            '65':  { 'S.Leggera': 69.70,  'S.Media': 68.90,  'S.Pesante': 67.10 },
+            '80':  { 'S.Leggera': 82.50,  'S.Media': 80.90,  'S.Pesante': 78.90 },
+            '100': { 'S.Leggera': 107.10, 'S.Media': 105.30, 'S.Pesante': 103.50 }
+        }
+    },
+    'Rame': {
+        roughness: 0.0015, lambda: 380.0,
+        specs: {
+            '6':  { 'EN 1057': 6.00 },
+            '8':  { 'EN 1057': 8.00 },
+            '10': { 'EN 1057': 10.00 },
+            '12': { 'EN 1057': 12.00 },
+            '13': { 'EN 1057': 13.00 },
+            '14': { 'EN 1057': 14.00 },
+            '16': { 'EN 1057': 16.00 },
+            '20': { 'EN 1057': 20.00, 'EN 1057 Sp.': 19.00 },
+            '25': { 'EN 1057': 26.00, 'EN 1057 Sp.': 25.00 },
+            '32': { 'EN 1057': 32.60, 'EN 1057 Sp.': 32.00 },
+            '40': { 'EN 1057': 39.60, 'EN 1057 Sp.': 39.00 },
+            '50': { 'EN 1057': 51.00, 'EN 1057 Sp.': 50.00 },
+            '65': { 'EN 1057': 60.00, 'EN 1057 76': 72.10 },
+            '80': { 'EN 1057': 84.90 },
+            '100': { 'EN 1057': 103.00 },
+            '1/4':   { 'ASTM K': 7.74,  'ASTM L': 8.00  },
+            '3/8':   { 'ASTM K': 10.22, 'ASTM L': 10.92, 'ASTM M': 11.42 },
+            '1/2':   { 'ASTM K': 13.40, 'ASTM L': 13.84, 'ASTM M': 14.46 },
+            '5/8':   { 'ASTM L': 16.91 },
+            '3/4':   { 'ASTM K': 18.93, 'ASTM L': 19.95, 'ASTM M': 20.61 },
+            '1':     { 'ASTM K': 25.28, 'ASTM L': 26.04, 'ASTM M': 26.30 },
+            '1 1/4': { 'ASTM K': 31.63, 'ASTM L': 32.13 },
+            '1 1/2': { 'ASTM K': 37.62, 'ASTM L': 38.24 },
+            '2':     { 'ASTM K': 49.76, 'ASTM L': 50.42 }
         }
     },
     'Cemento': {
@@ -159,8 +373,8 @@ export interface KPresetItem {
 }
 
 export const K_PRESETS: KPresetItem[] = [
-    { label: 'Imbocco', value: 0.5 }, { label: 'Sbocco', value: 1.0 }, { label: 'Curva 90°', value: 0.9 },
-    { label: 'Curva 45°', value: 0.4 }, { label: 'Saracinesca', value: 0.2 }, { label: 'Valv. Ritegno', value: 2.0 },
+    { label: 'Imbocco', value: 0.5 }, { label: 'Sbocco', value: 1.0 }, { label: 'Curva 90', value: 0.9 },
+    { label: 'Curva 45', value: 0.4 }, { label: 'Saracinesca', value: 0.2 }, { label: 'Valv. Ritegno', value: 2.0 },
 ];
 
 // Funzione per ricavare il Diametro Esterno in base al materiale
@@ -168,17 +382,37 @@ export const getExternalDiameter = (mat: string, dn: string | number, d_int: num
     if (!mat || !dn) return 0;
     const plasticDNs = ['PE100', 'PEAD', 'PRFV', 'PVC', 'PVC EN'];
     if (plasticDNs.includes(mat)) return Number(dn); // Per la plastica, il DN indica il diametro esterno esatto
-    
-    if (mat === 'Acciaio') {
-        const steelOD: Record<string, number> = {
-            '50': 60.3, '65': 76.1, '80': 88.9, '100': 114.3, '125': 139.7, '150': 168.3,
-            '200': 219.1, '250': 273.0, '300': 323.9, '350': 355.6, '400': 406.4, '450': 457.0,
-            '500': 508.0, '600': 610.0, '700': 711.0, '800': 813.0, '900': 914.0
-        };
+
+    // Tabella OD standard acciaio (ASME B36.10 / EN 10220) per tutti i materiali acciaio
+    const steelOD: Record<string, number> = {
+        '6': 10.3, '8': 13.7, '10': 17.1, '15': 21.3, '20': 26.7, '25': 33.4,
+        '32': 42.2, '40': 48.3, '50': 60.3, '65': 73.0, '80': 88.9, '90': 101.6,
+        '100': 114.3, '125': 141.3, '150': 168.3, '200': 219.1, '250': 273.0,
+        '300': 323.9, '350': 355.6, '400': 406.4, '450': 457.0, '500': 508.0,
+        '600': 610.0, '700': 711.0, '800': 813.0, '900': 914.0
+    };
+
+    const steelMaterials = ['Acciaio al Carbonio', 'Acciaio INOX 304-316', 'Acciaio Zincato'];
+    if (steelMaterials.includes(mat)) {
         const dnStr = String(dn);
         return steelOD[dnStr] || (d_int + 10);
     }
-    
+
+    if (mat === 'Rame') {
+        const dnStr = String(dn);
+        // Mappa OD per tubi in rame EN 1057 (DN nominale mm -> OD mm)
+        const copperOD: Record<string, number> = {
+            '6': 8, '8': 10, '10': 12, '12': 14, '13': 15, '14': 16, '16': 18,
+            '20': 22, '25': 28, '32': 35, '40': 42, '50': 54, '65': 64, '80': 88.9, '100': 108
+        };
+        // Mappa OD per tubi in rame ASTM B88 (DN nominale pollici -> OD mm)
+        const copperASTM_OD: Record<string, number> = {
+            '1/4': 9.52, '3/8': 12.7, '1/2': 15.88, '5/8': 19.05,
+            '3/4': 22.23, '1': 28.58, '1 1/4': 34.93, '1 1/2': 41.28, '2': 53.98
+        };
+        return copperOD[dnStr] ?? copperASTM_OD[dnStr] ?? (d_int + 2);
+    }
+
     if (mat === 'Ghisa') return d_int + 16;
     if (mat === 'Cemento') return d_int * 1.2;
     return d_int + 10;
