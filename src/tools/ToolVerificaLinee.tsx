@@ -316,7 +316,7 @@ function SVGGradienteSovrapposto({ tratto, fluidTemp }: SVGGradienteSovrappostoP
           
           <path 
             d={`M ${originX} ${originY} L ${originX + R_e_px} ${originY} A ${R_e_px} ${R_e_px} 0 0 0 ${originX} ${originY - R_e_px} Z`} 
-            fill={tratto.material === 'Acciaio' ? 'rgba(148, 163, 184, 0.4)' : 'rgba(71, 85, 105, 0.4)'} 
+            fill={['Acciaio al Carbonio','Acciaio INOX 304-316','Acciaio Zincato','Ghisa'].includes(tratto.material) ? 'rgba(148, 163, 184, 0.4)' : 'rgba(71, 85, 105, 0.4)'} 
             stroke="#94a3b8" 
             strokeWidth="0.5"
           />
@@ -709,9 +709,9 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                 tag: `L${newId}`, 
                 name: `Linea Tratto ${newId}`, 
                 portata: '', 
-                material: 'Acciaio', 
-                DN: '100', 
-                PN: 'NORM', 
+                material: Object.keys(PIPE_CATALOG)[0], 
+                DN: Object.keys(PIPE_CATALOG[Object.keys(PIPE_CATALOG)[0]].specs)[0], 
+                PN: Object.keys(PIPE_CATALOG[Object.keys(PIPE_CATALOG)[0]].specs[Object.keys(PIPE_CATALOG[Object.keys(PIPE_CATALOG)[0]].specs)[0]])[0], 
                 length: '', 
                 n_valvole: 0, 
                 n_riduzioni: 0, 

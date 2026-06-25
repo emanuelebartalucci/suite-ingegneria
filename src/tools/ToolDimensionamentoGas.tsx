@@ -491,15 +491,18 @@ export function ToolDimensionamentoGas({
   const addBranch = () => {
     const defaultParent = branches[branches.length - 1]?.id || null;
     const newId = branches.length > 0 ? Math.max(...branches.map(b => b.id)) + 1 : 1;
+    const defaultMat = Object.keys(PIPE_CATALOG)[0];
+    const defaultDN = Object.keys(PIPE_CATALOG[defaultMat].specs)[0];
+    const defaultPN = Object.keys(PIPE_CATALOG[defaultMat].specs[defaultDN])[0];
     setBranches([...branches, {
       id: newId,
       parentId: defaultParent,
       length: '',
       hMonte: 0,
       hValle: 0,
-      material: 'Acciaio',
-      DN: '50',
-      PN: 'NORM',
+      material: defaultMat,
+      DN: defaultDN,
+      PN: defaultPN,
       dIntManual: '',
       dExtManual: '',
       roughnessManual: '',
@@ -938,8 +941,9 @@ export function ToolDimensionamentoGas({
                         className="bg-transparent font-semibold text-slate-700 focus:outline-none cursor-pointer"
                         onClick={e => e.stopPropagation()}
                       >
-                        <option value="Acciaio">Acciaio</option>
-                        <option value="PEAD">PEAD</option>
+                        {Object.keys(PIPE_CATALOG).map(m => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
                         <option value="manuale">Manuale...</option>
                       </select>
                     </td>
