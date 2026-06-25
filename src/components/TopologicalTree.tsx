@@ -8,6 +8,10 @@ export interface TrattoNode {
   name: string;
   velocity?: number;
   loss_tot_mbar?: number;
+  // --- FASE 2 ---
+  dislivelloGeodetico?: number | string;
+  pressioneNodo?: number;          // pressione calcolata al nodo di arrivo (barg)
+  pressioneMinimaRichiesta?: number | string; // soglia minima (barg)
   children?: TrattoNode[];
 }
 
@@ -15,6 +19,7 @@ interface TopologicalTreeProps {
   tratti: TrattoNode[];
   activeTag?: string;
   onSelectTag?: (tag: string) => void;
+  pressionePartenza?: number | string; // pressione alla radice (barg)
 }
 
 interface MapNode extends TrattoNode {
@@ -34,6 +39,11 @@ interface VisualLine {
   loss?: number;
   length: number | string;
   dir: 'H' | 'V';
+  // nuovi
+  dislivello?: number | string;
+  pressioneNodo?: number;
+  pressioneMin?: number | string;
+  hasAlarm?: boolean;
 }
 
 interface VisualLabel {
@@ -44,7 +54,7 @@ interface VisualLabel {
   dir: 'H' | 'V';
 }
 
-export default function TopologicalTree({ tratti, activeTag, onSelectTag }: TopologicalTreeProps) {
+export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressionePartenza = 0 }: TopologicalTreeProps) {
   const svgData = useMemo(() => {
     if (!tratti || tratti.length === 0) return null;
 
@@ -227,7 +237,6 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
 
         if (dir === 'H') {
           if (parentDir === 'V') {
-            // Lo schema deve andare sempre verso destra (+x), mai a sinistra
             tempEndX = startX + candidateLen;
           } else {
             const sgnX = parentEndX - parentStartX < 0 ? -1 : 1;
@@ -236,9 +245,9 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
         } else {
           if (parentDir === 'H') {
             if (childIndex % 2 === 1) {
-              tempEndY = startY - candidateLen; // Alternando, va verso l'alto (dispari)
+              tempEndY = startY - candidateLen;
             } else {
-              tempEndY = startY + candidateLen; // Di default, va verso il basso (pari/singolo)
+              tempEndY = startY + candidateLen;
             }
           } else {
             const sgnY = parentEndY - parentStartY < 0 ? -1 : 1;
@@ -258,7 +267,6 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
       if (collision) {
         if (dir === 'H') {
           if (parentDir === 'V') {
-            // Lo schema deve andare sempre verso destra (+x), mai a sinistra
             endX = startX + visualLen;
           } else {
             const sgnX = parentEndX - parentStartX < 0 ? -1 : 1;
@@ -267,9 +275,9 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
         } else {
           if (parentDir === 'H') {
             if (childIndex % 2 === 1) {
-              endY = startY - visualLen; // Alternando, va verso l'alto (dispari)
+              endY = startY - visualLen;
             } else {
-              endY = startY + visualLen; // Di default, va verso il basso (pari/singolo)
+              endY = startY + visualLen;
             }
           } else {
             const sgnY = parentEndY - parentStartY < 0 ? -1 : 1;
@@ -283,17 +291,22 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
       let lineColor = "#3b82f6";
       if (node.hierarchy === 'dorsale_principale') {
         lineThickness = 5;
-        lineColor = "#1d4ed8"; // Blu scuro
+        lineColor = "#1d4ed8";
       } else if (node.hierarchy === 'dorsale_secondaria') {
         lineThickness = 3.5;
-        lineColor = "#0ea5e9"; // Celeste / Azzurro chiaro
+        lineColor = "#0ea5e9";
       } else if (node.hierarchy === 'dorsale_terziaria') {
         lineThickness = 2.5;
-        lineColor = "#10b981"; // Smeraldo
+        lineColor = "#10b981";
       } else {
         lineThickness = 1.5;
-        lineColor = "#64748b"; // Ardesia per utenze
+        lineColor = "#64748b";
       }
+
+      const pNodo = node.pressioneNodo;
+      const pMin = Number(node.pressioneMinimaRichiesta) || 0;
+      const hasAlarm = pNodo !== undefined && pNodo < pMin;
+      const dz = Number(node.dislivelloGeodetico) || 0;
 
       // Aggiungiamo la linea reale del tratto di tubo
       lines.push({
@@ -308,23 +321,28 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
         velocity: node.velocity,
         loss: node.loss_tot_mbar,
         length: node.length,
-        dir
+        dir,
+        dislivello: dz !== 0 ? dz : undefined,
+        pressioneNodo: pNodo,
+        pressioneMin: pMin,
+        hasAlarm,
       });
 
       // Posizioniamo l'etichetta di testo a metà del tratto, leggermente sfalsata
       let textX = (startX + endX) / 2;
       let textY = (startY + endY) / 2;
       if (dir === 'H') {
-        textY -= 6; // Sopra
+        textY -= 6;
       } else {
-        textX += 8; // A destra
+        textX += 8;
       }
 
+      // Label principale: TAG + lunghezza
       labels.push({
         x: textX,
         y: textY,
         text: `${node.tag} (${Number(node.length).toFixed(0)}m)`,
-        title: `${node.name}\nv = ${node.velocity?.toFixed(2)} m/s\n∆P = ${node.loss_tot_mbar?.toFixed(1)} mbar`,
+        title: `${node.name}\nv = ${node.velocity?.toFixed(2)} m/s\n∆P = ${node.loss_tot_mbar?.toFixed(1)} mbar\n∆z = ${dz >= 0 ? '+' : ''}${dz} m\nP_nodo = ${pNodo !== undefined ? pNodo.toFixed(3) : '—'} barg`,
         dir
       });
 
@@ -335,8 +353,6 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
       let vCount = 0;
 
       sortedChildren.forEach((child) => {
-        // Se la gerarchia del figlio è identica a quella del genitore prosegue dritto (stessa direzione 'dir'),
-        // altrimenti svolta di 90 gradi.
         const desiredDir: 'H' | 'V' = child.hierarchy === node.hierarchy ? dir : (dir === 'H' ? 'V' : 'H');
         
         let actualDir = desiredDir;
@@ -344,7 +360,6 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
           if (!hasStraight) {
             hasStraight = true;
           } else {
-            // Se c'è già un ramo che prosegue dritto, forziamo questo a svoltare per evitare sovrapposizioni
             actualDir = dir === 'H' ? 'V' : 'H';
           }
         }
@@ -359,12 +374,12 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
       });
     };
 
-    // Inizializziamo le radici. Se ci sono più radici, le separiamo in verticale.
+    // Inizializziamo le radici
     roots.forEach((root, idx) => {
       layoutNode(root, 40, 80 + idx * 200, 40, 80 + idx * 200, 'H', 0, 'H');
     });
 
-    // 5. TROVIAMO I LIMITI ED APPLICHIAMO LO SHIFT PER EVITARE COORDINATE NEGATIVE
+    // TROVIAMO I LIMITI ED APPLICHIAMO LO SHIFT
     let minX = 40;
     let maxX = 40;
     let minY = 40;
@@ -377,10 +392,17 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
       maxY = Math.max(maxY, l.y1, l.y2);
     });
 
-    // Calcoliamo lo slittamento per posizionare tutto correttamente nell'area visibile
     const padding = 40;
-    const shiftX = minX < padding ? (padding - minX) : 0;
-    const shiftY = minY < padding ? (padding - minY) : 0;
+    const rawWidth = maxX - minX + 2 * padding;
+    const rawHeight = maxY - minY + 2 * padding;
+
+    // Definiamo una dimensione minima del viewBox per evitare grafiche giganti su piccoli schemi
+    const viewBoxWidth = Math.max(rawWidth, 500);
+    const viewBoxHeight = Math.max(rawHeight, 200);
+
+    // Lo shift compensa sia i limiti minimi che la centratura del disegno nel viewBox più grande
+    const shiftX = (minX < padding ? (padding - minX) : 0) + (viewBoxWidth - rawWidth) / 2;
+    const shiftY = (minY < padding ? (padding - minY) : 0) + (viewBoxHeight - rawHeight) / 2;
 
     lines.forEach(l => {
       l.x1 += shiftX;
@@ -394,10 +416,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
       lbl.y += shiftY;
     });
 
-    const totalWidth = maxX - minX + 2 * padding;
-    const totalHeight = maxY - minY + 2 * padding;
-
-    return { lines, labels, totalWidth, totalHeight };
+    return { lines, labels, totalWidth: viewBoxWidth, totalHeight: viewBoxHeight };
   }, [tratti]);
 
   if (!tratti || tratti.length === 0) {
@@ -411,59 +430,54 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
   const { lines, labels, totalWidth, totalHeight } = svgData || { lines: [], labels: [], totalWidth: 600, totalHeight: 150 };
 
   return (
-    <div className="w-full overflow-x-auto bg-slate-50 border border-slate-200 rounded-xl p-4 print:bg-white print:border-none print:p-0">
-      <div style={{ width: '100%', minWidth: `${totalWidth}px` }} className="mx-auto print:!min-w-0 print:!w-full print:flex print:justify-center">
-        <svg 
-          width={totalWidth} 
-          height={totalHeight} 
-          viewBox={`0 0 ${totalWidth} ${totalHeight}`} 
-          style={{ maxWidth: '100%', height: 'auto' }}
-          className="select-none font-sans print:max-h-[250px] print:mx-auto"
-        >
+    <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 print:bg-white print:border-none print:p-0 flex flex-col justify-center items-center gap-4 overflow-hidden">
+      <svg 
+        viewBox={`0 0 ${totalWidth} ${totalHeight}`} 
+        style={{ width: '100%', height: 'auto', maxWidth: `${totalWidth}px` }}
+        className="select-none font-sans print:max-h-[250px] mx-auto block"
+      >
           <style>{`
             @media print {
-              .topo-highlight-line {
-                display: none !important;
-              }
-              .topo-line-dorsale-principale {
-                stroke: #1d4ed8 !important;
-                stroke-width: 5px !important;
-              }
-              .topo-line-dorsale-secondaria {
-                stroke: #0ea5e9 !important;
-                stroke-width: 3.5px !important;
-              }
-              .topo-line-dorsale-terziaria {
-                stroke: #10b981 !important;
-                stroke-width: 2.5px !important;
-              }
-              .topo-line-utenza {
-                stroke: #64748b !important;
-                stroke-width: 1.5px !important;
-              }
-              .topo-circle-node {
-                fill: #cbd5e1 !important;
-                stroke: #475569 !important;
-              }
-              .topo-circle-thick {
-                r: 4.5px !important;
-              }
-              .topo-circle-thin {
-                r: 3px !important;
-              }
+              .topo-highlight-line { display: none !important; }
+              .topo-line-dorsale-principale { stroke: #1d4ed8 !important; stroke-width: 5px !important; }
+              .topo-line-dorsale-secondaria { stroke: #0ea5e9 !important; stroke-width: 3.5px !important; }
+              .topo-line-dorsale-terziaria  { stroke: #10b981 !important; stroke-width: 2.5px !important; }
+              .topo-line-utenza              { stroke: #64748b !important; stroke-width: 1.5px !important; }
+              .topo-circle-node { fill: #cbd5e1 !important; stroke: #475569 !important; }
+              .topo-circle-thick { r: 4.5px !important; }
+              .topo-circle-thin  { r: 3px !important; }
             }
           `}</style>
 
-          {/* Definiamo i marker per le frecce terminali dei rami sottili */}
           <defs>
             <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
               <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748b" />
             </marker>
           </defs>
 
+          {/* Nodo radice (sorgente / pompa) */}
+          {lines.length > 0 && (() => {
+            // Troviamo tutti i punti di partenza radice (non endpoint di altri)
+            const endPoints = new Set(lines.map(l => `${l.x2},${l.y2}`));
+            const rootLines = lines.filter(l => !endPoints.has(`${l.x1},${l.y1}`));
+            return rootLines.map((l, i) => (
+              <g key={`root-node-${i}`}>
+                {/* Cerchio radice con indicazione pressione partenza */}
+                <circle cx={l.x1} cy={l.y1} r="7" fill="#1e293b" stroke="#94a3b8" strokeWidth="1.5" />
+                <text x={l.x1} y={l.y1 - 12} textAnchor="middle" fill="#1e293b" fontSize="8" fontWeight="bold">
+                  {Number(pressionePartenza).toFixed(2)} bar
+                </text>
+                <text x={l.x1} y={l.y1 - 3} textAnchor="middle" fill="white" fontSize="6" fontWeight="bold">P₀</text>
+              </g>
+            ));
+          })()}
+
           {/* Disegnamo i tratti reali di fluido ortogonali */}
           {lines.map((l) => {
             const isActive = activeTag === l.tag;
+            const dz = Number(l.dislivello) || 0;
+            const dzLabel = dz !== 0 ? (dz > 0 ? `↑${dz}m` : `↓${Math.abs(dz)}m`) : null;
+
             return (
               <g 
                 key={l.tag} 
@@ -471,24 +485,18 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
                 onClick={() => onSelectTag?.(l.tag)}
               >
                 <title>
-                  {`${l.name}\nLunghezza: ${l.length} m\nVelocità: ${l.velocity?.toFixed(2)} m/s\nPerdita: ${l.loss?.toFixed(1)} mbar`}
+                  {`${l.name}\nLunghezza: ${l.length} m\nVelocità: ${l.velocity?.toFixed(2)} m/s\nPerdita: ${l.loss?.toFixed(1)} mbar\n∆z: ${dz >= 0 ? '+' : ''}${dz} m\nP_nodo: ${l.pressioneNodo !== undefined ? l.pressioneNodo.toFixed(3) : '—'} barg`}
                 </title>
-                {/* Linea di hover/attiva allargata per feedback utente */}
+                {/* Linea di hover/attiva */}
                 <line 
-                  x1={l.x1}
-                  y1={l.y1}
-                  x2={l.x2}
-                  y2={l.y2}
+                  x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
                   stroke={isActive ? "rgba(249, 115, 22, 0.25)" : "rgba(59, 130, 246, 0.08)"}
                   strokeWidth={l.thickness + 8}
                   className={`topo-highlight-line ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 transition-opacity"}`}
                 />
-                {/* Linea reale del tratto */}
+                {/* Linea reale */}
                 <line 
-                  x1={l.x1}
-                  y1={l.y1}
-                  x2={l.x2}
-                  y2={l.y2}
+                  x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
                   stroke={isActive ? "#f97316" : l.color}
                   strokeWidth={isActive ? l.thickness + 1 : l.thickness}
                   strokeLinecap="round"
@@ -499,26 +507,82 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
                     l.color === "#10b981" ? "topo-line-dorsale-terziaria" : "topo-line-utenza"
                   }`}
                 />
-                {/* Nodo di giunzione all'inizio di ciascun tratto */}
+
+                {/* Badge Δz sul segmento */}
+                {dzLabel && (
+                  <text
+                    x={(l.x1 + l.x2) / 2}
+                    y={(l.y1 + l.y2) / 2 + (l.dir === 'H' ? 14 : 0)}
+                    dx={l.dir === 'V' ? 8 : 0}
+                    dy={l.dir === 'V' ? 12 : 0}
+                    textAnchor="middle"
+                    fill={dz > 0 ? "#ea580c" : "#0891b2"}
+                    fontSize="7.5"
+                    fontWeight="bold"
+                  >
+                    {dzLabel}
+                  </text>
+                )}
+
+                {/* Nodo di giunzione (cerchio) con allarme pressione */}
                 <circle 
-                  cx={l.x1} 
-                  cy={l.y1} 
+                  cx={l.x1} cy={l.y1} 
                   r={isActive ? "5.5" : (l.thickness > 3 ? "4.5" : "3")} 
                   fill={isActive ? "#ffedd5" : "#cbd5e1"} 
                   stroke={isActive ? "#f97316" : "#475569"} 
                   strokeWidth="1.5"
                   className={`topo-circle-node ${l.thickness > 3 ? "topo-circle-thick" : "topo-circle-thin"}`}
                 />
+
+                {/* Nodo di arrivo (endpoint) con pressione e allarme */}
+                <circle 
+                  cx={l.x2} cy={l.y2} 
+                  r={l.hasAlarm ? "6" : (l.thickness > 3 ? "4.5" : "3")} 
+                  fill={l.hasAlarm ? "#fef2f2" : (isActive ? "#ffedd5" : "#e2e8f0")}
+                  stroke={l.hasAlarm ? "#ef4444" : (isActive ? "#f97316" : "#64748b")} 
+                  strokeWidth={l.hasAlarm ? "2" : "1.5"}
+                />
+                {/* Allarme pressione: punto rosso + etichetta */}
+                {l.hasAlarm && (
+                  <g>
+                    <circle cx={l.x2} cy={l.y2} r="3" fill="#ef4444" opacity="0.8" />
+                    <text
+                      x={l.x2}
+                      y={l.y2 + (l.dir === 'H' ? 14 : -8)}
+                      textAnchor="middle"
+                      fill="#ef4444"
+                      fontSize="7"
+                      fontWeight="bold"
+                    >
+                      ⚠ P&lt;min
+                    </text>
+                  </g>
+                )}
+
+                {/* Etichetta pressione al nodo di arrivo */}
+                {l.pressioneNodo !== undefined && (
+                  <text
+                    x={l.x2}
+                    y={l.y2 + (l.dir === 'H' ? (l.hasAlarm ? 24 : 14) : -8)}
+                    dx={l.dir === 'V' ? 10 : 0}
+                    dy={l.dir === 'V' ? (l.hasAlarm ? -20 : -8) : 0}
+                    textAnchor={l.dir === 'H' ? "middle" : "start"}
+                    fill={l.hasAlarm ? "#ef4444" : "#475569"}
+                    fontSize="7"
+                    fontWeight="600"
+                  >
+                    {l.pressioneNodo.toFixed(2)} bar
+                  </text>
+                )}
               </g>
             );
           })}
 
-          {/* Disegniamo i testi informativi sopra o a lato delle linee */}
+          {/* Testi informativi */}
           {labels.map((lbl, index) => (
             <g key={`lbl-${index}`} className="pointer-events-none">
               <text 
-                x={lbl.x} 
-                y={lbl.y} 
+                x={lbl.x} y={lbl.y} 
                 textAnchor={lbl.dir === 'H' ? "middle" : "start"} 
                 fill="#334155" 
                 fontSize="9" 
@@ -530,12 +594,13 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag }: Topo
             </g>
           ))}
         </svg>
-      </div>
-      <div className="flex gap-4 justify-center mt-3 text-[10px] text-slate-400 print:hidden">
+      <div className="flex flex-wrap gap-4 justify-center mt-3 text-[10px] text-slate-400 print:hidden">
         <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1.5 bg-[#1d4ed8]"></span> Dorsale Principale</div>
         <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-[#0ea5e9]"></span> Dorsale Secondaria</div>
         <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-[#10b981]"></span> Dorsale Terziaria</div>
         <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-px bg-[#64748b]"></span> Tratto Terminale / Utenza</div>
+        <div className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-full bg-red-400 border-2 border-red-500"></span> Pressione &lt; Minima</div>
+        <div className="flex items-center gap-1.5"><span className="text-orange-500 font-bold">↑</span><span className="text-cyan-600 font-bold">↓</span> Dislivello (m)</div>
       </div>
     </div>
   );
