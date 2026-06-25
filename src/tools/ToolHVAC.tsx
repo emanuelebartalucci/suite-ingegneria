@@ -308,6 +308,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
     setNewSystemCode('');
     setNewSystemDesc('');
     setShowAddSystemModal(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const confirmAddSystem = () => {
@@ -355,6 +356,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
     setNewRoomCode('');
     setNewRoomDesc('');
     setShowAddRoomModal(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const confirmAddRoom = () => {
@@ -847,7 +849,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-xs">
                       <div>
                         <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Codice Locale</label>
                         <input 
@@ -864,6 +866,25 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                           value={selectedRoom.description} 
                           onChange={e => handleUpdateRoomField(selectedRoom.id, 'description', e.target.value)}
                           className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold focus:border-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Area (m²)</label>
+                        <input 
+                          type="number" 
+                          value={selectedRoom.area} 
+                          onChange={e => handleUpdateRoomField(selectedRoom.id, 'area', e.target.value === '' ? '' : Number(e.target.value))}
+                          className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold focus:border-blue-500 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Altezza (m)</label>
+                        <input 
+                          type="number" 
+                          step="0.1" 
+                          value={selectedRoom.height} 
+                          onChange={e => handleUpdateRoomField(selectedRoom.id, 'height', e.target.value === '' ? '' : Number(e.target.value))}
+                          className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold focus:border-blue-500 font-mono"
                         />
                       </div>
                       <div>
