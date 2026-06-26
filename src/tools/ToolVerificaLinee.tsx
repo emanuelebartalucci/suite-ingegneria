@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import logoImg from '../assets/Logo.png';
 import { createPortal } from 'react-dom';
 import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
@@ -2378,11 +2379,14 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                         {/* Contenuto principale del Datasheet */}
                         <div className="p-6 md:p-8 space-y-6 max-h-[85vh] overflow-y-auto print:max-h-none print:overflow-visible print:p-0">
                             
-                            {/* Titolo di Stampa */}
-                            <div className="hidden print:block text-center border-b pb-4 mb-4">
-                                <h1 className="text-xl font-bold uppercase tracking-wider text-slate-800">SUITE INGEGNERIA</h1>
-                                <h2 className="text-sm font-bold text-slate-500 uppercase mt-1">SCHEDA TECNICA DI DIMENSIONAMENTO GRUPPO DI POMPAGGIO</h2>
-                            </div>
+                            {/* Intestazione di Stampa con Logo */}
+                             <div className="hidden print:flex items-center justify-between border-b border-slate-300 pb-3 mb-4">
+                                 <img src={logoImg} alt="Ingegno" className="h-10 object-contain" />
+                                 <div className="text-right">
+                                     <h2 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Scheda Tecnica di Dimensionamento</h2>
+                                     <p className="text-xs text-slate-500 uppercase tracking-wider">Gruppo di Pompaggio</p>
+                                 </div>
+                             </div>
 
                             {/* Info Progetto */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200/80 text-xs print:bg-white print:border-slate-300">
@@ -2666,20 +2670,6 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                             <li>La potenza elettrica standard consigliata è calcolata includendo margini di sicurezza normativi a seconda della taglia per assorbire variazioni di punto di lavoro o fluttuazioni di viscosità.</li>
                                             <li>I calcoli si riferiscono al fluido termovettore selezionato in base alla temperatura locale nella sezione di aspirazione.</li>
                                         </ul>
-                                    </div>
-
-                                    {/* Blocco firme (solo stampa) */}
-                                    <div className="hidden print:grid grid-cols-2 gap-8 pt-12 text-xs">
-                                        <div className="border-t border-slate-300 pt-2 text-center text-slate-500">
-                                            <p className="font-semibold uppercase text-[8px] text-slate-700">Ingegnere Progettista</p>
-                                            <div className="h-12"></div>
-                                            <p>Firma e timbro: _________________________</p>
-                                        </div>
-                                        <div className="border-t border-slate-300 pt-2 text-center text-slate-500">
-                                            <p className="font-semibold uppercase text-[8px] text-slate-700">Verificato / Approvato da</p>
-                                            <div className="h-12"></div>
-                                            <p>Firma e timbro: _________________________</p>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
