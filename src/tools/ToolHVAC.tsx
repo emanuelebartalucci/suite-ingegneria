@@ -308,7 +308,6 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
     setNewSystemCode('');
     setNewSystemDesc('');
     setShowAddSystemModal(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const confirmAddSystem = () => {
@@ -356,7 +355,6 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
     setNewRoomCode('');
     setNewRoomDesc('');
     setShowAddRoomModal(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const confirmAddRoom = () => {
@@ -535,7 +533,8 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
   };
 
   return (
-    <div className="max-w-7xl mx-auto animate-fade-in px-4 pb-12">
+    <>
+      <div className="max-w-7xl mx-auto animate-fade-in px-4 pb-12">
       {/* Title Header */}
       <ProjectHeader 
         pData={projectData} 
@@ -2372,151 +2371,193 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                           <td className="py-2.5 px-2 font-mono text-right">{formatNumber(c.volume, 1)}</td>
                           <td className="py-2.5 px-2 text-center font-mono">{c.room.ricambiApp}</td>
                           <td className="py-2.5 px-2 font-mono text-right">{formatNumber(c.adoptedFlow, 0)}</td>
-                          <td className="py-2.5 px-2 font-mono text-right text-slate-500">{leakageText}</td>
-                          <td className="py-2.5 px-2 font-mono text-right">{formatNumber(c.adoptedRipresaFlow, 0)}</td>
-                          <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-700">
-                            {c.room.pressure_Pa > 0 ? `+${c.room.pressure_Pa}` : c.room.pressure_Pa} Pa
+                          <td className="py-2.5 px-2 font-mono text-right">
+                            <span className={netLeakage > 0 ? 'text-orange-600' : netLeakage < 0 ? 'text-blue-600' : ''}>
+                              {leakageText}
+                            </span>
                           </td>
-                          <td className="py-2.5 px-2 font-mono text-right text-blue-700 font-bold">{formatNumber(c.reheatDesignPower_kW, 2)}</td>
+                          <td className="py-2.5 px-2 font-mono text-right">{formatNumber(c.adoptedRipresaFlow, 0)}</td>
+                          <td className="py-2.5 px-2 text-center font-mono">
+                            <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-bold ${c.room.pressure_Pa > 0 ? 'bg-blue-50 text-blue-700' : c.room.pressure_Pa < 0 ? 'bg-red-50 text-red-700' : 'bg-slate-50 text-slate-500'}`}>
+                              {c.room.pressure_Pa > 0 ? '+' : ''}{c.room.pressure_Pa} Pa
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-2 font-mono text-right text-blue-800 font-bold">{formatNumber(c.reheatDesignPower_kW, 2)}</td>
                         </tr>
                       );
                     })}
-                    {roomCalculations.length === 0 && (
-                      <tr>
-                        <td colSpan={10} className="text-center py-4 text-slate-450 italic">
-                          Nessun locale inserito nel progetto.
-                        </td>
-                      </tr>
-                    )}
                   </tbody>
                 </table>
               </div>
             </div>
 
-        </div>
-        {/* Help Sidebar */}
-            <div className="lg:col-span-1 bg-amber-50/60 border border-amber-200/60 rounded-3xl p-5 space-y-4 print:hidden self-start shadow-sm text-xs text-slate-650">
-              <h5 className="font-bold text-amber-900 flex items-center gap-1.5 uppercase tracking-wide text-[10px]">
-                💡 Guida: Riepilogo Consumi
-              </h5>
-              <div className="space-y-3 leading-relaxed">
-                <p>Questa scheda presenta il dimensionamento finale di progetto:</p>
-                <ul className="list-disc pl-4 space-y-1.5">
-                  <li><strong>Consumi Totali UTA</strong>: Portate globali e potenza totale delle batterie di post per macchina.</li>
-                  <li><strong>Diametro Tubazione DN</strong>: Calcolato per mantenere le velocità dell'acqua entro i limiti.</li>
-                  <li><strong>Valvola Consigliata</strong>: Suggerisce il Kvs per le valvole modulanti.</li>
-                  <li><strong>Dettaglio Locali</strong>: Tabella di riepilogo stanza per stanza per la stampa.</li>
-                </ul>
+            </div>{/* end lg:col-span-3 */}
+
+            {/* Right column: System-level summary */}
+            <div className="space-y-4">
+              <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-3">
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide border-b border-slate-100 pb-2">
+                  Riepilogo per Sistema UTA
+                </h4>
+                {systems.map(sys => {
+                  const sc = systemCalculations.find(s => s.system.id === sys.id);
+                  if (!sc) return null;
+                  return (
+                    <div key={sys.id} className="border border-slate-100 rounded-2xl p-3 bg-slate-50/50 space-y-2 text-xs">
+                      <div className="font-black text-slate-800 font-mono text-[11px]">{sys.id}</div>
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-slate-500">Portata Mandata</span>
+                        <span className="font-mono font-bold">{formatNumber(sc.totalMandataSovr, 0)} m³/h</span>
+                      </div>
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-slate-500">Portata Ripresa</span>
+                        <span className="font-mono font-bold">{formatNumber(sc.totalRipresaSovr, 0)} m³/h</span>
+                      </div>
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-slate-500">Potenza Post-Riscaldo</span>
+                        <span className="font-mono font-bold text-blue-700">{formatNumber(sc.totalReheatDesignPower_kW, 2)} kW</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                {systems.length === 0 && (
+                  <p className="text-xs text-slate-400 italic text-center py-4">Nessun sistema configurato.</p>
+                )}
               </div>
             </div>
           </div>
         )}
-      </div>
+      </div>{/* end Main Tab Content */}
+      </div>{/* end max-w-7xl */}
 
-      {/* Add System Modal Overlay */}
+      {/* ====== Modal: Aggiungi Sistema ====== */}
       {showAddSystemModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-200 shadow-2xl space-y-4">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
-              <span>🌀</span> Aggiungi Nuovo Sistema UTA
-            </h3>
-            <div className="space-y-3.5 text-xs">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowAddSystemModal(false)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-md mx-4 space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+              <Plus className="w-4 h-4 text-blue-600" />
+              <h3 className="text-sm font-black text-slate-800">Aggiungi Nuovo Sistema UTA</h3>
+            </div>
+            <div className="space-y-3">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Codice Sistema (es. AH-105-01)</label>
-                <input 
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                  Codice Sistema <span className="text-red-500">*</span>
+                </label>
+                <input
                   type="text"
                   value={newSystemCode}
                   onChange={e => setNewSystemCode(e.target.value)}
-                  placeholder="AH-105-01"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold focus:border-blue-500 font-mono text-slate-800"
+                  onKeyDown={e => e.key === 'Enter' && confirmAddSystem()}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold focus:border-blue-500 font-mono text-sm"
+                  placeholder="es. UTA-01"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Descrizione Sistema</label>
-                <input 
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                  Descrizione
+                </label>
+                <input
                   type="text"
                   value={newSystemDesc}
                   onChange={e => setNewSystemDesc(e.target.value)}
-                  placeholder="Macchina a parziale ricircolo"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold focus:border-blue-500 text-slate-800"
+                  onKeyDown={e => e.key === 'Enter' && confirmAddSystem()}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold focus:border-blue-500 text-sm"
+                  placeholder="es. Unità trattamento aria piano 1"
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-2 text-xs pt-2">
-              <button 
-                onClick={() => {
-                  setShowAddSystemModal(false);
-                  setNewSystemCode('');
-                  setNewSystemDesc('');
-                }}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors cursor-pointer"
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAddSystemModal(false)}
+                className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors cursor-pointer"
               >
                 Annulla
               </button>
-              <button 
+              <button
+                type="button"
                 onClick={confirmAddSystem}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors cursor-pointer shadow-md shadow-blue-200"
+                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors cursor-pointer"
               >
-                Aggiungi
+                Aggiungi Sistema
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Add Room Modal Overlay */}
+      {/* ====== Modal: Aggiungi Locale ====== */}
       {showAddRoomModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl p-6 max-w-md w-full border border-slate-200 shadow-2xl space-y-4">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
-              <span>🚪</span> Aggiungi Nuovo Locale
-            </h3>
-            <div className="space-y-3.5 text-xs">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => setShowAddRoomModal(false)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-md mx-4 space-y-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+              <Plus className="w-4 h-4 text-blue-600" />
+              <h3 className="text-sm font-black text-slate-800">
+                Aggiungi Locale a{' '}
+                <span className="font-mono text-blue-600">{addRoomSystemId}</span>
+              </h3>
+            </div>
+            <div className="space-y-3">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Codice Locale (es. A108)</label>
-                <input 
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                  Codice Locale <span className="text-red-500">*</span>
+                </label>
+                <input
                   type="text"
                   value={newRoomCode}
                   onChange={e => setNewRoomCode(e.target.value)}
-                  placeholder="A108"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold focus:border-blue-500 font-mono text-slate-800"
+                  onKeyDown={e => e.key === 'Enter' && confirmAddRoom()}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold focus:border-blue-500 font-mono text-sm"
+                  placeholder="es. LOC-101"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Descrizione Locale</label>
-                <input 
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                  Descrizione
+                </label>
+                <input
                   type="text"
                   value={newRoomDesc}
                   onChange={e => setNewRoomDesc(e.target.value)}
-                  placeholder="STORAGE"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold focus:border-blue-500 text-slate-800"
+                  onKeyDown={e => e.key === 'Enter' && confirmAddRoom()}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold focus:border-blue-500 text-sm"
+                  placeholder="es. Laboratorio Analisi"
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-2 text-xs pt-2">
-              <button 
-                onClick={() => {
-                  setShowAddRoomModal(false);
-                  setNewRoomCode('');
-                  setNewRoomDesc('');
-                  setAddRoomSystemId(null);
-                }}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors cursor-pointer"
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAddRoomModal(false)}
+                className="flex-1 py-2.5 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors cursor-pointer"
               >
                 Annulla
               </button>
-              <button 
+              <button
+                type="button"
                 onClick={confirmAddRoom}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors cursor-pointer shadow-md shadow-blue-200"
+                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors cursor-pointer"
               >
-                Aggiungi
+                Aggiungi Locale
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

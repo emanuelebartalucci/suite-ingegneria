@@ -2401,7 +2401,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                 <div>
                                     <span className="text-slate-400 font-semibold block uppercase text-[9px] print:text-slate-600">Fluido Circuito</span>
                                     <span className="text-slate-800 font-bold">
-                                        {glycolEtPercent > 0 ? `Etilenico (${glycolEtPercent}%)` : glycolPrPercent > 0 ? `Propilenico (${glycolPrPercent}%)` : 'Acqua Pura'} 
+                                        {Number(glycolEtPercent) > 0 ? `Etilenico (${glycolEtPercent}%)` : Number(glycolPrPercent) > 0 ? `Propilenico (${glycolPrPercent}%)` : 'Acqua Pura'} 
                                         {` @ ${fluidTemp}°C`}
                                     </span>
                                 </div>
