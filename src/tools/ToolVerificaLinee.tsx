@@ -334,14 +334,17 @@ function SVGGradienteSovrapposto({ tratto, fluidTemp }: SVGGradienteSovrappostoP
   const isoPath = `M ${isoPoints.join(' L ')}`;
 
   // 4. ZONA ARIA ESTERNA (convezione esterna, decadimento esponenziale verso tAmb)
+  // Con nessun isolamento: la curva dell'aria parte dalla parete esterna (t_ext_tubo a re)
+  // Con isolamento: la curva parte dalla superficie dell'isolamento (t_s a riso)
+  const rStartAir = (isNoneIso || s_iso <= 0) ? re : riso;
+  const tStartAir = (isNoneIso || s_iso <= 0) ? t_ext_tubo : t_s;
   const airPoints: string[] = [];
   const numAirPoints = 15;
-  const rStartAir = riso;
   const rEndAir = R_max;
   for (let i = 0; i <= numAirPoints; i++) {
     const fraction = i / numAirPoints;
     const r = rStartAir + fraction * (rEndAir - rStartAir);
-    const temp = ta + (t_s - ta) * Math.exp(-3 * fraction);
+    const temp = ta + (tStartAir - ta) * Math.exp(-3 * fraction);
     airPoints.push(`${getX(r)},${getY(temp)}`);
   }
   const airPath = `M ${airPoints.join(' L ')}`;
@@ -470,7 +473,7 @@ function SVGGradienteSovrapposto({ tratto, fluidTemp }: SVGGradienteSovrappostoP
           <circle cx={getX(riso)} cy={getY(t_s)} r="2.5" fill="#b91c1c" />
         )}
         
-        <text x={getX((riso + R_max) / 2)} y={getY(ta) - 4} textAnchor="middle" fill="#94a3b8" fontSize="7" className="italic">Aria ambiente</text>
+        <text x={getX((rStartAir + R_max) / 2)} y={getY(ta) - 4} textAnchor="middle" fill="#94a3b8" fontSize="7" className="italic">Aria ambiente</text>
       </svg>
 
       {/* Legenda orizzontale */}
