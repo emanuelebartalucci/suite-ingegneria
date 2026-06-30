@@ -79,8 +79,21 @@ export default function App() {
     });
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [authLoading, setAuthLoading] = useState<boolean>(true);
-    const [appMode, setAppMode] = useState<string>('dashboard');
-    const [prevMode, setPrevMode] = useState<string>('dashboard');
+    const [appMode, setAppMode] = useState<string>(() => {
+        const reloadTo = sessionStorage.getItem('reload_to_tool');
+        if (reloadTo) {
+            sessionStorage.removeItem('reload_to_tool');
+            return reloadTo;
+        }
+        return 'dashboard';
+    });
+    const [prevMode, setPrevMode] = useState<string>(() => {
+        const reloadTo = sessionStorage.getItem('reload_to_tool');
+        if (reloadTo) {
+            return reloadTo;
+        }
+        return 'dashboard';
+    });
     const [dashboardSection, setDashboardSection] = useState<'home' | 'termoidraulica' | 'elettrica'>('home');
     
     const [projectData, setProjectData] = useState<ProjectData>({

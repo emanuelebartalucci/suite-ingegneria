@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   collection, 
@@ -49,6 +49,75 @@ export default function ProjectStorage({
   const [showModal, setShowModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [user, setUser] = useState<any>(null);
+  const [draftLoaded, setDraftLoaded] = useState<boolean>(false);
+  const isResettingRef = useRef<boolean>(false);
+
+  // 1. Carica la bozza all'avvio (con delay per superare i reset di App.tsx al cambio strumento)
+  useEffect(() => {
+    isResettingRef.current = false;
+    const timer = setTimeout(() => {
+      const draftStr = localStorage.getItem(`draft_${toolType}`);
+      if (draftStr) {
+        try {
+          const draft = JSON.parse(draftStr);
+          if (draft && draft.currentData) {
+            if (draft.currentProjectId) {
+              setCurrentProjectId(draft.currentProjectId);
+            }
+            if (draft.currentProjectName) {
+              setCurrentProjectName(draft.currentProjectName);
+            }
+            if (draft.projectInfo) {
+              setProjectInfo(draft.projectInfo);
+            }
+            onLoadProject(draft.currentData);
+            (window as any).suiteUI?.toast("Bozza locale ripristinata!", "info");
+          }
+        } catch (e) {
+          console.error("Errore nel ripristino della bozza locale:", e);
+        }
+      }
+      setDraftLoaded(true);
+    }, 80);
+
+    return () => clearTimeout(timer);
+  }, [toolType]);
+
+  // 2. Salva la bozza locale ad ogni digitazione/modifica
+  useEffect(() => {
+    if (!draftLoaded || isResettingRef.current) return;
+
+    const draft = {
+      currentProjectId,
+      currentProjectName,
+      projectInfo,
+      currentData
+    };
+    try {
+      localStorage.setItem(`draft_${toolType}`, JSON.stringify(draft));
+    } catch (e) {
+      console.error("Errore nel salvataggio della bozza locale:", e);
+    }
+  }, [currentData, projectInfo, currentProjectId, currentProjectName, draftLoaded, toolType]);
+
+  const handleNewCalculation = async () => {
+    const confirmed = await (window as any).suiteUI?.confirm(
+      "Vuoi avviare un nuovo calcolo? Tutti i dati correnti non salvati andranno persi.",
+      "Nuovo Calcolo"
+    );
+    if (!confirmed) return;
+
+    try {
+      isResettingRef.current = true;
+      localStorage.removeItem(`draft_${toolType}`);
+      // Memorizziamo il toolType per aprirlo dopo il reload
+      sessionStorage.setItem('reload_to_tool', toolType);
+      // Ricarica per azzerare lo stato di React in modo pulito e sicuro per tutti gli strumenti
+      window.location.reload();
+    } catch (e) {
+      console.error("Errore durante l'azzeramento del calcolo:", e);
+    }
+  };
 
   useEffect(() => {
     // Sottoscrizione allo stato dell'utente
@@ -301,6 +370,13 @@ export default function ProjectStorage({
           </form>
         )}
 
+        <button 
+          onClick={handleNewCalculation}
+          className="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-650 text-white text-xs font-bold rounded-lg transition-colors border border-slate-600 cursor-pointer"
+          title="Azzera e avvia un nuovo calcolo"
+        >
+          🆕 Nuovo
+        </button>
         <button 
           onClick={() => { setShowModal(true); if (user) fetchProjects(user); }}
           className="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-650 text-white text-xs font-bold rounded-lg transition-colors border border-slate-600 cursor-pointer"
