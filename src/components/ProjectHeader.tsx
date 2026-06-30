@@ -15,6 +15,7 @@ interface ProjectHeaderProps {
   title: string;
   setAppMode: (mode: string) => void;
   iconColor?: 'brand' | 'orange' | 'red' | 'redbrand' | 'purple';
+  showPrintButton?: boolean;
 }
 
 export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ 
@@ -22,7 +23,8 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   setPData, 
   title, 
   setAppMode, 
-  iconColor = 'brand' 
+  iconColor = 'brand',
+  showPrintButton = true
 }) => {
     const [logoError, setLogoError] = useState<boolean>(false);
     const iconBg = iconColor === 'brand' 
@@ -55,11 +57,13 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
 
     return (
         <div className="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 mb-6 print:shadow-none print:border-none print:p-0 print:mb-2">
-            <div className="flex justify-end items-center mb-6 print:hidden">
-                <button onClick={() => window.print()} className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm cursor-pointer">
-                    <IconPrinter className="w-4 h-4 mr-2"/> Stampa Report
-                </button>
-            </div>
+            {showPrintButton && (
+                <div className="flex justify-end items-center mb-6 print:hidden">
+                    <button onClick={() => window.print()} className="flex items-center px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm cursor-pointer">
+                        <IconPrinter className="w-4 h-4 mr-2"/> Stampa Report
+                    </button>
+                </div>
+            )}
 
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 print:border-b-2 print:border-slate-800 print:pb-4 print:mb-4">
                 <div className="flex items-center space-x-4 flex-1 w-full">

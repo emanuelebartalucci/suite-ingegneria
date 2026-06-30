@@ -527,7 +527,7 @@ export default function App() {
                         {appMode === 'gas' && <>💨 <span className="bg-gradient-to-r from-purple-600 to-fuchsia-600 bg-clip-text text-transparent">Dimensionamento Gas</span></>}
                         {appMode === 'calcoli_vari' && <>🛠️ <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Calcoli Rapidi & Utilità</span></>}
                         {appMode === 'calcoli_elettrici' && <>⚡ <span className="bg-gradient-to-r from-amber-500 to-yellow-600 bg-clip-text text-transparent">Calcoli Elettrici Rapidi</span></>}
-                        {appMode === 'hvac' && <>🌀 <span className="inline-block pb-1 pr-2 bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">Dimensionamento HVAC</span></>}
+                        {appMode === 'hvac' && <>🌀 <span className="inline-block pb-1 pr-2 bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">Dimensionamento Impianto di Climatizzazione</span></>}
                     </h1>
                 </div>
             )}
@@ -635,7 +635,7 @@ export default function App() {
                                     {/* 6. Dimensionamento HVAC */}
                                     <button onClick={() => setAppMode('hvac')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left cursor-pointer w-full">
                                         <div className="w-14 h-14 bg-blue-100 text-blue-650 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><Fan className="w-7 h-7" /></div>
-                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Dimensionamento HVAC</h2>
+                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Dimensionamento Impianto di Climatizzazione</h2>
                                         <p className="text-[11px] text-slate-500 text-center leading-relaxed">Bilanci aeraulici, portate UTA, trafilamenti e batterie post-riscaldo.</p>
                                     </button>
 
