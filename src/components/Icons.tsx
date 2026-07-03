@@ -103,3 +103,40 @@ export const IconWind: React.FC<IconProps> = ({ className = "w-full h-full" }) =
   </svg>
 );
 
+/**
+ * Simbolo P&ID pompa centrifuga:
+ * cerchio = corpo pompa, triangolo = girante, pipe suction/discharge
+ */
+export const IconPump: React.FC<IconProps> = ({ className = "w-full h-full" }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    {/* Corpo pompa */}
+    <circle cx="12" cy="13" r="6" />
+    {/* Girante (triangolo che indica la rotazione) */}
+    <path d="M9 10.5v5l6-2.5-6-2.5z" />
+    {/* Tubo aspirazione dal basso */}
+    <line x1="12" y1="19" x2="12" y2="23" />
+    {/* Tubo mandata verso l'alto con freccia */}
+    <line x1="12" y1="7" x2="12" y2="3" />
+    <polyline points="9.5 5.5 12 3 14.5 5.5" />
+  </svg>
+);
+
+/**
+ * Ventilatore centrifugo / aspiratore industriale:
+ * 3 pale ricurve intorno all'asse centrale
+ */
+export const IconImpeller: React.FC<IconProps> = ({ className = "w-full h-full" }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    {/* Mozzo centrale */}
+    <circle cx="12" cy="12" r="2.5" />
+    {/* Pala 1 — in alto a destra */}
+    <path d="M12 9.5C12 7 14 4 17 5" />
+    {/* Pala 2 — in basso a destra */}
+    <path d="M14.2 13C16.5 13.5 19.5 12 19 9" />
+    {/* Pala 3 — in basso a sinistra */}
+    <path d="M10 14C9 16.5 6 18 5 15" />
+    {/* Involucro esterno (cassa voluta) */}
+    <circle cx="12" cy="12" r="9" />
+  </svg>
+);
+

@@ -13,7 +13,9 @@ import { ToolDimensionamentoGas } from './tools/ToolDimensionamentoGas';
 import { ToolCalcoliElettrici } from './tools/ToolCalcoliElettrici';
 import { ToolCalcoliVari } from './tools/ToolCalcoliVari';
 import { ToolHVAC } from './tools/ToolHVAC';
-import { IconWaves, IconFlame, IconThermometer, IconArrowUp, IconWind } from './components/Icons';
+import { ToolPompeFognarie } from './tools/ToolPompeFognarie';
+import { ToolAspiratore } from './tools/ToolAspiratore';
+import { IconWaves, IconFlame, IconThermometer, IconArrowUp, IconWind, IconPump, IconImpeller } from './components/Icons';
 import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap, Scale, Fan } from 'lucide-react';
 
 import logoImg from './assets/Logo.png';
@@ -533,14 +535,16 @@ export default function App() {
             {appMode !== 'dashboard' && (
                 <div className="max-w-7xl mx-auto text-center mb-6 print:hidden">
                     <h1 className="text-3xl md:text-4xl font-black tracking-tight drop-shadow-sm flex items-center justify-center gap-3">
-                        {appMode === 'idraulico' && <>🌊 <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Profilo Idraulico</span></>}
-                        {appMode === 'termico' && <>🔥 <span className="bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">Carichi Termici</span></>}
-                        {appMode === 'dispersione' && <>🌡️ <span className="bg-gradient-to-r from-rose-600 to-red-600 bg-clip-text text-transparent">Dispersioni</span></>}
-                        {appMode === 'verifica_linee' && <>📈 <span className="bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">Verifica Perdita Linee</span></>}
-                        {appMode === 'gas' && <>💨 <span className="bg-gradient-to-r from-purple-600 to-fuchsia-600 bg-clip-text text-transparent">Dimensionamento Gas</span></>}
-                        {appMode === 'calcoli_vari' && <>🛠️ <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Calcoli Rapidi & Utilità</span></>}
-                        {appMode === 'calcoli_elettrici' && <>⚡ <span className="bg-gradient-to-r from-amber-500 to-yellow-600 bg-clip-text text-transparent">Calcoli Elettrici Rapidi</span></>}
+                        {appMode === 'idraulico' && <>🌊 <span className="inline-block pb-1 bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Profilo Idraulico</span></>}
+                        {appMode === 'termico' && <>🔥 <span className="inline-block pb-1 bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">Carichi Termici</span></>}
+                        {appMode === 'dispersione' && <>🌡️ <span className="inline-block pb-1 bg-gradient-to-r from-rose-600 to-red-600 bg-clip-text text-transparent">Dispersioni</span></>}
+                        {appMode === 'verifica_linee' && <>📈 <span className="inline-block pb-1 bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">Verifica Perdita Linee</span></>}
+                        {appMode === 'gas' && <>💨 <span className="inline-block pb-1 bg-gradient-to-r from-purple-600 to-fuchsia-600 bg-clip-text text-transparent">Dimensionamento Gas</span></>}
+                        {appMode === 'calcoli_vari' && <>🛠️ <span className="inline-block pb-1 bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Calcoli Rapidi & Utilità</span></>}
+                        {appMode === 'calcoli_elettrici' && <>⚡ <span className="inline-block pb-1 bg-gradient-to-r from-amber-500 to-yellow-600 bg-clip-text text-transparent">Calcoli Elettrici Rapidi</span></>}
                         {appMode === 'hvac' && <>🌀 <span className="inline-block pb-1 pr-2 bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">Dimensionamento Impianto di Climatizzazione</span></>}
+                        {appMode === 'pompe_fognarie' && <>🔧 <span className="inline-block pb-1 bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent">Pompe di Sollevamento Fognario</span></>}
+                        {appMode === 'aspiratore' && <>🌪️ <span className="inline-block pb-1 bg-gradient-to-r from-cyan-600 to-sky-600 bg-clip-text text-transparent">Aspiratore / Ventilatore Industriale</span></>}
                     </h1>
                 </div>
             )}
@@ -652,7 +656,21 @@ export default function App() {
                                         <p className="text-[11px] text-slate-500 text-center leading-relaxed">Bilanci aeraulici, portate UTA, trafilamenti e batterie post-riscaldo.</p>
                                     </button>
 
-                                    {/* 7. Calcoli Vari & Utilità */}
+                                    {/* 7. Pompe di Sollevamento Fognario */}
+                                    <button onClick={() => setAppMode('pompe_fognarie')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-teal-500 hover:bg-teal-50 transition-all text-left cursor-pointer w-full">
+                                        <div className="w-14 h-14 bg-teal-100 text-teal-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><IconPump /></div>
+                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Pompe di Sollevamento Fognario</h2>
+                                        <p className="text-[11px] text-slate-500 text-center leading-relaxed">Dimensionamento pompe, prevalenza manometrica, taglia motore e vasca di accumulo.</p>
+                                    </button>
+
+                                    {/* 8. Aspiratore / Ventilatore Industriale */}
+                                    <button onClick={() => setAppMode('aspiratore')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-cyan-500 hover:bg-cyan-50 transition-all text-left cursor-pointer w-full">
+                                        <div className="w-14 h-14 bg-cyan-100 text-cyan-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><IconImpeller /></div>
+                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Aspiratore / Ventilatore</h2>
+                                        <p className="text-[11px] text-slate-500 text-center leading-relaxed">Perdite di carico aerauliche, scrubber, dimensionamento ventilatore industriale.</p>
+                                    </button>
+
+                                    {/* 9. Calcoli Rapidi & Utilità — sempre ultimo */}
                                     <button onClick={() => setAppMode('calcoli_vari')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left cursor-pointer w-full">
                                         <div className="w-14 h-14 bg-blue-100 text-blue-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><Scale className="w-7 h-7" /></div>
                                         <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Calcoli Rapidi & Utilità</h2>
@@ -700,6 +718,8 @@ export default function App() {
                 {appMode === 'calcoli_vari' && <ToolCalcoliVari projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 {appMode === 'calcoli_elettrici' && <ToolCalcoliElettrici projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 {appMode === 'hvac' && <ToolHVAC projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
+                {appMode === 'pompe_fognarie' && <ToolPompeFognarie projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
+                {appMode === 'aspiratore' && <ToolAspiratore projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
 
             </div>
 
