@@ -61,3 +61,9 @@ Desktop.ini
 
 *.xlsx
 /File utili
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
