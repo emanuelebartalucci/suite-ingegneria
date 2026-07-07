@@ -12,6 +12,7 @@ export interface TrattoNode {
   dislivelloGeodetico?: number | string;
   pressioneNodo?: number;          // pressione calcolata al nodo di arrivo (barg)
   pressioneMinimaRichiesta?: number | string; // soglia minima (barg)
+  tipoCondotto?: 'aspirazione' | 'mandata';
   children?: TrattoNode[];
 }
 
@@ -44,6 +45,7 @@ interface VisualLine {
   pressioneNodo?: number;
   pressioneMin?: number | string;
   hasAlarm?: boolean;
+  tipoCondotto?: 'aspirazione' | 'mandata';
 }
 
 interface VisualLabel {
@@ -75,10 +77,10 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       }
     });
 
-    // Scala compressa per le lunghezze grafiche
+    // Scala compressa per le lunghezze grafiche (aumentata per distanziare i rami)
     const getVisualLength = (l: number | string): number => {
       const len = Number(l) || 0;
-      return 45 + Math.sqrt(len) * 15;
+      return 90 + Math.sqrt(len) * 35;
     };
 
     const lines: VisualLine[] = [];
@@ -185,8 +187,8 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
         }
       }
 
-      // 3. Prossimità degli endpoint dei rami
-      const minDistance = 28;
+      // 3. Prossimità degli endpoint dei rami (aumentato il minimo)
+      const minDistance = 50;
       for (const line of placedLines) {
         const dStart = Math.hypot(x2 - line.x1, y2 - line.y1);
         if (dStart < minDistance && !(x2 === line.x1 && y2 === line.y1)) {
@@ -223,7 +225,10 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
 
       let collision = true;
       let attempts = 0;
-      const offsets = [0, 25, -25, 50, -50, 75, -75, 100, -100];
+      const offsets = [0, 45, -45, 90, -90, 135, -135, 180, -180];
+
+      const dz = Number(node.dislivelloGeodetico) || 0;
+      const deltaY_quota = -dz * 8; // 8px per metro di dislivello
 
       while (collision && attempts < offsets.length) {
         const candidateLen = visualLen + offsets[attempts];
@@ -255,6 +260,8 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
           }
         }
 
+        tempEndY += deltaY_quota;
+
         if (!checkCollision(startX, startY, tempEndX, tempEndY, lines)) {
           collision = false;
           endX = tempEndX;
@@ -284,29 +291,31 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
             endY = startY + sgnY * visualLen;
           }
         }
+        endY += deltaY_quota;
       }
 
       // Spessore e colore del tratto
       let lineThickness = 4;
       let lineColor = "#3b82f6";
+      const isAsp = node.tipoCondotto === 'aspirazione';
+
       if (node.hierarchy === 'dorsale_principale') {
         lineThickness = 5;
-        lineColor = "#1d4ed8";
+        lineColor = isAsp ? "#ea580c" : "#1d4ed8";
       } else if (node.hierarchy === 'dorsale_secondaria') {
         lineThickness = 3.5;
-        lineColor = "#0ea5e9";
+        lineColor = isAsp ? "#f97316" : "#0ea5e9";
       } else if (node.hierarchy === 'dorsale_terziaria') {
         lineThickness = 2.5;
-        lineColor = "#10b981";
+        lineColor = isAsp ? "#fb923c" : "#10b981";
       } else {
         lineThickness = 1.5;
-        lineColor = "#64748b";
+        lineColor = isAsp ? "#d97706" : "#64748b";
       }
 
       const pNodo = node.pressioneNodo;
       const pMin = Number(node.pressioneMinimaRichiesta) || 0;
       const hasAlarm = pNodo !== undefined && pNodo < pMin;
-      const dz = Number(node.dislivelloGeodetico) || 0;
 
       // Aggiungiamo la linea reale del tratto di tubo
       lines.push({
@@ -326,6 +335,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
         pressioneNodo: pNodo,
         pressioneMin: pMin,
         hasAlarm,
+        tipoCondotto: node.tipoCondotto || 'mandata',
       });
 
       // Posizioniamo l'etichetta di testo a metà del tratto, leggermente sfalsata
@@ -392,13 +402,13 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       maxY = Math.max(maxY, l.y1, l.y2);
     });
 
-    const padding = 40;
+    const padding = 50;
     const rawWidth = maxX - minX + 2 * padding;
     const rawHeight = maxY - minY + 2 * padding;
 
-    // Definiamo una dimensione minima del viewBox per evitare grafiche giganti su piccoli schemi
-    const viewBoxWidth = Math.max(rawWidth, 500);
-    const viewBoxHeight = Math.max(rawHeight, 200);
+    // Definiamo una dimensione minima del viewBox più ampia per evitare compressioni e accavallamenti
+    const viewBoxWidth = Math.max(rawWidth, 800);
+    const viewBoxHeight = Math.max(rawHeight, 350);
 
     // Lo shift compensa sia i limiti minimi che la centratura del disegno nel viewBox più grande
     const shiftX = (minX < padding ? (padding - minX) : 0) + (viewBoxWidth - rawWidth) / 2;
@@ -416,7 +426,17 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       lbl.y += shiftY;
     });
 
-    return { lines, labels, totalWidth: viewBoxWidth, totalHeight: viewBoxHeight };
+    const pumpLocations: { x: number; y: number }[] = [];
+    lines.forEach(l1 => {
+      if (l1.tipoCondotto === 'aspirazione') {
+        const hasMandataChild = lines.some(l2 => l2.tipoCondotto === 'mandata' && Math.abs(l2.x1 - l1.x2) < 0.1 && Math.abs(l2.y1 - l1.y2) < 0.1);
+        if (hasMandataChild) {
+          pumpLocations.push({ x: l1.x2, y: l1.y2 });
+        }
+      }
+    });
+
+    return { lines, labels, pumpLocations, totalWidth: viewBoxWidth, totalHeight: viewBoxHeight };
   }, [tratti]);
 
   if (!tratti || tratti.length === 0) {
@@ -427,7 +447,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
     );
   }
 
-  const { lines, labels, totalWidth, totalHeight } = svgData || { lines: [], labels: [], totalWidth: 600, totalHeight: 150 };
+  const { lines, labels, pumpLocations, totalWidth, totalHeight } = svgData || { lines: [], labels: [], pumpLocations: [], totalWidth: 600, totalHeight: 150 };
 
   return (
     <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 print:bg-white print:border-none print:p-0 flex flex-col justify-center items-center gap-4 overflow-hidden">
@@ -465,7 +485,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                 {/* Cerchio radice con indicazione pressione partenza */}
                 <circle cx={l.x1} cy={l.y1} r="7" fill="#1e293b" stroke="#94a3b8" strokeWidth="1.5" />
                 <text x={l.x1} y={l.y1 - 12} textAnchor="middle" fill="#1e293b" fontSize="8" fontWeight="bold">
-                  {Number(pressionePartenza).toFixed(2)} bar
+                  {Number(pressionePartenza).toFixed(2)} barg
                 </text>
                 <text x={l.x1} y={l.y1 - 3} textAnchor="middle" fill="white" fontSize="6" fontWeight="bold">P₀</text>
               </g>
@@ -571,12 +591,21 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                     fontSize="7"
                     fontWeight="600"
                   >
-                    {l.pressioneNodo.toFixed(2)} bar
+                    {l.pressioneNodo.toFixed(2)} barg
                   </text>
                 )}
               </g>
             );
           })}
+
+          {/* Simbolo Pompa nei punti di transizione */}
+          {pumpLocations.map((p, i) => (
+            <g key={`pump-${i}`}>
+              <title>Gruppo di Pompaggio (Transizione Aspirazione ➔ Mandata)</title>
+              <circle cx={p.x} cy={p.y} r="9" fill="white" stroke="#1e293b" strokeWidth="1.8" />
+              <text x={p.x} y={p.y} textAnchor="middle" dominantBaseline="central" fill="#1e293b" fontSize="9" fontWeight="black" fontFamily="sans-serif">P</text>
+            </g>
+          ))}
 
           {/* Testi informativi */}
           {labels.map((lbl, index) => (
@@ -595,10 +624,11 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
           ))}
         </svg>
       <div className="flex flex-wrap gap-4 justify-center mt-3 text-[10px] text-slate-400 print:hidden">
-        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1.5 bg-[#1d4ed8]"></span> Dorsale Principale</div>
-        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-[#0ea5e9]"></span> Dorsale Secondaria</div>
-        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-0.5 bg-[#10b981]"></span> Dorsale Terziaria</div>
-        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-px bg-[#64748b]"></span> Tratto Terminale / Utenza</div>
+        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1.5 bg-[#1d4ed8]"></span> Dorsale Principale (Mandata)</div>
+        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1.5 bg-[#ea580c]"></span> Dorsale Principale (Aspirazione)</div>
+        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-[#0ea5e9]"></span> Dorsale Secondaria (Mandata)</div>
+        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-[#f97316]"></span> Dorsale Secondaria (Aspirazione)</div>
+        <div className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-white border border-[#1e293b] font-bold text-[9px] inline-flex items-center justify-center leading-none">P</span> Pompa</div>
         <div className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-full bg-red-400 border-2 border-red-500"></span> Pressione &lt; Minima</div>
         <div className="flex items-center gap-1.5"><span className="text-orange-500 font-bold">↑</span><span className="text-cyan-600 font-bold">↓</span> Dislivello (m)</div>
       </div>
