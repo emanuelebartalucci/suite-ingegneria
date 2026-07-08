@@ -187,7 +187,7 @@ function solveColebrookWhite(Re: number, roughnessRel: number): number {
   // Risoluzione a punto fisso
   let x = 1 / Math.sqrt(f);
   for (let i = 0; i < 20; i++) {
-    const term = (roughnessRel / 3.71) + (2.51 / (Re * x));
+    const term = (roughnessRel / 3.71) + (2.51 * x / Re);
     if (term <= 0) break;
     x = -2 * Math.log10(term);
   }
