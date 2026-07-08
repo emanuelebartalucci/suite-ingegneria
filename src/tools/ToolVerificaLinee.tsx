@@ -155,7 +155,7 @@ const convertFromBar = (valBar: number, targetUnit: string): string => {
   const valPa = valBar * 100000;
   if (targetUnit === 'Pa') return formatNumber(Math.round(valPa), 0);
   if (targetUnit === 'kPa') return formatNumber(valPa / 1000, 2);
-  if (targetUnit === 'mH2O' || targetUnit === 'm.c.a.') return formatNumber(valPa / 9806.65, 3);
+  if (targetUnit === 'mH2O' || targetUnit === 'm.c.a.') return formatNumber(valPa / 9806.65, 1);
   if (targetUnit === 'ata') return formatNumber(valPa / 98066.5, 3);
   if (targetUnit === 'mbar') return formatNumber(valPa / 100, 1);
   return formatNumber(valBar, 4);
@@ -197,7 +197,6 @@ function solveColebrookWhite(Re: number, roughnessRel: number): number {
 // Componente per disegnare la sezione geometrica del tubo sovrapposta al grafico del gradiente termico radiale
 interface SVGGradienteSovrappostoProps {
   tratto: TrattoLine;
-  fluidTemp: number | string;
 }
 
 interface YLabelItem {
@@ -218,7 +217,7 @@ interface XLabelItem {
   adjustedX?: number;
 }
 
-function SVGGradienteSovrapposto({ tratto, fluidTemp }: SVGGradienteSovrappostoProps) {
+function SVGGradienteSovrapposto({ tratto }: SVGGradienteSovrappostoProps) {
   if (!tratto || !tratto.d_int) return null;
 
   const ri = tratto.d_int / 2; // Raggio interno in mm
@@ -226,7 +225,7 @@ function SVGGradienteSovrapposto({ tratto, fluidTemp }: SVGGradienteSovrappostoP
   const s_iso = Number(tratto.isoThick) || 0;
   const riso = re + s_iso; // Raggio complessivo isolato in mm
 
-  const tf = Number(fluidTemp) || 55;
+  const tf = Number(tratto.tempLocalizzata) || 55;
   const ta = tratto.tAmb !== undefined ? Number(tratto.tAmb) : -5;
   const t_int_tubo = tratto.t_pipe_int !== undefined ? tratto.t_pipe_int : tf;
   const t_ext_tubo = tratto.t_pipe_ext !== undefined ? tratto.t_pipe_ext : tf;
@@ -552,7 +551,6 @@ function SVGGradienteSovrapposto({ tratto, fluidTemp }: SVGGradienteSovrappostoP
 }
 
 export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: ToolVerificaLineeProps) {
-    const [fluidTemp, setFluidTemp] = useState<number | ''>(55); // °C
     const [glycolEtPercent, setGlycolEtPercent] = useState<number | ''>(0); // %
     const [glycolPrPercent, setGlycolPrPercent] = useState<number | ''>(0); // %
     const [tratti, setTratti] = useState<TrattoLine[]>([]);
@@ -574,45 +572,50 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
     const [pumpConfig, setPumpConfig] = useState<string>('1+1'); // '1+1', '1+0', '2+1'
     const [pumpActiveCustom, setPumpActiveCustom] = useState<number>(1);
     const [pumpReserveCustom, setPumpReserveCustom] = useState<number>(0);
-    const [pumpType, setPumpType] = useState<string>('Basamento');
+    const [pumpType, setPumpType] = useState<string>('');
     const [pumpFluidText, setPumpFluidText] = useState<string>('');
+    const [datasheetLang, setDatasheetLang] = useState<'ita' | 'eng'>('ita');
+    const [pumpOperatingTemp, setPumpOperatingTemp] = useState<string>('');
+    const [pumpMaterials, setPumpMaterials] = useState<string>('');
+    const [pumpSealType, setPumpSealType] = useState<string>('');
+    const [pumpNotes, setPumpNotes] = useState<string>('');
 
     // Unità pressione specifica del datasheet
     const [pumpPressureUnit, setPumpPressureUnit] = useState<string>('bar');
 
     // Parametri manuali datasheet pompa
-    const [pumpLiquidHandled, setPumpLiquidHandled] = useState<string>('Acqua calda HVAC (HW)');
-    const [pumpDesignPressureMin, setPumpDesignPressureMin] = useState<string>('5');
-    const [pumpDesignTempMin, setPumpDesignTempMin] = useState<string>('100');
-    const [pumpCorrosive, setPumpCorrosive] = useState<string>('No');
+    const [pumpLiquidHandled, setPumpLiquidHandled] = useState<string>('');
+    const [pumpDesignPressureMin, setPumpDesignPressureMin] = useState<string>('');
+    const [pumpDesignTempMin, setPumpDesignTempMin] = useState<string>('');
+    const [pumpCorrosive, setPumpCorrosive] = useState<string>('');
     const [pumpSuspendedSolids, setPumpSuspendedSolids] = useState<string>('');
     const [pumpMaxSolidsSize, setPumpMaxSolidsSize] = useState<string>('');
     const [pumpCorrosionAllowance, setPumpCorrosionAllowance] = useState<string>('');
-    const [pumpNpshRequired, setPumpNpshRequired] = useState<string>('1.5');
-    const [pumpFlowControl, setPumpFlowControl] = useState<string>('Automatico');
+    const [pumpNpshRequired, setPumpNpshRequired] = useState<string>('');
+    const [pumpFlowControl, setPumpFlowControl] = useState<string>('');
     const [pumpMaxHeadShutOff, setPumpMaxHeadShutOff] = useState<string>('');
 
-    const [pumpSuctionNozzleDn, setPumpSuctionNozzleDn] = useState<string>('50');
-    const [pumpSuctionNozzleRating, setPumpSuctionNozzleRating] = useState<string>('PN 6');
-    const [pumpDischargeNozzleDn, setPumpDischargeNozzleDn] = useState<string>('50');
-    const [pumpDischargeNozzleRating, setPumpDischargeNozzleRating] = useState<string>('PN 6');
-    const [pumpImpellerType, setPumpImpellerType] = useState<string>('Chiusa');
+    const [pumpSuctionNozzleDn, setPumpSuctionNozzleDn] = useState<string>('');
+    const [pumpSuctionNozzleRating, setPumpSuctionNozzleRating] = useState<string>('');
+    const [pumpDischargeNozzleDn, setPumpDischargeNozzleDn] = useState<string>('');
+    const [pumpDischargeNozzleRating, setPumpDischargeNozzleRating] = useState<string>('');
+    const [pumpImpellerType, setPumpImpellerType] = useState<string>('');
     const [pumpImpellerMin, setPumpImpellerMin] = useState<string>('');
     const [pumpImpellerMax, setPumpImpellerMax] = useState<string>('');
     const [pumpImpellerRated, setPumpImpellerRated] = useState<string>('');
 
-    const [pumpBaseplate, setPumpBaseplate] = useState<string>('Acciaio verniciato');
-    const [pumpCouplings, setPumpCouplings] = useState<string>('Giunto elastico');
-    const [pumpFoundationBolts, setPumpFoundationBolts] = useState<string>('Inclusi');
-    const [pumpFoundationPlate, setPumpFoundationPlate] = useState<string>('No');
-    const [pumpCouplingGuard, setPumpCouplingGuard] = useState<string>('Sì');
-    const [pumpCounterFlanges, setPumpCounterFlanges] = useState<string>('Fornite sciolte');
+    const [pumpBaseplate, setPumpBaseplate] = useState<string>('');
+    const [pumpCouplings, setPumpCouplings] = useState<string>('');
+    const [pumpFoundationBolts, setPumpFoundationBolts] = useState<string>('');
+    const [pumpFoundationPlate, setPumpFoundationPlate] = useState<string>('');
+    const [pumpCouplingGuard, setPumpCouplingGuard] = useState<string>('');
+    const [pumpCounterFlanges, setPumpCounterFlanges] = useState<string>('');
 
-    const [pumpDriverType, setPumpDriverType] = useState<string>('Motore Elettrico TEFC');
-    const [pumpPowerSupply, setPumpPowerSupply] = useState<string>('400 V / 3 ph / 50 Hz');
-    const [pumpRpm, setPumpRpm] = useState<string>('2900');
-    const [pumpEnclosureType, setPumpEnclosureType] = useState<string>('IP 55');
-    const [pumpAutoStart, setPumpAutoStart] = useState<string>('Sì');
+    const [pumpDriverType, setPumpDriverType] = useState<string>('');
+    const [pumpPowerSupply, setPumpPowerSupply] = useState<string>('');
+    const [pumpRpm, setPumpRpm] = useState<string>('');
+    const [pumpEnclosureType, setPumpEnclosureType] = useState<string>('');
+    const [pumpAutoStart, setPumpAutoStart] = useState<string>('');
 
     const computedBranchTags = useMemo(() => {
         const tags: Record<number, string> = {};
@@ -678,28 +681,15 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
         return tags;
     }, [tratti]);
 
-    // Calcolo densità e viscosità dinamica globali basati sulle percentuali di glicole in acqua
+    // Calcolo densità e viscosità dinamica basati sulla temperatura del tratto selezionato (o il primo) e sulle percentuali di glicole in acqua
     const fluidProps = useMemo(() => {
-        const T = Number(fluidTemp) || 55;
+        const selTratto = tratti.find(x => x.id === selectedTrattoId) || tratti[0];
+        const T = selTratto ? (Number(selTratto.tempLocalizzata) || 55) : 55;
         const xEt = (Number(glycolEtPercent) || 0) / 100;
         const xPr = (Number(glycolPrPercent) || 0) / 100;
 
-        // Proprietà di base dell'acqua pura alla temperatura T
-        const rho_water = 1000 * (1 - ((T + 288.9414) / (508929.2 * (T + 68.12963))) * Math.pow(T - 3.9863, 2));
-        const visc_water = 0.00179 / (1 + 0.0337 * T + 0.00022 * Math.pow(T, 2));
-
-        // Incrementi di densità dovuti ai due glicoli
-        const delta_rho_et = xEt * (160 - 0.35 * T) + Math.pow(xEt, 2) * 30;
-        const delta_rho_pr = xPr * (105 - 0.4 * T) + Math.pow(xPr, 2) * 20;
-        const rho = rho_water + delta_rho_et + delta_rho_pr;
-
-        // Incremento di viscosità dovuto ai due glicoli
-        const mult_et = (2.5 + 0.02 * T) * xEt + (10 - 0.05 * T) * Math.pow(xEt, 2);
-        const mult_pr = (3.0 + 0.03 * T) * xPr + (18 - 0.1 * T) * Math.pow(xPr, 2);
-        const visc = visc_water * (1 + mult_et + mult_pr);
-
-        return { rho: Number(rho.toFixed(1)), visc: Number(visc.toFixed(6)) };
-    }, [fluidTemp, glycolEtPercent, glycolPrPercent]);
+        return computeFluidPropsAtT(T, xEt, xPr);
+    }, [selectedTrattoId, tratti, glycolEtPercent, glycolPrPercent]);
 
     const activeRho = fluidProps.rho;
     const activeVisc = fluidProps.visc;
@@ -733,8 +723,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             const activeTAmb     = tAmbVal  === '' ? 0 : Number(tAmbVal);
 
             // Temperatura per questo tratto
-            const hasTempLocale = t.tempLocalizzata !== '' && t.tempLocalizzata !== undefined;
-            const T_tratto = hasTempLocale ? Number(t.tempLocalizzata) : (Number(fluidTemp) || 55);
+            const T_tratto = Number(t.tempLocalizzata) || 55;
             const lf = computeFluidPropsAtT(T_tratto, xEt_glob, xPr_glob);
             const rho_locale  = lf.rho;
             const visc_locale = lf.visc;
@@ -943,7 +932,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
         });
 
         return Object.values(byId);
-    }, [tratti, fluidTemp, glycolEtPercent, glycolPrPercent, computedBranchTags, pressionePartenza]);
+    }, [tratti, glycolEtPercent, glycolPrPercent, computedBranchTags, pressionePartenza]);
 
 
     // --- CALCOLI DI DIMENSIONAMENTO GRUPPO DI POMPAGGIO (FASE 3) ---
@@ -1029,7 +1018,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
         let worstSuctionBranch = suctionBoundaries.find(t => t.pressioneNodo === p_inlet_gauge);
         const T_pump = worstSuctionBranch && worstSuctionBranch.tempLocalizzata !== '' && worstSuctionBranch.tempLocalizzata !== undefined
             ? Number(worstSuctionBranch.tempLocalizzata)
-            : (Number(fluidTemp) || 55);
+            : 55;
 
         const fluidProps = computeFluidPropsAtT(T_pump, xEt_glob, xPr_glob);
         const rho_pump = fluidProps.rho;
@@ -1083,7 +1072,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             safety_factor,
             visc_pump
         };
-    }, [processedTratti, fluidTemp, glycolEtPercent, glycolPrPercent, pressionePartenza, pumpEfficiency, pumpSafetyMargin, pumpFlowOverride]);
+    }, [processedTratti, glycolEtPercent, glycolPrPercent, pressionePartenza, pumpEfficiency, pumpSafetyMargin, pumpFlowOverride]);
 
 
 
@@ -1107,13 +1096,13 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             n_tee: 0,
             hierarchy: parent ? parent.hierarchy : 'dorsale_principale',
             parentId: defaultParent,
-            isoType: 'pur',
-            isoThick: 50,
-            isoLambda: 0.025,
+            isoType: parent ? parent.isoType : 'pur',
+            isoThick: parent ? parent.isoThick : 50,
+            isoLambda: parent ? parent.isoLambda : 0.025,
             tAmb: parent ? parent.tAmb : -5,
             // Fase 1
             tipoCondotto: parent ? parent.tipoCondotto : 'mandata',
-            tempLocalizzata: '',
+            tempLocalizzata: parent ? (parent.tempLocalizzata !== '' && parent.tempLocalizzata !== undefined ? parent.tempLocalizzata : 55) : 55,
             dislivelloGeodetico: '',
             pressioneMinimaRichiesta: 0,
             pressioneInizioTratto: '',
@@ -1160,11 +1149,20 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                         updated.PN = parent.PN;
                         updated.tAmb = parent.tAmb;
                         updated.hierarchy = parent.hierarchy;
+                        updated.isoType = parent.isoType;
+                        updated.isoThick = parent.isoThick;
+                        updated.isoLambda = parent.isoLambda;
+                        updated.tempLocalizzata = parent.tempLocalizzata;
                         if (parent.material === 'manuale') {
                             updated.D = parent.D;
                             updated.roughness = parent.roughness;
                         }
                     }
+                }
+
+                if (field === 'isoType') {
+                    const matched = INSULATION_CATALOG.find(i => i.id === val);
+                    updated.isoLambda = matched ? matched.lambda : 0.025;
                 }
 
                 if (field === 'portata') {
@@ -1277,7 +1275,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
 
     const handleLoadCloudProject = (data: any) => {
         if (!data) return;
-        if (data.fluidTemp !== undefined) setFluidTemp(data.fluidTemp);
+        const legacyFluidTemp = data.fluidTemp !== undefined ? data.fluidTemp : 55;
         if (data.pressureUnit !== undefined) setPressureUnit(data.pressureUnit);
         // Nuovi campi globali Fase 1 (retrocompatibili: default se assenti)
         if (data.collegaPompaggio !== undefined) setCollegaPompaggio(data.collegaPompaggio);
@@ -1331,6 +1329,16 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
         if (data.pumpRpm !== undefined) setPumpRpm(data.pumpRpm);
         if (data.pumpEnclosureType !== undefined) setPumpEnclosureType(data.pumpEnclosureType);
         if (data.pumpAutoStart !== undefined) setPumpAutoStart(data.pumpAutoStart);
+        if (data.datasheetLang !== undefined) setDatasheetLang(data.datasheetLang);
+        else setDatasheetLang('ita');
+        if (data.pumpOperatingTemp !== undefined) setPumpOperatingTemp(data.pumpOperatingTemp);
+        else setPumpOperatingTemp('');
+        if (data.pumpMaterials !== undefined) setPumpMaterials(data.pumpMaterials);
+        else setPumpMaterials('');
+        if (data.pumpSealType !== undefined) setPumpSealType(data.pumpSealType);
+        else setPumpSealType('');
+        if (data.pumpNotes !== undefined) setPumpNotes(data.pumpNotes);
+        else setPumpNotes('');
         
         // Supporto retrocompatibilità: mappa i vecchi campi fluidType e glycolPercent sui nuovi stati separati
         if (data.glycolEtPercent !== undefined) {
@@ -1431,7 +1439,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                     parentId: newParentId,
                     // Retrocompatibilità Fase 1
                     tipoCondotto:             t.tipoCondotto             ?? 'mandata',
-                    tempLocalizzata:          t.tempLocalizzata          ?? '',
+                    tempLocalizzata:          (t.tempLocalizzata !== '' && t.tempLocalizzata !== undefined) ? t.tempLocalizzata : legacyFluidTemp,
                     dislivelloGeodetico:      t.dislivelloGeodetico      ?? '',
                     pressioneMinimaRichiesta: t.pressioneMinimaRichiesta ?? 0,
                     pressioneInizioTratto:    t.pressioneInizioTratto    ?? '',
@@ -1455,8 +1463,9 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
     };
 
     const getCloudSaveData = () => {
+        const legacyFluidTemp = tratti[0]?.tempLocalizzata !== '' && tratti[0]?.tempLocalizzata !== undefined ? Number(tratti[0].tempLocalizzata) : 55;
         return {
-            fluidTemp,
+            fluidTemp: legacyFluidTemp,
             glycolEtPercent,
             glycolPrPercent,
             tratti,
@@ -1503,7 +1512,12 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             pumpPowerSupply,
             pumpRpm,
             pumpEnclosureType,
-            pumpAutoStart
+            pumpAutoStart,
+            datasheetLang,
+            pumpOperatingTemp,
+            pumpMaterials,
+            pumpSealType,
+            pumpNotes
         };
     };
 
@@ -1918,11 +1932,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                     
                                     {/* Temperatura */}
                                     <td className="py-2.5 px-2 print:p-1 font-mono text-xs text-slate-800">
-                                        {t.tempLocalizzata !== '' && t.tempLocalizzata !== undefined ? (
-                                            <span className="text-indigo-600 font-bold">{t.tempLocalizzata} °C</span>
-                                        ) : (
-                                            <span className="text-slate-400">{fluidTemp} °C</span>
-                                        )}
+                                        <span className="font-bold text-slate-800">{t.tempLocalizzata || 55} °C</span>
                                     </td>
                                     
                                     {/* Delta Quota */}
@@ -2214,17 +2224,17 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                             {/* Temperatura Localizzata */}
                                             <div>
                                                 <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">
-                                                    Temp. Tratto (°C)
+                                                    Temp. Fluido Tratto (°C)
                                                 </label>
                                                 <input
                                                     type="number"
                                                     step="0.5"
                                                     value={activeTratto.tempLocalizzata === '' || activeTratto.tempLocalizzata === undefined ? '' : activeTratto.tempLocalizzata}
                                                     onChange={e => updateTratto(activeTratto.id, 'tempLocalizzata', e.target.value === '' ? '' : Number(e.target.value))}
-                                                    placeholder={`Globale (${fluidTemp}°C)`}
+                                                    placeholder="55"
                                                     className="w-full text-xs p-1.5 border border-indigo-200 rounded bg-white font-bold text-slate-800 focus:border-indigo-400 focus:outline-none placeholder:text-slate-300 placeholder:font-normal"
                                                 />
-                                                <p className="text-[8px] text-slate-400 mt-0.5 leading-tight">Lascia vuoto per usare la temperatura globale</p>
+                                                <p className="text-[8px] text-slate-400 mt-0.5 leading-tight">Valore predefinito: 55°C</p>
                                             </div>
 
                                             {/* Dislivello Geodetico */}
@@ -2767,7 +2777,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                     <h5 className="text-[9px] font-black text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-1.5 mb-2">4. Profilo Termico Radiale</h5>
                                     <div className="flex-1 flex items-center justify-center min-h-[220px]">
                                         <div className="w-full max-w-[320px]">
-                                            <SVGGradienteSovrapposto tratto={activeTratto} fluidTemp={fluidTemp} />
+                                            <SVGGradienteSovrapposto tratto={activeTratto} />
                                         </div>
                                     </div>
                                 </div>
@@ -2851,7 +2861,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                             {/* Perdita idraulica gran totale */}
                             <div className="bg-slate-700/60 rounded-xl p-3 text-center">
                                 <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wide">Perdita Idraul. Totale</p>
-                                <p className="text-lg font-mono font-black text-brand-400">{formatPressureVal(totalGranTotPa, pressureUnit)}</p>
+                                <p className="text-lg font-mono font-black text-cyan-400">{formatPressureVal(totalGranTotPa, pressureUnit)}</p>
                                 <p className="text-[8px] text-slate-500">{getPressureUnitLabel(pressureUnit)}</p>
                             </div>
                             {/* Contributo geodetico totale */}
@@ -2966,7 +2976,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                     <p><strong>Isolamento:</strong> {INSULATION_CATALOG.find(i => i.id === t.isoType)?.name || 'Nessuno'} ({t.isoThick} mm)</p>
                                     <p><strong>Conduttività Termica (&lambda;):</strong> {t.isoLambda} W/mK</p>
                                     <p><strong>Dati Fluido:</strong> Portata {formatNumber(t.portata, 2)} m³/h | Velocità {formatNumber(t.velocity, 2)} m/s</p>
-                                    <p><strong>Temperature:</strong> Fluido {t.tempLocalizzata !== '' && t.tempLocalizzata !== undefined ? `${t.tempLocalizzata} °C (locale)` : `${fluidTemp} °C`} | Ambiente {t.tAmb} °C</p>
+                                    <p><strong>Temperature:</strong> Fluido {t.tempLocalizzata || 55} °C | Ambiente {t.tAmb} °C</p>
                                     {t.dislivelloGeodetico !== '' && t.dislivelloGeodetico !== undefined && Number(t.dislivelloGeodetico) !== 0 ? (
                                         <p><strong>Delta Quota:</strong> {Number(t.dislivelloGeodetico) > 0 ? '+' : ''}{formatNumber(t.dislivelloGeodetico, 1)} m</p>
                                     ) : null}
@@ -2998,7 +3008,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                 </div>
                             </div>
                             <div className="w-[180px] mx-auto mt-2 shrink-0">
-                                <SVGGradienteSovrapposto tratto={t} fluidTemp={fluidTemp} />
+                                <SVGGradienteSovrapposto tratto={t} />
                             </div>
                         </div>
                     ))}
@@ -3009,37 +3019,54 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             {showPumpDatasheet && createPortal(
                 <div id="print-datasheet-root" className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 print:p-0 print:static print:bg-white print:backdrop-blur-none">
                     <style dangerouslySetInnerHTML={{__html: `
+                        /* Stili per l'anteprima a schermo */
+                        #datasheet-print-area {
+                            background-color: white !important;
+                            color: #1e293b !important; /* slate-800 */
+                            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+                            font-size: 12px !important;
+                        }
+                        #datasheet-print-area table {
+                            font-size: 11px !important;
+                            line-height: 1.35 !important;
+                            border-collapse: collapse !important;
+                            width: 100% !important;
+                        }
+                        #datasheet-print-area table td {
+                            padding: 4.5px 7px !important;
+                        }
+                        #datasheet-print-area h4 {
+                            font-size: 12.5px !important;
+                            margin-top: 10px !important;
+                            margin-bottom: 4px !important;
+                            font-weight: 800 !important;
+                        }
+                        
+                        /* Stili dedicati per la stampa A4 */
                         @media print {
                             @page {
                                 size: A4 portrait;
-                                margin: 6mm 10mm;
+                                margin: 8mm 10mm;
                             }
                             html, body {
                                 height: auto !important;
                                 overflow: visible !important;
                                 background: white !important;
+                                color: black !important;
                             }
                             body > :not(#print-datasheet-root) {
                                 display: none !important;
                             }
                             #print-datasheet-root {
                                 display: block !important;
-                                position: relative !important;
+                                position: static !important;
                                 width: 100% !important;
                                 height: auto !important;
                                 background: white !important;
-                                color: black !important;
                                 padding: 0 !important;
                                 margin: 0 !important;
                             }
-                            .print-no-break {
-                                page-break-inside: avoid !important;
-                                break-inside: avoid !important;
-                            }
-                            #datasheet-print-area {
-                                display: block !important;
-                            }
-                            #print-datasheet-root .print-editor-sidebar {
+                            .print-editor-sidebar {
                                 display: none !important;
                             }
                             #print-datasheet-root .print-main-content {
@@ -3048,23 +3075,27 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                 padding: 0 !important;
                                 margin: 0 !important;
                             }
-                            #print-datasheet-root table {
-                                font-size: 8px !important;
-                                line-height: 1.1 !important;
+                            #datasheet-print-area {
+                                border: none !important;
+                                box-shadow: none !important;
+                                padding: 0 !important;
+                                margin: 0 !important;
+                                font-size: 12.5px !important;
+                                width: 100% !important;
+                                max-width: none !important;
                             }
-                            #print-datasheet-root table th, 
-                            #print-datasheet-root table td {
-                                padding-top: 1.5px !important;
-                                padding-bottom: 1.5px !important;
-                                padding-left: 4px !important;
-                                padding-right: 4px !important;
+                            #datasheet-print-area table {
+                                font-size: 11.5px !important;
+                                line-height: 1.35 !important;
                             }
-                            #print-datasheet-root h4, 
-                            #print-datasheet-root h5, 
-                            #print-datasheet-root h6 {
-                                margin-top: 2px !important;
-                                margin-bottom: 2px !important;
-                                font-size: 9px !important;
+                            #datasheet-print-area table td {
+                                padding: 4.5px 8px !important;
+                                border-bottom: 1px solid #cbd5e1 !important; /* slate-300 in print */
+                            }
+                            #datasheet-print-area h4 {
+                                font-size: 12.5px !important;
+                                margin-top: 10px !important;
+                                margin-bottom: 5px !important;
                             }
                         }
                     `}} />
@@ -3225,9 +3256,9 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                             <div className="space-y-1">
                                                 <label className="block text-[10px] font-bold text-slate-500 uppercase">Fluido Circuito (Personalizzato)</label>
                                                 <input 
-                                                    type="text" placeholder={`${Number(glycolEtPercent) > 0 ? `Etilenico (${glycolEtPercent}%)` : Number(glycolPrPercent) > 0 ? `Propilenico (${glycolPrPercent}%)` : 'Acqua Pura'} a ${fluidTemp}°C`}
+                                                    type="text" placeholder={`${Number(glycolEtPercent) > 0 ? `Etilenico (${glycolEtPercent}%)` : Number(glycolPrPercent) > 0 ? `Propilenico (${glycolPrPercent}%)` : 'Acqua Pura'} a ${formatNumber(pumpSizing.T_pump, 1)}°C`}
                                                     value={pumpFluidText} onChange={e => setPumpFluidText(e.target.value)}
-                                                    className="w-full p-2 border border-slate-300 rounded font-semibold text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                    className="w-full p-2 border border-slate-300 rounded font-semibold text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                 />
                                             </div>
 
@@ -3235,7 +3266,17 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                 <label className="block text-[10px] font-bold text-slate-500 uppercase">Tipo Pompa</label>
                                                 <input 
                                                     type="text" value={pumpType} onChange={e => setPumpType(e.target.value)}
-                                                    className="w-full p-2 border border-slate-300 rounded font-semibold text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                    className="w-full p-2 border border-slate-300 rounded font-semibold text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase">Note / Notes</label>
+                                                <textarea 
+                                                    rows={4}
+                                                    value={pumpNotes} onChange={e => setPumpNotes(e.target.value)}
+                                                    className="w-full p-2 border border-slate-300 rounded font-medium text-slate-850 focus:border-brand-500 focus:outline-none bg-white text-xs"
+                                                    placeholder="Note o specifiche aggiuntive (es. collaudi, verniciatura...)"
                                                 />
                                             </div>
                                         </div>
@@ -3250,7 +3291,18 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                 <label className="block text-[10px] font-bold text-slate-500 uppercase">Fluido Gestito (Liquid Handled)</label>
                                                 <input 
                                                     type="text" value={pumpLiquidHandled} onChange={e => setPumpLiquidHandled(e.target.value)}
-                                                    className="w-full p-1.5 border border-slate-300 rounded font-medium text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                    className="w-full p-1.5 border border-slate-300 rounded font-medium text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase">Temperatura di Esercizio (°C)</label>
+                                                <input 
+                                                    type="text" 
+                                                    placeholder={`Auto: ${formatNumber(pumpSizing.T_pump, 1)}`}
+                                                    value={pumpOperatingTemp} 
+                                                    onChange={e => setPumpOperatingTemp(e.target.value)}
+                                                    className="w-full p-1.5 border border-slate-300 rounded font-semibold text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                 />
                                             </div>
 
@@ -3259,14 +3311,14 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                     <label className="block text-[9px] font-bold text-slate-500 uppercase">Design Press Min (bar)</label>
                                                     <input 
                                                         type="text" value={pumpDesignPressureMin} onChange={e => setPumpDesignPressureMin(e.target.value)}
-                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
                                                     <label className="block text-[9px] font-bold text-slate-500 uppercase">Design Temp Min (°C)</label>
                                                     <input 
                                                         type="text" value={pumpDesignTempMin} onChange={e => setPumpDesignTempMin(e.target.value)}
-                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                     />
                                                 </div>
                                             </div>
@@ -3277,8 +3329,9 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                     value={pumpCorrosive} onChange={e => setPumpCorrosive(e.target.value)}
                                                     className="w-full p-1.5 border border-slate-300 rounded bg-white text-slate-800 focus:border-brand-500 focus:outline-none cursor-pointer"
                                                 >
+                                                    <option value="">— Seleziona —</option>
                                                     <option value="No">No (Inerte)</option>
-                                                    <option value="Yes">Sì</option>
+                                                    <option value="Sì">Sì</option>
                                                 </select>
                                             </div>
 
@@ -3286,7 +3339,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                 <label className="block text-[10px] font-bold text-slate-500 uppercase">Solidi Sospesi (% wt)</label>
                                                 <input 
                                                     type="text" value={pumpSuspendedSolids} onChange={e => setPumpSuspendedSolids(e.target.value)}
-                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                 />
                                             </div>
 
@@ -3295,14 +3348,14 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                     <label className="block text-[9px] font-bold text-slate-500 uppercase">Dim. Solidi Max (mm)</label>
                                                     <input 
                                                         type="text" value={pumpMaxSolidsSize} onChange={e => setPumpMaxSolidsSize(e.target.value)}
-                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
                                                     <label className="block text-[9px] font-bold text-slate-500 uppercase">Corrosion Allowance (mm)</label>
                                                     <input 
                                                         type="text" value={pumpCorrosionAllowance} onChange={e => setPumpCorrosionAllowance(e.target.value)}
-                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                     />
                                                 </div>
                                             </div>
@@ -3311,7 +3364,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                 <label className="block text-[10px] font-bold text-slate-500 uppercase">NPSH Richiesto (NPSHr - m)</label>
                                                 <input 
                                                     type="text" value={pumpNpshRequired} onChange={e => setPumpNpshRequired(e.target.value)}
-                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none font-bold text-brand-650"
+                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none font-bold text-brand-650 bg-white"
                                                 />
                                             </div>
 
@@ -3321,6 +3374,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                     value={pumpFlowControl} onChange={e => setPumpFlowControl(e.target.value)}
                                                     className="w-full p-1.5 border border-slate-300 rounded bg-white text-slate-800 focus:border-brand-500 focus:outline-none cursor-pointer"
                                                 >
+                                                    <option value="">— Seleziona —</option>
                                                     <option value="Automatico">Automatico (Inverter VSD)</option>
                                                     <option value="Manuale">Manuale (Valvola a globo)</option>
                                                     <option value="Bypass">Bypass</option>
@@ -3331,7 +3385,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                 <label className="block text-[10px] font-bold text-slate-500 uppercase">Prevalenza a Bocca Chiusa (Shut-off - m)</label>
                                                 <input 
                                                     type="text" value={pumpMaxHeadShutOff} onChange={e => setPumpMaxHeadShutOff(e.target.value)}
-                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                 />
                                             </div>
                                         </div>
@@ -3342,19 +3396,35 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                         <div className="space-y-3">
                                             <h5 className="font-bold text-slate-700 uppercase text-[9px] border-b pb-1.5 mb-2">Equipment Characteristics</h5>
                                             
+                                            <div className="space-y-1">
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase">Materiali parti a contatto con il liquido</label>
+                                                <input 
+                                                    type="text" value={pumpMaterials} onChange={e => setPumpMaterials(e.target.value)}
+                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white font-medium"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase">Tipo di tenuta (Seal type)</label>
+                                                <input 
+                                                    type="text" value={pumpSealType} onChange={e => setPumpSealType(e.target.value)}
+                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white font-medium"
+                                                />
+                                            </div>
+
                                             <div className="grid grid-cols-2 gap-2">
                                                 <div className="space-y-1">
                                                     <label className="block text-[9px] font-bold text-slate-500 uppercase">Nozzle Asp. DN</label>
                                                     <input 
                                                         type="text" value={pumpSuctionNozzleDn} onChange={e => setPumpSuctionNozzleDn(e.target.value)}
-                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
                                                     <label className="block text-[9px] font-bold text-slate-500 uppercase">Nozzle Asp. Rating</label>
                                                     <input 
                                                         type="text" value={pumpSuctionNozzleRating} onChange={e => setPumpSuctionNozzleRating(e.target.value)}
-                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                     />
                                                 </div>
                                             </div>
@@ -3364,14 +3434,14 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                     <label className="block text-[9px] font-bold text-slate-500 uppercase">Nozzle Mand. DN</label>
                                                     <input 
                                                         type="text" value={pumpDischargeNozzleDn} onChange={e => setPumpDischargeNozzleDn(e.target.value)}
-                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
                                                     <label className="block text-[9px] font-bold text-slate-500 uppercase">Nozzle Mand. Rating</label>
                                                     <input 
                                                         type="text" value={pumpDischargeNozzleRating} onChange={e => setPumpDischargeNozzleRating(e.target.value)}
-                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                     />
                                                 </div>
                                             </div>
@@ -3380,7 +3450,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                 <label className="block text-[10px] font-bold text-slate-500 uppercase">Tipo Girante (Impeller Type)</label>
                                                 <input 
                                                     type="text" value={pumpImpellerType} onChange={e => setPumpImpellerType(e.target.value)}
-                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                 />
                                             </div>
 
@@ -3389,21 +3459,21 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                     <label className="block text-[8px] font-bold text-slate-500 uppercase">Girante Min (mm)</label>
                                                     <input 
                                                         type="text" value={pumpImpellerMin} onChange={e => setPumpImpellerMin(e.target.value)}
-                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
                                                     <label className="block text-[8px] font-bold text-slate-500 uppercase">Girante Nom (mm)</label>
                                                     <input 
                                                         type="text" value={pumpImpellerRated} onChange={e => setPumpImpellerRated(e.target.value)}
-                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
                                                     <label className="block text-[8px] font-bold text-slate-500 uppercase">Girante Max (mm)</label>
                                                     <input 
                                                         type="text" value={pumpImpellerMax} onChange={e => setPumpImpellerMax(e.target.value)}
-                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                     />
                                                 </div>
                                             </div>
@@ -3419,7 +3489,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                 <label className="block text-[10px] font-bold text-slate-500 uppercase">Basamento (Baseplate)</label>
                                                 <input 
                                                     type="text" value={pumpBaseplate} onChange={e => setPumpBaseplate(e.target.value)}
-                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                 />
                                             </div>
 
@@ -3427,7 +3497,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                 <label className="block text-[10px] font-bold text-slate-500 uppercase">Giunti d'Accoppiamento (Couplings)</label>
                                                 <input 
                                                     type="text" value={pumpCouplings} onChange={e => setPumpCouplings(e.target.value)}
-                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                 />
                                             </div>
 
@@ -3435,7 +3505,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                 <label className="block text-[10px] font-bold text-slate-500 uppercase">Tirafondi Fondazione (Foundation Bolts)</label>
                                                 <input 
                                                     type="text" value={pumpFoundationBolts} onChange={e => setPumpFoundationBolts(e.target.value)}
-                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                 />
                                             </div>
 
@@ -3443,7 +3513,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                 <label className="block text-[10px] font-bold text-slate-500 uppercase">Contropiastra (Foundation Plate)</label>
                                                 <input 
                                                     type="text" value={pumpFoundationPlate} onChange={e => setPumpFoundationPlate(e.target.value)}
-                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                 />
                                             </div>
 
@@ -3451,7 +3521,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                 <label className="block text-[10px] font-bold text-slate-500 uppercase">Riparo Giunto (Coupling Guard)</label>
                                                 <input 
                                                     type="text" value={pumpCouplingGuard} onChange={e => setPumpCouplingGuard(e.target.value)}
-                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                 />
                                             </div>
 
@@ -3459,7 +3529,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                 <label className="block text-[10px] font-bold text-slate-500 uppercase">Controflange (Counter Flanges)</label>
                                                 <input 
                                                     type="text" value={pumpCounterFlanges} onChange={e => setPumpCounterFlanges(e.target.value)}
-                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                 />
                                             </div>
                                         </div>
@@ -3474,7 +3544,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                 <label className="block text-[10px] font-bold text-slate-500 uppercase">Tipo Driver (Motore)</label>
                                                 <input 
                                                     type="text" value={pumpDriverType} onChange={e => setPumpDriverType(e.target.value)}
-                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                 />
                                             </div>
 
@@ -3482,7 +3552,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                 <label className="block text-[10px] font-bold text-slate-500 uppercase">Alimentazione Elettrica (Supply)</label>
                                                 <input 
                                                     type="text" value={pumpPowerSupply} onChange={e => setPumpPowerSupply(e.target.value)}
-                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                    className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                 />
                                             </div>
 
@@ -3491,14 +3561,14 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                     <label className="block text-[9px] font-bold text-slate-500 uppercase">Giri Motore (rpm)</label>
                                                     <input 
                                                         type="text" value={pumpRpm} onChange={e => setPumpRpm(e.target.value)}
-                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
                                                     <label className="block text-[9px] font-bold text-slate-500 uppercase">Grado Protezione (Enclosure)</label>
                                                     <input 
                                                         type="text" value={pumpEnclosureType} onChange={e => setPumpEnclosureType(e.target.value)}
-                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                        className="w-full p-1.5 border border-slate-300 rounded text-slate-800 focus:border-brand-500 focus:outline-none bg-white"
                                                     />
                                                 </div>
                                             </div>
@@ -3509,6 +3579,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                     value={pumpAutoStart} onChange={e => setPumpAutoStart(e.target.value)}
                                                     className="w-full p-1.5 border border-slate-300 rounded bg-white text-slate-800 focus:border-brand-500 focus:outline-none cursor-pointer"
                                                 >
+                                                    <option value="">— Seleziona —</option>
                                                     <option value="Sì">Sì</option>
                                                     <option value="No">No</option>
                                                 </select>
@@ -3520,239 +3591,26 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
 
                             {/* Scheda Tecnica Stampabile - Colonna Destra (100% in Stampa) */}
                             <div className="flex-1 p-6 overflow-y-auto bg-slate-100 print:bg-white print:p-0 print:overflow-visible print-main-content">
-                                
-                                {/* VISUALIZZAZIONE A SCHERMO - INTERATTIVA */}
-                                <div className="print:hidden space-y-6 max-w-4xl mx-auto pb-8">
-                                    {/* Intestazione Informativa e Editabile */}
-                                    <div className="bg-white border border-slate-200 p-5 rounded-2xl text-slate-800 text-xs shadow-sm space-y-4">
-                                        <div className="grid grid-cols-3 gap-4 items-center">
-                                            <div>
-                                                <span className="text-slate-400 font-semibold block uppercase text-[9px]">Cliente</span>
-                                                <span className="text-slate-800 font-black text-sm">{projectData.client || '—'}</span>
-                                            </div>
-                                            <div>
-                                                <span className="text-slate-400 font-semibold block uppercase text-[9px]">Autore</span>
-                                                <span className="text-slate-800 font-black text-sm">{projectData.author || '—'}</span>
-                                            </div>
-                                            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                                                <label className="text-slate-500 font-bold block uppercase text-[9px] mb-1">Fluido Circuito</label>
-                                                <input 
-                                                    type="text" 
-                                                    value={pumpFluidText} 
-                                                    placeholder={`${Number(glycolEtPercent) > 0 ? `Etilenico (${glycolEtPercent}%)` : Number(glycolPrPercent) > 0 ? `Propilenico (${glycolPrPercent}%)` : 'Acqua Pura'} a ${fluidTemp}°C`}
-                                                    onChange={e => setPumpFluidText(e.target.value)}
-                                                    className="w-full bg-white px-2 py-1 text-xs border border-slate-300 rounded font-bold text-slate-800 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                                                />
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="grid grid-cols-3 gap-4 items-center pt-4 border-t border-slate-100">
-                                            <div>
-                                                <span className="text-slate-400 font-semibold block uppercase text-[9px]">Sicurezza Prevalenza</span>
-                                                <span className="text-slate-800 font-black text-sm">+{pumpSafetyMargin}%</span>
-                                            </div>
-                                            <div>
-                                                <span className="text-slate-400 font-semibold block uppercase text-[9px]">Configurazione Pompe</span>
-                                                <span className="text-slate-800 font-black text-sm uppercase">
-                                                    {pumpConfig === '1+0' ? '1 Attiva' : 
-                                                     pumpConfig === '1+1' ? '1 Attiva + 1 Riserva' : 
-                                                     pumpConfig === '2+0' ? '2 Attive (Senza riserva)' :
-                                                     pumpConfig === '2+1' ? '2 Attive + 1 Riserva' : 
-                                                     pumpConfig === '3+0' ? '3 Attive (Senza riserva)' :
-                                                     pumpConfig === '3+1' ? '3 Attive + 1 Riserva' : 
-                                                     pumpConfig === 'custom' ? `${pumpActiveCustom} Attive + ${pumpReserveCustom} Riserva` :
-                                                     pumpConfig}
-                                                </span>
-                                            </div>
-                                            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                                                <label className="text-slate-500 font-bold block uppercase text-[9px] mb-1">Tipo Pompa</label>
-                                                <input 
-                                                    type="text" 
-                                                    value={pumpType} 
-                                                    onChange={e => setPumpType(e.target.value)}
-                                                    className="w-full bg-white px-2 py-1 text-xs border border-slate-300 rounded font-bold text-slate-800 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Box Neri Portata e Prevalenza */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 flex flex-col justify-between shadow-md">
-                                            <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Portata di Progetto (Q)</span>
-                                            <span className="text-3xl font-mono font-black text-brand-400 mt-2">
-                                                {formatNumber(pumpSizing.q_pump_nom, 2)} <span className="text-sm font-sans font-normal text-white">m³/h</span>
-                                            </span>
-                                            <span className="text-[10px] text-slate-500 mt-1">({formatNumber(pumpSizing.q_pump_nom / 3.6, 3)} l/s)</span>
-                                        </div>
-
-                                        <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 flex flex-col justify-between shadow-md">
-                                            <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider block">Prevalenza Totale Richiesta (H)</span>
-                                            <span className="text-3xl font-mono font-black text-brand-400 mt-2">
-                                                {formatNumber(pumpSizing.prevalenza_richiesta_bar, 3)} <span className="text-sm font-sans font-normal text-white">bar</span>
-                                            </span>
-                                            <span className="text-[10px] text-slate-500 mt-1">
-                                                ({formatNumber(pumpSizing.prevalenza_richiesta_bar * 10.197, 2)} m.c.a. | {formatNumber(pumpSizing.prevalenza_richiesta_bar * 100, 1)} kPa)
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Dettagli dei percorsi peggiori */}
-                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                        <div className="bg-slate-50 px-5 py-3 border-b border-slate-200">
-                                            <h6 className="text-[11px] font-black text-slate-700 uppercase tracking-wide">Dettagli dei percorsi peggiori</h6>
-                                        </div>
-                                        <table className="w-full text-xs text-left border-collapse">
-                                            <tbody>
-                                                <tr className="border-b border-slate-100">
-                                                    <th className="px-5 py-3 font-semibold text-slate-500 uppercase text-[9px] w-2/5">Lato Aspirazione (Worst-path)</th>
-                                                    <td className="px-5 py-3 font-medium text-slate-800">
-                                                        {formatNumber(pumpSizing.max_suction_loss, 3)} bar 
-                                                        <span className="text-slate-400 text-[10px] ml-1">
-                                                            ({formatNumber(pumpSizing.max_suction_loss * 10.197, 2)} m.c.a. perdite idrauliche + dislivello)
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                                <tr className="border-b border-slate-100">
-                                                    <th className="px-5 py-3 font-semibold text-slate-500 uppercase text-[9px]">Lato Mandata (Worst-path)</th>
-                                                    <td className="px-5 py-3 font-medium text-slate-800">
-                                                        {formatNumber(pumpSizing.max_delivery_loss, 3)} bar 
-                                                        <span className="text-slate-400 text-[10px] ml-1">
-                                                            ({formatNumber(pumpSizing.max_delivery_loss * 10.197, 2)} m.c.a. perdite idrauliche + dislivello)
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                                <tr className="border-b border-slate-100 bg-slate-50/30">
-                                                    <th className="px-5 py-3 font-semibold text-slate-500 uppercase text-[9px]">Somma Perdite Idrauliche (ΔP)</th>
-                                                    <td className="px-5 py-3 font-bold text-slate-900">
-                                                        {formatNumber(pumpSizing.delta_P_circuito, 3)} bar
-                                                        <span className="text-slate-400 font-normal text-[10px] ml-1">
-                                                            ({formatNumber(pumpSizing.delta_P_circuito * 10.197, 2)} m.c.a.)
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                                <tr className="border-b border-slate-100 bg-amber-50/20">
-                                                    <th className="px-5 py-3 font-semibold text-amber-800 uppercase text-[9px]">Aumento Prevalenza Richiesto dai Terminali</th>
-                                                    <td className="px-5 py-3 font-bold text-amber-600">
-                                                        {formatNumber(pumpSizing.prevalenza_richiesta_bar, 3)} bar
-                                                        <span className="text-slate-400 font-normal text-[10px] ml-1">
-                                                            (Necessario per vincere il gap di pressione sul nodo più sfavorito)
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                                <tr className="bg-violet-50/20">
-                                                    <th className="px-5 py-3 font-semibold text-violet-700 uppercase text-[9px]">NPSH Disponibile (NPSHa)</th>
-                                                    <td className="px-5 py-3 font-black text-violet-850">
-                                                        {formatNumber(pumpSizing.npsh_a, 2)} m
-                                                        <span className="text-violet-500 font-normal text-[9px] ml-2">
-                                                            (Calcolato a P_inlet = {formatNumber(pumpSizing.p_inlet_gauge, 3)} bar g, T = {formatNumber(pumpSizing.T_pump, 1)}°C, P_vapore = {formatNumber(pumpSizing.pv_bar, 3)} bar a)
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    {/* Dimensionamento Potenza e Motore Elettrico */}
-                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                                        <div className="bg-slate-50 px-5 py-3 border-b border-slate-200">
-                                            <h6 className="text-[11px] font-black text-slate-700 uppercase tracking-wide">Dimensionamento Potenza e Motore Elettrico</h6>
-                                        </div>
-                                        <table className="w-full text-xs text-left border-collapse">
-                                            <tbody>
-                                                <tr className="border-b border-slate-100">
-                                                    <th className="px-5 py-3 font-semibold text-slate-500 uppercase text-[9px] w-2/5">Potenza Idraulica (P_idr)</th>
-                                                    <td className="px-5 py-3 font-mono font-medium text-slate-800">{formatNumber(pumpSizing.p_idraulica, 3)} kW</td>
-                                                </tr>
-                                                <tr className="border-b border-slate-100">
-                                                    <th className="px-5 py-3 font-semibold text-slate-500 uppercase text-[9px]">Potenza Assorbita all'Asse (P_asse)</th>
-                                                    <td className="px-5 py-3 font-mono font-bold text-slate-900">
-                                                        {formatNumber(pumpSizing.p_shaft, 3)} kW
-                                                        <span className="text-slate-400 font-sans font-normal text-[9px] ml-2">(Rendimento pompa: {pumpEfficiency}%)</span>
-                                                    </td>
-                                                </tr>
-                                                <tr className="border-b border-slate-100">
-                                                    <th className="px-5 py-3 font-semibold text-slate-500 uppercase text-[9px]">Potenza Consigliata (con coeff. sicurezza)</th>
-                                                    <td className="px-5 py-3 font-mono font-medium text-slate-800">
-                                                        {formatNumber(pumpSizing.p_motor_rec, 3)} kW
-                                                        <span className="text-slate-400 font-sans font-normal text-[9px] ml-2">(Coefficiente applicato: x{pumpSizing.safety_factor})</span>
-                                                    </td>
-                                                </tr>
-                                                <tr className="border-b border-slate-100 bg-brand-50/10">
-                                                    <th className="px-5 py-3 font-semibold text-brand-850 uppercase text-[9px]">Taglia Motore Standard consigliata</th>
-                                                    <td className="px-5 py-3 font-mono font-black text-brand-900 text-sm">
-                                                        {formatNumber(pumpSizing.p_motor_std, 2)} kW
-                                                        <span className="text-brand-600 font-sans font-normal text-[9px] ml-2">
-                                                            (Standard IEC / NEMA)
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                                <tr className="bg-slate-50/30">
-                                                    <th className="px-5 py-3 font-semibold text-slate-500 uppercase text-[9px]">Configurazione di Servizio</th>
-                                                    <td className="px-5 py-3 font-bold text-slate-800 uppercase text-[10px]">
-                                                        {pumpConfig === '1+0' ? '1 Pompa in funzione' : 
-                                                         pumpConfig === '1+1' ? '1 Pompa in funzione + 1 in riserva' : 
-                                                         pumpConfig === '2+0' ? '2 Pompe in funzione' :
-                                                         pumpConfig === '2+1' ? '2 Pompe in funzione + 1 in riserva' : 
-                                                         pumpConfig === '3+0' ? '3 Pompe in funzione' :
-                                                         pumpConfig === '3+1' ? '3 Pompe in funzione + 1 in riserva' : 
-                                                         pumpConfig === 'custom' ? `${pumpActiveCustom} Pompe in funzione` + (pumpReserveCustom > 0 ? ` + ${pumpReserveCustom} in riserva` : '') :
-                                                         `${pumpConfig.split('+')[0]} Pompe in funzione + ${pumpConfig.split('+')[1]} in riserva`}
-                                                    </td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    {/* Note di Calcolo */}
-                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-[10px] leading-relaxed text-slate-500">
-                                        <p className="font-bold uppercase text-[9px] text-slate-600 mb-1">Note e Linee Guida:</p>
-                                        <ul className="list-disc pl-4 space-y-0.5">
-                                            <li>L'NPSH disponibile (NPSHa) deve essere superiore all'NPSH richiesto (NPSHr) di almeno 0.5 metri per prevenire la cavitazione.</li>
-                                            <li>La potenza elettrica standard consigliata è calcolata includendo margini normativi a seconda della taglia.</li>
-                                            <li>I calcoli si riferiscono al fluido selezionato in base alla temperatura locale nella sezione di aspirazione.</li>
-                                        </ul>
-                                    </div>
-                                </div>
-
-                                {/* SCHEDA TECNICA DI STAMPA A 4 SEZIONI (STILE EXCEL) */}
-                                <div id="datasheet-print-area" className="hidden print:block bg-white rounded-xl shadow-lg border border-slate-200 p-8 max-w-4xl mx-auto text-slate-800 font-sans print:shadow-none print:border-none print:p-0 print:rounded-none print:w-full print:max-w-none">
+                                <div id="datasheet-print-area" className="bg-white rounded-xl shadow-lg border border-slate-200 p-8 max-w-4xl mx-auto text-slate-800 font-sans print:shadow-none print:border-none print:p-0 print:rounded-none print:w-full print:max-w-none">
                                     
                                     {/* Intestazione del Documento */}
-                                    <div className="flex items-center justify-between border-b-2 border-slate-800 pb-3 mb-4">
-                                        <img src={logoImg} alt="Ingegno" className="h-10 object-contain" />
+                                    <div className="flex items-center justify-between border-b-2 border-slate-800 pb-4 mb-5">
+                                        <img src={logoImg} alt="Ingegno" className="h-12 object-contain" />
                                         <div className="text-right">
-                                            <h2 className="text-base font-black text-slate-800 uppercase tracking-wider">SCHEDA TECNICA DI PATTUGLIAMENTO / SPECIFICA POMPA</h2>
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">CENTRIFUGAL PUMP DATASHEET</p>
+                                            <h2 className="text-xl font-extrabold text-slate-955 uppercase tracking-wider">
+                                                {datasheetLang === 'eng' ? "PUMP DATASHEET" : "SCHEDA TECNICA POMPA"}
+                                            </h2>
+                                            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mt-0.5">
+                                                {datasheetLang === 'eng' ? "ELECTRIC PUMP SPECIFICATION" : "SPECIFICA ELETTROPOMPA"}
+                                            </p>
                                         </div>
                                     </div>
 
-                                    {/* Informazioni Progetto (Senza Data) */}
-                                    <div className="grid grid-cols-4 gap-2 bg-slate-50 border border-slate-200 p-2.5 rounded-lg text-[9px] mb-4 print:bg-white print:border-slate-300">
-                                        <div>
-                                            <strong className="text-slate-500 uppercase block text-[8px]">Cliente / Client:</strong>
-                                            <span className="font-bold text-slate-800">{projectData.client || '—'}</span>
-                                        </div>
-                                        <div>
-                                            <strong className="text-slate-500 uppercase block text-[8px]">Autore / Author:</strong>
-                                            <span className="font-bold text-slate-800">{projectData.author || '—'}</span>
-                                        </div>
-                                        <div>
-                                            <strong className="text-slate-500 uppercase block text-[8px]">Circuito Termovettore:</strong>
-                                            <span className="font-bold text-slate-800">
-                                                {pumpFluidText || `${Number(glycolEtPercent) > 0 ? `Etilenico (${glycolEtPercent}%)` : Number(glycolPrPercent) > 0 ? `Propilenico (${glycolPrPercent}%)` : 'Acqua Pura'} a ${fluidTemp}°C`}
-                                            </span>
-                                        </div>
-                                        <div>
-                                            <strong className="text-slate-500 uppercase block text-[8px]">Tipo Pompa:</strong>
-                                            <span className="font-bold text-slate-800">{pumpType || '—'}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Calcolo e Estrazione Variabili in bar per coerenza fisica */}
+                                    {/* Calcolo e Estrazione Variabili */}
                                     {(() => {
                                         const q_oper = pumpSizing.q_pump_nom;
                                         const q_rated = pumpFlowOverride === '' ? q_oper : (Number(pumpFlowOverride) || q_oper);
+                                        const T_pump = pumpSizing.T_pump;
                                         
                                         // Worst paths DN e velocità
                                         const suctionTratti = processedTratti.filter(t => t.tipoCondotto === 'aspirazione');
@@ -3772,268 +3630,356 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                         const p_vap_bar = pumpSizing.pv_bar; // ass
                                         const diff_p_bar = pumpSizing.prevalenza_richiesta_bar;
 
+                                        const isEng = datasheetLang === 'eng';
+                                        const tD = {
+                                            title: isEng ? "PUMP DATASHEET" : "SCHEDA TECNICA POMPA",
+                                            client: isEng ? "Client:" : "Committente:",
+                                            author: isEng ? "Designer:" : "Progettista:",
+                                            fluidCircuit: isEng ? "Heat Transfer Fluid:" : "Circuito Termovettore:",
+                                            pumpType: isEng ? "Pump Type:" : "Tipo Pompa:",
+                                            
+                                            sec1Title: isEng ? "OPERATING CONDITIONS" : "CONDIZIONI OPERATIVE",
+                                            sec1Sub: isEng ? "Values in" : "Valori in",
+                                            
+                                            liquidHandled: isEng ? "Liquid handled:" : "Liquido processato:",
+                                            suctionTemp: isEng ? "Suction temperature:" : "Temperatura aspirazione:",
+                                            density: isEng ? "Density (Suction temp.):" : "Densità (Temp. aspiraz.):",
+                                            viscosity: isEng ? "Viscosity (Suction temp.):" : "Viscosità (Temp. aspiraz.):",
+                                            ratedFlow: isEng ? "Rated flow:" : "Portata di progetto:",
+                                            suctionPress: isEng ? "Suction pressure:" : "Pressione aspirazione:",
+                                            dischargePress: isEng ? "Discharge pressure:" : "Pressione mandata:",
+                                            vaporPress: isEng ? "Vapor pressure (Operating cond.):" : "Tensione vap. (cond. Oper.):",
+                                            headMca: isEng ? "Head:" : "Prevalenza:",
+                                            npsha: isEng ? "N.P.S.H. available:" : "N.P.S.H. disponibile:",
+                                            npshr: isEng ? "N.P.S.H. required:" : "N.P.S.H. richiesto:",
+                                            flowControl: isEng ? "Flow control:" : "Regolazione portata:",
+                                            designPressTemp: isEng ? "Design Pressure / Temp:" : "Pressione / Temp. di progetto:",
+                                            corrosive: isEng ? "Corrosive characteristics:" : "Caratter. corrosive:",
+                                            suspendedSolids: isEng ? "Suspended solids:" : "Solidi in sospensione:",
+                                            
+                                            sec2Title: isEng ? "PUMP CHARACTERISTICS" : "CARATTERISTICHE TECNICHE POMPA",
+                                            maxPress: isEng ? "Maximum allowable pressure:" : "Pressione massima ammissibile:",
+                                            tempRange: isEng ? "Liquid temperature range:" : "Campo di temperature liquido:",
+                                            materials: isEng ? "Materials in contact with liquid:" : "Materiali parti a contatto con il liquido:",
+                                            sealType: isEng ? "Seal type:" : "Tipo di tenuta:",
+                                            suctionLine: isEng ? "Suction line size:" : "Sez. aspiraz. impianto:",
+                                            suctionNozzle: isEng ? "Suction nozzle size:" : "Sez. aspiraz. pompa:",
+                                            suctionVel: isEng ? "Suction velocity:" : "Velocità aspirazione:",
+                                            dischargeLine: isEng ? "Discharge line size:" : "Sez. mandata impianto:",
+                                            dischargeNozzle: isEng ? "Discharge nozzle size:" : "Sez. mandata pompa:",
+                                            dischargeVel: isEng ? "Discharge velocity:" : "Velocità mandata:",
+                                            impellerType: isEng ? "Impeller type:" : "Tipo girante:",
+                                            impellerDiam: isEng ? "Impeller diameter:" : "Diametro girante:",
+                                            
+                                            sec3Title: isEng ? "ACCESSORIES" : "ACCESSORI",
+                                            baseplate: isEng ? "Baseplate:" : "Basamento:",
+                                            coupling: isEng ? "Coupling:" : "Giunto:",
+                                            bolts: isEng ? "Foundation bolts:" : "Bulloni per basamento:",
+                                            guard: isEng ? "Coupling guard:" : "Protezione giunto:",
+                                            flanges: isEng ? "Counter flanges:" : "Controflange:",
+                                            plate: isEng ? "Foundation plate:" : "Contropiastra:",
+                                            
+                                            sec4Title: isEng ? "MOTOR CHARACTERISTICS" : "CARATTERISTICHE TECNICHE MOTORE",
+                                            driverType: isEng ? "Driver Type:" : "Tipo Driver:",
+                                            powerSupply: isEng ? "Power supply:" : "Alimentazione:",
+                                            rpm: isEng ? "Rotational speed:" : "Velocità rotazione:",
+                                            enclosure: isEng ? "Enclosure protection:" : "Grado protezione:",
+                                            autoStart: isEng ? "Auto start:" : "Avv. automatico:",
+                                            shaftPower: isEng ? "Absorbed power:" : "Potenza assorbita:",
+                                            instPower: isEng ? "Installed power:" : "Potenza installata:",
+                                            couplingType: isEng ? "Coupling type:" : "Accoppiamento:",
+                                            serviceConfig: isEng ? "Service configuration:" : "Configurazione di Servizio:"
+                                        };
+
+                                        const translateSelectValue = (val: string) => {
+                                            if (val === 'Yes' || val === 'Sì') return isEng ? 'Yes' : 'Sì';
+                                            if (val === 'No') return isEng ? 'No' : 'No';
+                                            if (!isEng) return val;
+                                            if (val === 'Automatico' || val === 'Automatico (Inverter VSD)') return 'Automatic (VSD Inverter)';
+                                            if (val === 'Manuale' || val === 'Manuale (Valvola a globo)') return 'Manual (Globe valve)';
+                                            if (val === 'Bypass') return 'Bypass';
+                                            if (val === 'Basamento') return 'Baseplate';
+                                            if (val === 'Giunto elastico') return 'Elastic coupling';
+                                            if (val === 'Inclusi') return 'Included';
+                                            if (val === 'Fornite sciolte') return 'Supplied loose';
+                                            if (val === 'Motore Elettrico TEFC') return 'Electric Motor TEFC';
+                                            return val;
+                                        };
+
                                         return (
-                                            <div className="space-y-4">
+                                            <div className="space-y-3">
                                                 
-                                                {/* SEZIONE 1: OPERATING CONDITIONS */}
-                                                <div className="print-no-break">
-                                                    <h4 className="text-[10px] font-black bg-slate-800 text-white px-2 py-1 uppercase tracking-wider mb-1 flex justify-between">
-                                                        <span>1. Condizioni Operative / Operating Conditions</span>
-                                                        <span className="font-mono text-[8px] normal-case text-slate-350">Valori espressi in [{getPumpPressureUnitLabel(pumpPressureUnit)}]</span>
-                                                    </h4>
-                                                    <table className="w-full text-[9px] border border-slate-200 border-collapse print:border-slate-300">
-                                                        <thead>
-                                                            <tr className="bg-slate-100 border-b border-slate-200 font-bold text-slate-700 text-[8px] uppercase print:bg-white print:border-slate-350">
-                                                                <th className="px-3 py-1 w-1/3 text-left">Parametro / Specification</th>
-                                                                <th className="px-3 py-1 w-1/3 text-left">Unità / Unit</th>
-                                                                <th className="px-3 py-1 text-right">Valore / Value</th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-600">Fluido Gestito / Liquid Handled</td>
-                                                                <td className="px-3 py-1 text-slate-500">N/A</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpLiquidHandled}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-600">Temperatura di Esercizio / Suction Temperature</td>
-                                                                <td className="px-3 py-1 text-slate-500">°C</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{formatNumber(fluidTemp, 1)}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-600">Densità al punto d'uso / Density at Suction Temp.</td>
-                                                                <td className="px-3 py-1 text-slate-500">kg/m³</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{formatNumber(pumpSizing.rho_pump, 1)}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-600">Viscosità al punto d'uso / Viscosity</td>
-                                                                <td className="px-3 py-1 text-slate-500">cP (cps)</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{formatNumber((pumpSizing.visc_pump || 0) * 1000, 4)}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-600">Portata Nominale / Capacity (Operating)</td>
-                                                                <td className="px-3 py-1 text-slate-500">m³/h</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{formatNumber(q_oper, 2)}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-600">Portata di Progetto / Capacity (Rated)</td>
-                                                                <td className="px-3 py-1 text-slate-500">m³/h</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-brand-700">{formatNumber(q_rated, 2)}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-600">Pressione di Aspirazione / Suction Pressure (abs)</td>
-                                                                <td className="px-3 py-1 text-slate-500">{getPumpPressureUnitLabel(pumpPressureUnit)} a</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{convertFromBar(p_suc_bar, pumpPressureUnit)}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-600">Pressione di Mandata / Discharge Pressure (abs)</td>
-                                                                <td className="px-3 py-1 text-slate-500">{getPumpPressureUnitLabel(pumpPressureUnit)} a</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{convertFromBar(p_dis_bar, pumpPressureUnit)}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-600">Tensione di Vapore / Vapor Pressure (abs)</td>
-                                                                <td className="px-3 py-1 text-slate-500">{getPumpPressureUnitLabel(pumpPressureUnit)} a</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{convertFromBar(p_vap_bar, pumpPressureUnit)}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-600">Prevalenza Differenziale Netta / Differential Head</td>
-                                                                <td className="px-3 py-1 text-slate-500">{getPumpPressureUnitLabel(pumpPressureUnit)}</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{convertFromBar(diff_p_bar, pumpPressureUnit)}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-600">Prevalenza in m.c.a. Progetto / Head (m.c.a.)</td>
-                                                                <td className="px-3 py-1 text-slate-500">m.c.a. (mH2O)</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-brand-700">{formatNumber(diff_p_bar * 10.197, 2)}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-600">Prevalenza a Bocca Chiusa / Max Head at Shut-off</td>
-                                                                <td className="px-3 py-1 text-slate-500">m</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpMaxHeadShutOff || '—'}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-600">Design Pressure (min) / Design Temp (min)</td>
-                                                                <td className="px-3 py-1 text-slate-500">barg / °C</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">
-                                                                    {(!pumpDesignPressureMin && !pumpDesignTempMin)
-                                                                        ? '—'
-                                                                        : `${pumpDesignPressureMin || '—'} barg / ${pumpDesignTempMin || '—'} °C`
-                                                                    }
-                                                                </td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-600">Composti Corrosivi / Corrosive Compounds</td>
-                                                                <td className="px-3 py-1 text-slate-500">N/A</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpCorrosive || '—'}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-600">Solidi Sospesi / Suspended Solids</td>
-                                                                <td className="px-3 py-1 text-slate-500">% wt | max dim | corrosion</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">
-                                                                    {(!pumpSuspendedSolids && !pumpMaxSolidsSize && !pumpCorrosionAllowance)
-                                                                        ? '—'
-                                                                        : `${pumpSuspendedSolids || '—'} % | ${pumpMaxSolidsSize || '—'} mm | ${pumpCorrosionAllowance || '—'} mm`
-                                                                    }
-                                                                </td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 bg-violet-50/20 print:border-slate-300 print:bg-white">
-                                                                <td className="px-3 py-1 font-semibold text-violet-800">NPSH Disponibile / N.P.S.H. Available (NPSHa)</td>
-                                                                <td className="px-3 py-1 text-violet-700">m.c.a. (m)</td>
-                                                                <td className="px-3 py-1 text-right font-black text-violet-900">{formatNumber(npsha, 2)}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 bg-brand-50/20 print:border-slate-300 print:bg-white">
-                                                                <td className="px-3 py-1 font-semibold text-brand-850">NPSH Richiesto / N.P.S.H. Required (NPSHr)</td>
-                                                                <td className="px-3 py-1 text-brand-700">m.c.a. (m)</td>
-                                                                <td className="px-3 py-1 text-right font-black text-brand-900">{pumpNpshRequired}</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td className="px-3 py-1 font-semibold text-slate-600">Controllo Portata / Flow Control Method</td>
-                                                                <td className="px-3 py-1 text-slate-500">N/A</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpFlowControl}</td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
+                                                {/* Informazioni Progetto */}
+                                                <div className="grid grid-cols-4 gap-3 bg-slate-50 border border-slate-350 p-4 rounded-xl text-xs print:bg-white print:border-slate-400 mb-4">
+                                                    <div>
+                                                        <strong className="text-slate-500 uppercase block text-[9px] tracking-wide mb-0.5">{tD.client}</strong>
+                                                        <span className="font-bold text-slate-900">{projectData.client || '—'}</span>
+                                                    </div>
+                                                    <div>
+                                                        <strong className="text-slate-500 uppercase block text-[9px] tracking-wide mb-0.5">{tD.author}</strong>
+                                                        <span className="font-bold text-slate-900">{projectData.author || '—'}</span>
+                                                    </div>
+                                                    <div>
+                                                        <strong className="text-slate-500 uppercase block text-[9px] tracking-wide mb-0.5">{tD.fluidCircuit}</strong>
+                                                        <span className="font-bold text-slate-900">
+                                                            {pumpFluidText || `${Number(glycolEtPercent) > 0 ? (isEng ? `Ethylene` : `Etilenico`) + ` (${glycolEtPercent}%)` : Number(glycolPrPercent) > 0 ? (isEng ? `Propylene` : `Propilenico`) + ` (${glycolPrPercent}%)` : (isEng ? 'Pure Water' : 'Acqua Pura')} ${isEng ? 'at' : 'a'} ${formatNumber(T_pump, 1)}°C`}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <strong className="text-slate-500 uppercase block text-[9px] tracking-wide mb-0.5">{tD.pumpType}</strong>
+                                                        <span className="font-bold text-slate-900">{pumpType || '—'}</span>
+                                                    </div>
                                                 </div>
 
-                                                {/* SEZIONE 2: EQUIPMENT CHARACTERISTICS */}
-                                                <div className="print-no-break">
-                                                    <h4 className="text-[10px] font-black bg-slate-800 text-white px-2 py-1 uppercase tracking-wider mb-1">
-                                                        2. Caratteristiche Costruttive / Equipment Characteristics
-                                                    </h4>
-                                                    <table className="w-full text-[9px] border border-slate-200 border-collapse print:border-slate-300">
-                                                        <tbody>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-650 w-1/3">Linea Aspirazione / Suction Line</td>
-                                                                <td className="px-3 py-1 text-slate-500 w-1/3">Diametro & Velocità Calcolata</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{suctionDn} | {suctionVel}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-650">Bocca Aspirazione Pompa / Suction Nozzle</td>
-                                                                <td className="px-3 py-1 text-slate-500">DN | Rating</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpSuctionNozzleDn} | {pumpSuctionNozzleRating}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-650">Linea Mandata / Discharge Line</td>
-                                                                <td className="px-3 py-1 text-slate-500">Diametro & Velocità Calcolata</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{dischargeDn} | {dischargeVel}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-650">Bocca Mandata Pompa / Discharge Nozzle</td>
-                                                                <td className="px-3 py-1 text-slate-500">DN | Rating</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpDischargeNozzleDn} | {pumpDischargeNozzleRating}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-650">Tipo Girante / Impeller Type</td>
-                                                                <td className="px-3 py-1 text-slate-500">Chiusa / Aperta / Semi-aperta</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpImpellerType}</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td className="px-3 py-1 font-semibold text-slate-650">Diametro Girante / Impeller Diam. (Min/Rated/Max)</td>
-                                                                <td className="px-3 py-1 text-slate-500">mm</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">
-                                                                    {(!pumpImpellerMin && !pumpImpellerRated && !pumpImpellerMax)
-                                                                        ? '—'
-                                                                        : `${pumpImpellerMin || '—'} mm / ${pumpImpellerRated || '—'} mm / ${pumpImpellerMax || '—'} mm`
-                                                                    }
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
+                                                {/* SEZIONE 1: OPERATING CONDITIONS & PUMP CHARACTERISTICS */}
+                                                <div className="grid grid-cols-2 gap-4 items-start print-no-break">
+                                                    
+                                                    {/* COLONNA SINISTRA: CONDIZIONI OPERATIVE */}
+                                                    <div>
+                                                        <h4 className="text-[10px] font-black bg-slate-800 text-white px-2 py-1 uppercase tracking-wider mb-1 flex justify-between">
+                                                            <span>{tD.sec1Title}</span>
+                                                            <span className="font-mono text-[8px] normal-case text-slate-300">{tD.sec1Sub} [{getPumpPressureUnitLabel(pumpPressureUnit)}]</span>
+                                                        </h4>
+                                                        <table className="w-full text-[9px] border border-slate-200 border-collapse print:border-slate-300">
+                                                            <tbody>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.liquidHandled}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpLiquidHandled || '—'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.suctionTemp}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpOperatingTemp !== '' ? pumpOperatingTemp : formatNumber(T_pump, 1)} °C</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.density}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{formatNumber(pumpSizing.rho_pump, 1)} kg/m³</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.viscosity}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{formatNumber((pumpSizing.visc_pump || 0) * 1000, 3)} cP</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.ratedFlow}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-brand-700">{formatNumber(q_rated, 2)} m³/h</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.headMca}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-brand-700">{formatNumber(diff_p_bar * 10.197, 1)} {isEng ? 'm' : 'm'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.suctionPress}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{convertFromBar(p_suc_bar, pumpPressureUnit)} {getPumpPressureUnitLabel(pumpPressureUnit)} a</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.dischargePress}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{convertFromBar(p_dis_bar, pumpPressureUnit)} {getPumpPressureUnitLabel(pumpPressureUnit)} a</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.vaporPress}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{convertFromBar(p_vap_bar, pumpPressureUnit)} {getPumpPressureUnitLabel(pumpPressureUnit)} a</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.npsha}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-violet-800">{formatNumber(npsha, 1)} m</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.npshr}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-brand-800">{pumpNpshRequired !== '' ? formatNumber(Number(pumpNpshRequired), 1) + ' m' : '—'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.designPressTemp}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">
+                                                                        {(!pumpDesignPressureMin && !pumpDesignTempMin)
+                                                                            ? '—'
+                                                                            : `${pumpDesignPressureMin || '—'} barg / ${pumpDesignTempMin || '—'} °C`
+                                                                        }
+                                                                    </td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.corrosive}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{translateSelectValue(pumpCorrosive) || '—'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.suspendedSolids}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">
+                                                                        {(!pumpSuspendedSolids && !pumpMaxSolidsSize && !pumpCorrosionAllowance)
+                                                                            ? '—'
+                                                                            : `${pumpSuspendedSolids || '—'} % wt | ${pumpMaxSolidsSize || '—'} mm | ${pumpCorrosionAllowance || '—'} mm`
+                                                                        }
+                                                                    </td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.flowControl}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{translateSelectValue(pumpFlowControl) || '—'}</td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                    
+                                                    {/* COLONNA DESTRA: CARATTERISTICHE COSTUTTIVE POMPA */}
+                                                    <div>
+                                                        <h4 className="text-[10px] font-black bg-slate-800 text-white px-2 py-1 uppercase tracking-wider mb-1">
+                                                            {tD.sec2Title}
+                                                        </h4>
+                                                        <table className="w-full text-[9px] border border-slate-200 border-collapse print:border-slate-300">
+                                                            <tbody>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.maxPress}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpDesignPressureMin ? `${pumpDesignPressureMin} barg` : '—'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.tempRange}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpDesignTempMin ? `${pumpDesignTempMin} °C` : '—'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.materials}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{translateSelectValue(pumpMaterials) || '—'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.sealType}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{translateSelectValue(pumpSealType) || '—'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.suctionLine}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{suctionDn}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.suctionNozzle}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpSuctionNozzleDn ? `DN ${pumpSuctionNozzleDn}` : '—'} {pumpSuctionNozzleRating ? `(${pumpSuctionNozzleRating})` : ''}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.suctionVel}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{suctionVel}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.dischargeLine}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{dischargeDn}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.dischargeNozzle}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpDischargeNozzleDn ? `DN ${pumpDischargeNozzleDn}` : '—'} {pumpDischargeNozzleRating ? `(${pumpDischargeNozzleRating})` : ''}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.dischargeVel}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{dischargeVel}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.impellerType}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{translateSelectValue(pumpImpellerType) || '—'}</td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td className="px-3 py-1 font-semibold text-slate-600">{tD.impellerDiam}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">
+                                                                        {(!pumpImpellerMin && !pumpImpellerRated && !pumpImpellerMax)
+                                                                            ? '—'
+                                                                            : `${pumpImpellerMin || '—'} mm / ${pumpImpellerRated || '—'} mm / ${pumpImpellerMax || '—'} mm`
+                                                                        }
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
                                                 </div>
 
-                                                {/* SEZIONE 3: ACCESSORIES */}
-                                                <div className="print-no-break">
-                                                    <h4 className="text-[10px] font-black bg-slate-800 text-white px-2 py-1 uppercase tracking-wider mb-1">
-                                                        3. Accessori Corredo / Accessories
-                                                    </h4>
-                                                    <table className="w-full text-[9px] border border-slate-200 border-collapse print:border-slate-300">
-                                                        <tbody>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-650 w-1/3">Basamento Pompa / Baseplate</td>
-                                                                <td className="px-3 py-1 text-slate-500 w-1/3">Fornitura standard</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpBaseplate}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-650">Giunto e Riparo / Couplings & Guard</td>
-                                                                <td className="px-3 py-1 text-slate-500">Flessibile ed equilibrato</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpCouplings} | Riparo: {pumpCouplingGuard}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-650">Tirafondi & Piastra / Foundation Bolts & Plate</td>
-                                                                <td className="px-3 py-1 text-slate-500">Accessori posa a terra</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">Tirafondi: {pumpFoundationBolts} | Piastra: {pumpFoundationPlate}</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td className="px-3 py-1 font-semibold text-slate-650">Controflange in Acciaio / Counter Flanges</td>
-                                                                <td className="px-3 py-1 text-slate-500">Flange accoppiamento tubazioni</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpCounterFlanges}</td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
+                                                {/* SEZIONE 2: ACCESSORIES & MOTOR CHARACTERISTICS */}
+                                                <div className="grid grid-cols-2 gap-4 items-start print-no-break">
+                                                    
+                                                    {/* COLONNA SINISTRA: ACCESSORI */}
+                                                    <div>
+                                                        <h4 className="text-[10px] font-black bg-slate-800 text-white px-2 py-1 uppercase tracking-wider mb-1">
+                                                            {tD.sec3Title}
+                                                        </h4>
+                                                        <table className="w-full text-[9px] border border-slate-200 border-collapse print:border-slate-300">
+                                                            <tbody>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-650 w-1/2">{tD.baseplate}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{translateSelectValue(pumpBaseplate) || '—'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-650">{tD.coupling}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{translateSelectValue(pumpCouplings) || '—'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-650">{tD.bolts}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{translateSelectValue(pumpFoundationBolts) || '—'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-650">{tD.guard}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{translateSelectValue(pumpCouplingGuard) || '—'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-650">{tD.flanges}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{translateSelectValue(pumpCounterFlanges) || '—'}</td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td className="px-3 py-1 font-semibold text-slate-650">{tD.plate}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{translateSelectValue(pumpFoundationPlate) || '—'}</td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+
+                                                    {/* COLONNA DESTRA: MOTOR CHARACTERISTICS */}
+                                                    <div>
+                                                        <h4 className="text-[10px] font-black bg-slate-800 text-white px-2 py-1 uppercase tracking-wider mb-1">
+                                                            {tD.sec4Title}
+                                                        </h4>
+                                                        <table className="w-full text-[9px] border border-slate-200 border-collapse print:border-slate-300">
+                                                            <tbody>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-650 w-1/2">{tD.driverType}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{translateSelectValue(pumpDriverType) || '—'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-650">{tD.powerSupply}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{translateSelectValue(pumpPowerSupply) || '—'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-650">{tD.rpm}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpRpm ? `${pumpRpm} rpm` : '—'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-650">{tD.enclosure}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpEnclosureType || '—'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-650">{tD.autoStart}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{translateSelectValue(pumpAutoStart) || '—'}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-650">{tD.shaftPower}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{formatNumber(pumpSizing.p_shaft, 3)} kW {isEng ? `(at η = ${pumpEfficiency}%)` : `(a η = ${pumpEfficiency}%)`}</td>
+                                                                </tr>
+                                                                <tr className="border-b border-slate-100 print:border-slate-300">
+                                                                    <td className="px-3 py-1 font-semibold text-slate-650">{tD.instPower}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-brand-900">{formatNumber(pumpSizing.p_motor_std, 2)} kW</td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td className="px-3 py-1 font-semibold text-slate-650">{tD.serviceConfig}</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800 uppercase">
+                                                                        {pumpConfig === 'custom' ? (isEng ? `${pumpActiveCustom} Active + ${pumpReserveCustom} Reserve` : `${pumpActiveCustom} + ${pumpReserveCustom}`) : 
+                                                                        pumpConfig === '1+0' ? (isEng ? '1 Active' : '1 Pompa') : 
+                                                                        pumpConfig === '1+1' ? (isEng ? '1 Active + 1 Reserve' : '1 + 1') : 
+                                                                        pumpConfig === '2+0' ? (isEng ? '2 Active' : '2 Pompe') : 
+                                                                        pumpConfig === '2+1' ? (isEng ? '2 Active + 1 Reserve' : '2 + 1') : 
+                                                                        pumpConfig === '3+0' ? (isEng ? '3 Active' : '3 Pompe') : 
+                                                                        pumpConfig === '3+1' ? (isEng ? '3 Active + 1 Reserve' : '3 + 1') : 
+                                                                        pumpConfig}
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
                                                 </div>
 
-                                                {/* SEZIONE 4: MOTOR & ELECTRICAL DATA */}
-                                                <div className="print-no-break">
-                                                    <h4 className="text-[10px] font-black bg-slate-800 text-white px-2 py-1 uppercase tracking-wider mb-1">
-                                                        4. Dati Motorizzazione e Potenze / Driver Characteristics
+                                                {/* SEZIONE 5: NOTE */}
+                                                <div className="border border-slate-200 print:border-slate-350 rounded-lg p-2.5 mt-2.5 print-no-break bg-slate-50/30 print:bg-white text-left">
+                                                    <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">
+                                                        {isEng ? "Notes:" : "Note:"}
                                                     </h4>
-                                                    <table className="w-full text-[9px] border border-slate-200 border-collapse print:border-slate-300">
-                                                        <tbody>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-650 w-1/3">Tipo Driver / Driver type</td>
-                                                                <td className="px-3 py-1 text-slate-500 w-1/3">Motore elettrico / Turbina</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpDriverType}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-650">Tensione Alimentazione / Power Supply</td>
-                                                                <td className="px-3 py-1 text-slate-500">Volts | Fase | Hz</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpPowerSupply}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-650">Velocità di Rotazione / rpm</td>
-                                                                <td className="px-3 py-1 text-slate-500">giri al minuto (rpm)</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpRpm} rpm</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-650">Custodia e Isolamento / Enclosure & Insul.</td>
-                                                                <td className="px-3 py-1 text-slate-500">Classe IP / Ex-protection</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpEnclosureType}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-650">Avviamento Automatico / Auto Start</td>
-                                                                <td className="px-3 py-1 text-slate-500">Sì / No</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800">{pumpAutoStart}</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 print:border-slate-300">
-                                                                <td className="px-3 py-1 font-semibold text-slate-650">Potenza Idraulica Netta / Hydraulic Power</td>
-                                                                <td className="px-3 py-1 text-slate-500">kW</td>
-                                                                <td className="px-3 py-1 text-right font-mono font-bold text-slate-800">{formatNumber(pumpSizing.p_idraulica, 3)} kW</td>
-                                                            </tr>
-                                                            <tr className="border-b border-slate-100 bg-slate-55 print:border-slate-300 print:bg-white">
-                                                                <td className="px-3 py-1 font-semibold text-slate-850">Potenza Assorbita all'Asse / Absorbed Power (Shaft)</td>
-                                                                <td className="px-3 py-1 text-slate-500">kW (al punto di lavoro η = {pumpEfficiency}%)</td>
-                                                                <td className="px-3 py-1 text-right font-mono font-black text-slate-900">{formatNumber(pumpSizing.p_shaft, 3)} kW</td>
-                                                            </tr>
-                                                            <tr className="bg-brand-50/20 print:border-b print:border-slate-300 print:bg-white">
-                                                                <td className="px-3 py-1 font-semibold text-brand-850">Potenza Motore Standard Consigliata / Installed Power</td>
-                                                                <td className="px-3 py-1 text-brand-700">kW (Standard IEC - Coeff: x{pumpSizing.safety_factor})</td>
-                                                                <td className="px-3 py-1 text-right font-mono font-black text-brand-900">{formatNumber(pumpSizing.p_motor_std, 2)} kW</td>
-                                                            </tr>
-                                                            <tr className="bg-slate-50 border-t border-slate-200 print:bg-white print:border-slate-350 print:border-b">
-                                                                <td className="px-3 py-1 font-semibold text-slate-850">Configurazione di Servizio / Service Configuration</td>
-                                                                <td className="px-3 py-1 text-slate-500">N/A</td>
-                                                                <td className="px-3 py-1 text-right font-bold text-slate-800 uppercase">
-                                                                    {pumpConfig === 'custom' ? `${pumpActiveCustom} Pompe in funzione + ${pumpReserveCustom} in riserva` : 
-                                                                    pumpConfig === '1+0' ? '1 Pompa in funzione' : 
-                                                                    pumpConfig === '1+1' ? '1 Pompa in funzione + 1 in riserva' : 
-                                                                    pumpConfig === '2+0' ? '2 Pompe in funzione' : 
-                                                                    pumpConfig === '2+1' ? '2 Pompe in funzione + 1 in riserva' : 
-                                                                    pumpConfig === '3+0' ? '3 Pompe in funzione' : 
-                                                                    pumpConfig === '3+1' ? '3 Pompe in funzione + 1 in riserva' : 
-                                                                    pumpConfig}
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
+                                                    <div className="text-[11px] leading-relaxed text-slate-800 font-medium whitespace-pre-wrap min-h-[40px]">
+                                                        {pumpNotes || (isEng ? "No additional notes." : "Nessuna nota aggiuntiva.")}
+                                                    </div>
                                                 </div>
 
                                             </div>
@@ -4046,22 +3992,35 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                         </div>
 
                         {/* Footer del Modal (Pulsante di Stampa) */}
-                        <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex justify-end gap-3 shrink-0 print:hidden">
-                            <button
-                                onClick={() => setShowPumpDatasheet(false)}
-                                className="px-4 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 font-semibold text-xs hover:bg-slate-50 cursor-pointer"
-                            >
-                                Chiudi
-                            </button>
-                            <button
-                                onClick={() => window.print()}
-                                className="bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-lg hover:shadow-brand-500/20 transform hover:-translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer"
-                            >
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                                </svg>
-                                Stampa Datasheet
-                            </button>
+                        <div className="bg-slate-50 border-t border-slate-200 px-6 py-4 flex items-center justify-between shrink-0 print:hidden">
+                            <div className="flex items-center space-x-2">
+                                <label className="text-xs font-bold text-slate-600 uppercase">Lingua Documento:</label>
+                                <select
+                                    value={datasheetLang}
+                                    onChange={e => setDatasheetLang(e.target.value as 'ita' | 'eng')}
+                                    className="p-1.5 border border-slate-300 rounded bg-white text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                                >
+                                    <option value="ita">Italiano (ITA)</option>
+                                    <option value="eng">English (ENG)</option>
+                                </select>
+                            </div>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowPumpDatasheet(false)}
+                                    className="px-4 py-2 rounded-xl border border-slate-300 bg-white text-slate-700 font-semibold text-xs hover:bg-slate-50 cursor-pointer"
+                                >
+                                    Chiudi
+                                </button>
+                                <button
+                                    onClick={() => window.print()}
+                                    className="bg-brand-500 hover:bg-brand-600 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-lg hover:shadow-brand-500/20 transform hover:-translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer"
+                                >
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                    </svg>
+                                    Stampa Datasheet
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>,
