@@ -1565,6 +1565,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                 pressioneNodo: t.pressioneNodo,
                 pressioneMinimaRichiesta: t.pressioneMinimaRichiesta,
                 tipoCondotto: t.tipoCondotto,
+                pressioneInizioTratto: t.pressioneInizioCalcolata,
             } as TrattoNode;
         });
     }, [processedTratti, tratti, computedBranchTags]);

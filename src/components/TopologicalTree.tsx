@@ -13,6 +13,7 @@ export interface TrattoNode {
   pressioneNodo?: number;          // pressione calcolata al nodo di arrivo (barg)
   pressioneMinimaRichiesta?: number | string; // soglia minima (barg)
   tipoCondotto?: 'aspirazione' | 'mandata';
+  pressioneInizioTratto?: number;
   children?: TrattoNode[];
 }
 
@@ -46,6 +47,10 @@ interface VisualLine {
   pressioneMin?: number | string;
   hasAlarm?: boolean;
   tipoCondotto?: 'aspirazione' | 'mandata';
+  dzX?: number;
+  dzY?: number;
+  dzAnchor?: "end" | "inherit" | "start" | "middle";
+  pressioneInizioTratto?: number;
 }
 
 interface VisualLabel {
@@ -54,6 +59,7 @@ interface VisualLabel {
   text: string;
   title: string;
   dir: 'H' | 'V';
+  anchor?: "end" | "inherit" | "start" | "middle";
 }
 
 export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressionePartenza = 0 }: TopologicalTreeProps) {
@@ -317,6 +323,57 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       const pMin = Number(node.pressioneMinimaRichiesta) || 0;
       const hasAlarm = pNodo !== undefined && pNodo < pMin;
 
+      // Calcolo dell'angolo e dei vettori per il posizionamento ortogonale ed evitamento delle collisioni delle etichette
+      const dx_val = endX - startX;
+      const dy_val = endY - startY;
+      const angle = Math.atan2(dy_val, dx_val);
+
+      // Classifica l'angolo della condotta per distribuire i testi ed evitare sovrapposizioni reciproche
+      // angle è in radianti (da -PI a PI)
+      let labelFraction = 0.5;
+      let dzFraction = 0.5;
+
+      if (angle < -0.2 && angle > -1.3) {
+        // Linea inclinata verso l'alto (es. BC): sposta l'etichetta verso l'inizio, il dz verso la fine
+        labelFraction = 0.33;
+        dzFraction = 0.67;
+      } else if (angle > 0.2 && angle < 1.3) {
+        // Linea inclinata verso il basso (es. CD): sposta l'etichetta verso la fine, il dz verso l'inizio
+        labelFraction = 0.67;
+        dzFraction = 0.33;
+      } else if (Math.abs(angle) >= 1.3) {
+        // Linea quasi verticale (es. CF): posiziona l'etichetta in basso (75%) e la quota geodetica in alto (25%) per evitare le diagonali in alto
+        labelFraction = 0.75;
+        dzFraction = 0.25;
+      }
+
+      const midX_label = startX + dx_val * labelFraction;
+      const midY_label = startY + dy_val * labelFraction;
+
+      const midX_dz = startX + dx_val * dzFraction;
+      const midY_dz = startY + dy_val * dzFraction;
+
+      // Vettore perpendicolare unitario (punta a sinistra/sopra rispetto alla direzione della linea)
+      const px = -Math.sin(angle);
+      const py = Math.cos(angle);
+
+      // Shifta l'etichetta del tratto perpendicolarmente per non sovrapporsi al tubo (sopra/destra)
+      const offsetDist = 13;
+      const textX = midX_label - px * offsetDist;
+      const textY = midY_label - py * offsetDist;
+
+      // textAnchor intelligente basato sull'orientamento di -px
+      let textAnchor: "end" | "inherit" | "start" | "middle" = 'middle';
+      if (-px < -0.3) textAnchor = 'end';
+      else if (-px > 0.3) textAnchor = 'start';
+
+      // Shifta la quota geodetica nella direzione opposta (sotto/sinistra)
+      const dzX = midX_dz + px * offsetDist;
+      const dzY = midY_dz + py * offsetDist;
+      let dzAnchor: "end" | "inherit" | "start" | "middle" = 'middle';
+      if (px < -0.3) dzAnchor = 'end';
+      else if (px > 0.3) dzAnchor = 'start';
+
       // Aggiungiamo la linea reale del tratto di tubo
       lines.push({
         x1: startX,
@@ -336,16 +393,11 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
         pressioneMin: pMin,
         hasAlarm,
         tipoCondotto: node.tipoCondotto || 'mandata',
+        dzX: dz !== 0 ? dzX : undefined,
+        dzY: dz !== 0 ? dzY : undefined,
+        dzAnchor: dz !== 0 ? dzAnchor : undefined,
+        pressioneInizioTratto: node.pressioneInizioTratto,
       });
-
-      // Posizioniamo l'etichetta di testo a metà del tratto, leggermente sfalsata
-      let textX = (startX + endX) / 2;
-      let textY = (startY + endY) / 2;
-      if (dir === 'H') {
-        textY -= 6;
-      } else {
-        textX += 8;
-      }
 
       // Label principale: TAG + lunghezza
       labels.push({
@@ -353,7 +405,8 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
         y: textY,
         text: `${node.tag} (${Number(node.length).toFixed(0)}m)`,
         title: `${node.name}\nv = ${node.velocity?.toFixed(2)} m/s\n∆P = ${node.loss_tot_mbar?.toFixed(1)} mbar\n∆z = ${dz >= 0 ? '+' : ''}${dz} m\nP_nodo = ${pNodo !== undefined ? pNodo.toFixed(3) : '—'} barg`,
-        dir
+        dir,
+        anchor: textAnchor
       });
 
       // Ricorsione sui figli
@@ -419,6 +472,10 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       l.x2 += shiftX;
       l.y1 += shiftY;
       l.y2 += shiftY;
+      if (l.dzX !== undefined && l.dzY !== undefined) {
+        l.dzX += shiftX;
+        l.dzY += shiftY;
+      }
     });
 
     labels.forEach(lbl => {
@@ -529,19 +586,32 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                 />
 
                 {/* Badge Δz sul segmento */}
-                {dzLabel && (
-                  <text
-                    x={(l.x1 + l.x2) / 2}
-                    y={(l.y1 + l.y2) / 2 + (l.dir === 'H' ? 14 : 0)}
-                    dx={l.dir === 'V' ? 8 : 0}
-                    dy={l.dir === 'V' ? 12 : 0}
-                    textAnchor="middle"
-                    fill={dz > 0 ? "#ea580c" : "#0891b2"}
-                    fontSize="7.5"
-                    fontWeight="bold"
-                  >
-                    {dzLabel}
-                  </text>
+                {dzLabel && l.dzX !== undefined && l.dzY !== undefined && (
+                  <g className="pointer-events-none">
+                    <text
+                      x={l.dzX}
+                      y={l.dzY}
+                      textAnchor={l.dzAnchor || "middle"}
+                      fill="white"
+                      stroke="white"
+                      strokeWidth="2.5"
+                      strokeLinejoin="round"
+                      fontSize="7.5"
+                      fontWeight="bold"
+                    >
+                      {dzLabel}
+                    </text>
+                    <text
+                      x={l.dzX}
+                      y={l.dzY}
+                      textAnchor={l.dzAnchor || "middle"}
+                      fill={dz > 0 ? "#ea580c" : "#0891b2"}
+                      fontSize="7.5"
+                      fontWeight="bold"
+                    >
+                      {dzLabel}
+                    </text>
+                  </g>
                 )}
 
                 {/* Nodo di giunzione (cerchio) con allarme pressione */}
@@ -562,61 +632,198 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                   stroke={l.hasAlarm ? "#ef4444" : (isActive ? "#f97316" : "#64748b")} 
                   strokeWidth={l.hasAlarm ? "2" : "1.5"}
                 />
-                {/* Allarme pressione: punto rosso + etichetta */}
-                {l.hasAlarm && (
-                  <g>
-                    <circle cx={l.x2} cy={l.y2} r="3" fill="#ef4444" opacity="0.8" />
-                    <text
-                      x={l.x2}
-                      y={l.y2 + (l.dir === 'H' ? 14 : -8)}
-                      textAnchor="middle"
-                      fill="#ef4444"
-                      fontSize="7"
-                      fontWeight="bold"
-                    >
-                      ⚠ P&lt;min
-                    </text>
-                  </g>
-                )}
+                {/* Allarme pressione: punto rosso + etichetta spostata per evitare sovrapposizioni */}
+                {l.hasAlarm && (() => {
+                  const hasPumpAtEnd = pumpLocations.some(p => Math.abs(p.x - l.x2) < 0.1 && Math.abs(p.y - l.y2) < 0.1);
+                  let alarmX = l.x2;
+                  let alarmY = l.y2;
+                  let anchor: "end" | "inherit" | "start" | "middle" = "middle";
+                  
+                  if (hasPumpAtEnd) {
+                    alarmX = l.x2 - 12;
+                    alarmY = l.y2 + 4;
+                    anchor = "end";
+                  } else {
+                    if (l.dir === 'H') {
+                      alarmX = l.x2 + 8;
+                      alarmY = l.y2 - 8;
+                      anchor = "start";
+                    } else {
+                      alarmX = l.x2 + 8;
+                      alarmY = l.y2 + 10;
+                      anchor = "start";
+                    }
+                  }
+                  
+                  return (
+                    <g>
+                      <circle cx={l.x2} cy={l.y2} r="3" fill="#ef4444" opacity="0.8" />
+                      <text
+                        x={alarmX}
+                        y={alarmY}
+                        textAnchor={anchor}
+                        fill="white"
+                        stroke="white"
+                        strokeWidth="2.5"
+                        strokeLinejoin="round"
+                        fontSize="7.5"
+                        fontWeight="bold"
+                      >
+                        ⚠ P&lt;min
+                      </text>
+                      <text
+                        x={alarmX}
+                        y={alarmY}
+                        textAnchor={anchor}
+                        fill="#ef4444"
+                        fontSize="7.5"
+                        fontWeight="bold"
+                      >
+                        ⚠ P&lt;min
+                      </text>
+                    </g>
+                  );
+                })()}
 
-                {/* Etichetta pressione al nodo di arrivo */}
-                {l.pressioneNodo !== undefined && (
-                  <text
-                    x={l.x2}
-                    y={l.y2 + (l.dir === 'H' ? (l.hasAlarm ? 24 : 14) : -8)}
-                    dx={l.dir === 'V' ? 10 : 0}
-                    dy={l.dir === 'V' ? (l.hasAlarm ? -20 : -8) : 0}
-                    textAnchor={l.dir === 'H' ? "middle" : "start"}
-                    fill={l.hasAlarm ? "#ef4444" : "#475569"}
-                    fontSize="7"
-                    fontWeight="600"
-                  >
-                    {l.pressioneNodo.toFixed(2)} barg
-                  </text>
-                )}
+                {/* Etichetta pressione al nodo di arrivo con outline e spostata per non sovrapporsi */}
+                {l.pressioneNodo !== undefined && (() => {
+                  const hasPumpAtEnd = pumpLocations.some(p => Math.abs(p.x - l.x2) < 0.1 && Math.abs(p.y - l.y2) < 0.1);
+                  let labelX = l.x2;
+                  let labelY = l.y2;
+                  let anchor: "end" | "inherit" | "start" | "middle" = "middle";
+                  
+                  if (hasPumpAtEnd) {
+                    labelX = l.x2 - 12;
+                    labelY = l.y2 + 14;
+                    anchor = "end";
+                  } else {
+                    if (l.dir === 'H') {
+                      labelX = l.x2 + 8;
+                      labelY = l.y2 + (l.hasAlarm ? -18 : -8);
+                      anchor = "start";
+                    } else {
+                      labelX = l.x2 + 8;
+                      labelY = l.y2 + (l.hasAlarm ? 20 : 10);
+                      anchor = "start";
+                    }
+                  }
+                  
+                  return (
+                    <g>
+                      <text
+                        x={labelX}
+                        y={labelY}
+                        textAnchor={anchor}
+                        fill="white"
+                        stroke="white"
+                        strokeWidth="2.5"
+                        strokeLinejoin="round"
+                        fontSize="7.5"
+                        fontWeight="600"
+                      >
+                        {l.pressioneNodo.toFixed(2)} barg
+                      </text>
+                      <text
+                        x={labelX}
+                        y={labelY}
+                        textAnchor={anchor}
+                        fill={l.hasAlarm ? "#ef4444" : "#475569"}
+                        fontSize="7.5"
+                        fontWeight="600"
+                      >
+                        {l.pressioneNodo.toFixed(2)} barg
+                      </text>
+                    </g>
+                  );
+                })()}
               </g>
             );
           })}
 
           {/* Simbolo Pompa nei punti di transizione */}
-          {pumpLocations.map((p, i) => (
-            <g key={`pump-${i}`}>
-              <title>Gruppo di Pompaggio (Transizione Aspirazione ➔ Mandata)</title>
-              <circle cx={p.x} cy={p.y} r="9" fill="white" stroke="#1e293b" strokeWidth="1.8" />
-              <text x={p.x} y={p.y} textAnchor="middle" dominantBaseline="central" fill="#1e293b" fontSize="9" fontWeight="black" fontFamily="sans-serif">P</text>
-            </g>
-          ))}
+          {pumpLocations.map((p, i) => {
+            const childLine = lines.find(l => Math.abs(l.x1 - p.x) < 0.1 && Math.abs(l.y1 - p.y) < 0.1 && l.tipoCondotto === 'mandata');
+            const pStart = childLine?.pressioneInizioTratto;
+            
+            // Calcoliamo la direzione per l'offset dell'etichetta pressione della pompa
+            let dx = 1;
+            let dy = 0.5;
+            if (childLine) {
+              const len = Math.hypot(childLine.x2 - childLine.x1, childLine.y2 - childLine.y1);
+              if (len > 0) {
+                dx = (childLine.x2 - childLine.x1) / len;
+                dy = (childLine.y2 - childLine.y1) / len;
+              }
+            }
+            
+            // Posiziona il testo a distanza 22px lungo la linea, shiftato perpendicolarmente di 11px per non sovrapporsi
+            const dist = 22;
+            const perpOffset = 11;
+            const labelX = p.x + dx * dist - dy * perpOffset;
+            const labelY = p.y + dy * dist + dx * perpOffset;
+            
+            return (
+              <g key={`pump-${i}`}>
+                <title>Gruppo di Pompaggio (Transizione Aspirazione ➔ Mandata)</title>
+                <circle cx={p.x} cy={p.y} r="9" fill="white" stroke="#1e293b" strokeWidth="1.8" />
+                <text x={p.x} y={p.y} textAnchor="middle" dominantBaseline="central" fill="#1e293b" fontSize="9" fontWeight="black" fontFamily="sans-serif">P</text>
+                
+                {pStart !== undefined && (
+                  <g>
+                    <text 
+                      x={labelX} 
+                      y={labelY} 
+                      textAnchor="middle" 
+                      fill="white" 
+                      stroke="white"
+                      strokeWidth="2.5"
+                      strokeLinejoin="round"
+                      fontSize="7.5" 
+                      fontWeight="bold"
+                    >
+                      {pStart.toFixed(2)} barg
+                    </text>
+                    <text 
+                      x={labelX} 
+                      y={labelY} 
+                      textAnchor="middle" 
+                      fill="#1d4ed8" 
+                      fontSize="7.5" 
+                      fontWeight="bold"
+                    >
+                      {pStart.toFixed(2)} barg
+                    </text>
+                  </g>
+                )}
+              </g>
+            );
+          })}
 
           {/* Testi informativi */}
           {labels.map((lbl, index) => (
             <g key={`lbl-${index}`} className="pointer-events-none">
+              {/* Outline per leggibilità */}
               <text 
                 x={lbl.x} y={lbl.y} 
-                textAnchor={lbl.dir === 'H' ? "middle" : "start"} 
+                textAnchor={lbl.anchor || (lbl.dir === 'H' ? "middle" : "start")} 
+                fill="white" 
+                stroke="white"
+                strokeWidth="2.5"
+                strokeLinejoin="round"
+                fontSize="9" 
+                fontWeight="bold" 
+                className="font-semibold"
+              >
+                {lbl.text}
+              </text>
+              {/* Testo reale */}
+              <text 
+                x={lbl.x} y={lbl.y} 
+                textAnchor={lbl.anchor || (lbl.dir === 'H' ? "middle" : "start")} 
                 fill="#334155" 
                 fontSize="9" 
                 fontWeight="bold" 
-                className="bg-white/95 filter drop-shadow-sm font-semibold"
+                className="font-semibold"
               >
                 {lbl.text}
               </text>
