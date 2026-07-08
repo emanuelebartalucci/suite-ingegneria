@@ -2844,8 +2844,11 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                 const totalGranTotPa  = processedTratti.reduce((s, t) => s + (t.loss_gran_tot_Pa  || 0), 0);
                 const totalGeodesPa   = Math.abs(totalDz) < 0.001 ? 0 : processedTratti.reduce((s, t) => s + (t.contributo_geodesia_Pa || 0), 0);
                 const totalAggiuntPa  = processedTratti.reduce((s, t) => s + (t.loss_aggiuntive_Pa  || 0), 0);
-                const pNodi           = processedTratti.map(t => t.pressioneNodo).filter((p): p is number => p !== undefined);
-                const pMin            = pNodi.length > 0 ? Math.min(...pNodi) : undefined;
+                const P0_val          = Number(pressionePartenza) || 0;
+                const pIniziali       = processedTratti.map(t => t.pressioneInizioCalcolata).filter((p): p is number => p !== undefined && p !== null);
+                const pFinali         = processedTratti.map(t => t.pressioneNodo).filter((p): p is number => p !== undefined && p !== null);
+                const pNodi           = [P0_val, ...pIniziali, ...pFinali];
+                const pMin            = pFinali.length > 0 ? Math.min(...pFinali) : (pNodi.length > 0 ? Math.min(...pNodi) : undefined);
                 const pMax            = pNodi.length > 0 ? Math.max(...pNodi) : undefined;
                 const alarmCount      = processedTratti.filter(t =>
                     t.pressioneNodo !== undefined &&

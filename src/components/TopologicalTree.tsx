@@ -567,18 +567,18 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                 {/* Linea di hover/attiva */}
                 <line 
                   x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
-                  stroke={isActive ? "rgba(249, 115, 22, 0.25)" : "rgba(59, 130, 246, 0.08)"}
+                  stroke={isActive ? "rgba(34, 197, 94, 0.3)" : "rgba(59, 130, 246, 0.08)"}
                   strokeWidth={l.thickness + 8}
                   className={`topo-highlight-line ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 transition-opacity"}`}
                 />
                 {/* Linea reale */}
                 <line 
                   x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
-                  stroke={isActive ? "#f97316" : l.color}
+                  stroke={isActive ? "#22c55e" : l.color}
                   strokeWidth={isActive ? l.thickness + 1 : l.thickness}
                   strokeLinecap="round"
                   markerEnd={l.thickness <= 2 ? "url(#arrow)" : undefined}
-                  className={`transition-colors group-hover:stroke-orange-500 ${
+                  className={`transition-colors group-hover:stroke-green-500 ${
                     l.color === "#1d4ed8" ? "topo-line-dorsale-principale" :
                     l.color === "#0ea5e9" ? "topo-line-dorsale-secondaria" :
                     l.color === "#10b981" ? "topo-line-dorsale-terziaria" : "topo-line-utenza"
@@ -618,8 +618,8 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                 <circle 
                   cx={l.x1} cy={l.y1} 
                   r={isActive ? "5.5" : (l.thickness > 3 ? "4.5" : "3")} 
-                  fill={isActive ? "#ffedd5" : "#cbd5e1"} 
-                  stroke={isActive ? "#f97316" : "#475569"} 
+                  fill={isActive ? "#dcfce7" : "#cbd5e1"} 
+                  stroke={isActive ? "#22c55e" : "#475569"} 
                   strokeWidth="1.5"
                   className={`topo-circle-node ${l.thickness > 3 ? "topo-circle-thick" : "topo-circle-thin"}`}
                 />
@@ -628,8 +628,8 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                 <circle 
                   cx={l.x2} cy={l.y2} 
                   r={l.hasAlarm ? "6" : (l.thickness > 3 ? "4.5" : "3")} 
-                  fill={l.hasAlarm ? "#fef2f2" : (isActive ? "#ffedd5" : "#e2e8f0")}
-                  stroke={l.hasAlarm ? "#ef4444" : (isActive ? "#f97316" : "#64748b")} 
+                  fill={l.hasAlarm ? "#fef2f2" : (isActive ? "#dcfce7" : "#e2e8f0")}
+                  stroke={l.hasAlarm ? "#ef4444" : (isActive ? "#22c55e" : "#64748b")} 
                   strokeWidth={l.hasAlarm ? "2" : "1.5"}
                 />
                 {/* Allarme pressione: punto rosso + etichetta spostata per evitare sovrapposizioni */}
