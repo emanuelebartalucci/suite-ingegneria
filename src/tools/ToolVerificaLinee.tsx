@@ -1023,7 +1023,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
         const manualStartBranch = deliveryStarts.find(t => t.pressioneInizioTratto !== '' && t.pressioneInizioTratto !== undefined);
         if (manualStartBranch) {
             const p_outlet_gauge = Number(manualStartBranch.pressioneInizioTratto) || 0;
-            prevalenza_richiesta_bar = p_outlet_gauge - p_inlet_gauge;
+            prevalenza_richiesta_bar = (p_outlet_gauge - p_inlet_gauge) * (1 + safety_margin_val);
         }
 
         let worstSuctionBranch = suctionBoundaries.find(t => t.pressioneNodo === p_inlet_gauge);
