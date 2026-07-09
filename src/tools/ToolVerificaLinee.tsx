@@ -992,6 +992,11 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             : 0;
         const max_delivery_loss = max_delivery_loss_Pa / 100000; // bar
 
+        // Calcolo NPSH disponibile e pressione monte pompa (inlet)
+        const p_inlet_gauge = suctionBoundaries.length > 0 
+            ? Math.min(...suctionBoundaries.map(t => t.pressioneNodo ?? P0)) 
+            : P0;
+
         // Perdita totale circuito (bar)
         const delta_P_circuito = max_suction_loss + max_delivery_loss;
 
@@ -1010,11 +1015,17 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             prevalenza_richiesta_bar = max_terminal_boost;
         }
 
-        // Calcolo NPSH disponibile
-        const p_inlet_gauge = suctionBoundaries.length > 0 
-            ? Math.min(...suctionBoundaries.map(t => t.pressioneNodo ?? P0)) 
-            : P0;
-        
+        // Sovrascrittura della prevalenza in caso di impostazione manuale della pressione a valle (pressioneInizioTratto)
+        const deliveryStarts = processedTratti.filter(t => 
+            t.tipoCondotto === 'mandata' && 
+            (t.parentId === null || byId[t.parentId]?.tipoCondotto === 'aspirazione')
+        );
+        const manualStartBranch = deliveryStarts.find(t => t.pressioneInizioTratto !== '' && t.pressioneInizioTratto !== undefined);
+        if (manualStartBranch) {
+            const p_outlet_gauge = Number(manualStartBranch.pressioneInizioTratto) || 0;
+            prevalenza_richiesta_bar = p_outlet_gauge - p_inlet_gauge;
+        }
+
         let worstSuctionBranch = suctionBoundaries.find(t => t.pressioneNodo === p_inlet_gauge);
         const T_pump = worstSuctionBranch && worstSuctionBranch.tempLocalizzata !== '' && worstSuctionBranch.tempLocalizzata !== undefined
             ? Number(worstSuctionBranch.tempLocalizzata)
@@ -2810,6 +2821,10 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                             activeTag={selectedTrattoId ? computedBranchTags[selectedTrattoId] : undefined}
                             pressionePartenza={pressionePartenza}
                             onSelectTag={(tag) => {
+                                if (!tag) {
+                                    setSelectedTrattoId(null);
+                                    return;
+                                }
                                 const foundId = Object.keys(computedBranchTags).find(key => computedBranchTags[Number(key)] === tag);
                                 if (foundId) {
                                     const numId = Number(foundId);
@@ -3217,7 +3232,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                 <input 
                                                     type="number" placeholder={`Auto: ${formatNumber(pumpSizing.q_pump_nom, 2)}`}
                                                     value={pumpFlowOverride} onChange={e => setPumpFlowOverride(e.target.value)}
-                                                    className="w-full p-2 border border-slate-300 rounded font-semibold text-slate-800 focus:border-brand-500 focus:outline-none"
+                                                    className="w-full p-2 border border-slate-300 rounded bg-white font-semibold text-slate-800 focus:border-brand-500 focus:outline-none"
                                                 />
                                             </div>
 

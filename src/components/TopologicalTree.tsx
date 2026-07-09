@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 
 export interface TrattoNode {
   tag: string;
@@ -63,6 +63,18 @@ interface VisualLabel {
 }
 
 export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressionePartenza = 0 }: TopologicalTreeProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onSelectTag?.("");
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onSelectTag]);
+
   const svgData = useMemo(() => {
     if (!tratti || tratti.length === 0) return null;
 
@@ -83,10 +95,10 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       }
     });
 
-    // Scala compressa per le lunghezze grafiche (aumentata per distanziare i rami)
+    // Compressione logaritmica/radice quadrata limitata per mantenere il viewBox compatto differenziando tratti corti/lunghi
     const getVisualLength = (l: number | string): number => {
       const len = Number(l) || 0;
-      return 90 + Math.sqrt(len) * 35;
+      return 90 + Math.min(110, Math.sqrt(len) * 11);
     };
 
     const lines: VisualLine[] = [];
@@ -234,7 +246,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       const offsets = [0, 45, -45, 90, -90, 135, -135, 180, -180];
 
       const dz = Number(node.dislivelloGeodetico) || 0;
-      const deltaY_quota = -dz * 8; // 8px per metro di dislivello
+      const deltaY_quota = -dz * 8; // 8px per metro di dislivello reale
 
       while (collision && attempts < offsets.length) {
         const candidateLen = visualLen + offsets[attempts];
@@ -507,7 +519,10 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
   const { lines, labels, pumpLocations, totalWidth, totalHeight } = svgData || { lines: [], labels: [], pumpLocations: [], totalWidth: 600, totalHeight: 150 };
 
   return (
-    <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 print:bg-white print:border-none print:p-0 flex flex-col justify-center items-center gap-4 overflow-hidden">
+    <div 
+      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 print:bg-white print:border-none print:p-0 flex flex-col justify-center items-center gap-4 overflow-hidden cursor-default"
+      onClick={() => onSelectTag?.("")}
+    >
       <svg 
         viewBox={`0 0 ${totalWidth} ${totalHeight}`} 
         style={{ width: '100%', height: 'auto', maxWidth: `${totalWidth}px` }}
@@ -559,7 +574,14 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
               <g 
                 key={l.tag} 
                 className="group cursor-pointer"
-                onClick={() => onSelectTag?.(l.tag)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isActive) {
+                    onSelectTag?.("");
+                  } else {
+                    onSelectTag?.(l.tag);
+                  }
+                }}
               >
                 <title>
                   {`${l.name}\nLunghezza: ${l.length} m\nVelocità: ${l.velocity?.toFixed(2)} m/s\nPerdita: ${l.loss?.toFixed(1)} mbar\n∆z: ${dz >= 0 ? '+' : ''}${dz} m\nP_nodo: ${l.pressioneNodo !== undefined ? l.pressioneNodo.toFixed(3) : '—'} barg`}
