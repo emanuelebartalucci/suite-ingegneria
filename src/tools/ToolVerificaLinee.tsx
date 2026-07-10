@@ -3643,13 +3643,29 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                         const dischargeDn = dischargeTratti.length > 0 ? `DN ${dischargeTratti[0].DN}` : '—';
                                         const dischargeVel = dischargeTratti.length > 0 ? `${formatNumber(dischargeTratti[0].velocity || 0, 2)} m/s` : '—';
 
-                                        // NPSHa in metri
-                                        const npsha = pumpSizing.npsh_a;
+                                        // Ricalcolo proprietà alla temperatura del datasheet per consistenza fisica
+                                        const T_datasheet = pumpOperatingTemp !== '' ? (Number(pumpOperatingTemp) || T_pump) : T_pump;
+                                        const xEt_glob = (Number(glycolEtPercent) || 0) / 100;
+                                        const xPr_glob = (Number(glycolPrPercent) || 0) / 100;
+                                        const datasheetFluidProps = computeFluidPropsAtT(T_datasheet, xEt_glob, xPr_glob);
+                                        const rho_datasheet = datasheetFluidProps.rho;
+                                        const visc_datasheet = datasheetFluidProps.visc;
+
+                                        const getVaporPressureForDatasheet = (temp: number) => {
+                                            const A = 5.20389;
+                                            const B = 1733.926;
+                                            const C = 233.426;
+                                            return Math.pow(10, A - B / (temp + C));
+                                        };
+                                        const p_vap_datasheet_bar = getVaporPressureForDatasheet(T_datasheet);
+
+                                        // NPSHa in metri ricalcolato per il datasheet
+                                        const npsha = Math.max(0, (pumpSizing.p_inlet_gauge + 1.01325 - p_vap_datasheet_bar) * 100000 / (rho_datasheet * 9.80665));
                                         
                                         // Pressioni calcolate in bar (da convertire nell'unità scelta)
                                         const p_suc_bar = pumpSizing.p_inlet_gauge + 1.01325; // ass
                                         const p_dis_bar = p_suc_bar + pumpSizing.prevalenza_richiesta_bar; // ass
-                                        const p_vap_bar = pumpSizing.pv_bar; // ass
+                                        const p_vap_bar = p_vap_datasheet_bar; // ass
                                         const diff_p_bar = pumpSizing.prevalenza_richiesta_bar;
 
                                         const isEng = datasheetLang === 'eng';
@@ -3774,11 +3790,11 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                                 </tr>
                                                                 <tr className="border-b border-slate-100 print:border-slate-300">
                                                                     <td className="px-3 py-1 font-semibold text-slate-600">{tD.density}</td>
-                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{formatNumber(pumpSizing.rho_pump, 1)} kg/m³</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{formatNumber(rho_datasheet, 1)} kg/m³</td>
                                                                 </tr>
                                                                 <tr className="border-b border-slate-100 print:border-slate-300">
                                                                     <td className="px-3 py-1 font-semibold text-slate-600">{tD.viscosity}</td>
-                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{formatNumber((pumpSizing.visc_pump || 0) * 1000, 3)} cP</td>
+                                                                    <td className="px-3 py-1 text-right font-bold text-slate-800">{formatNumber(visc_datasheet * 1000, 3)} cP</td>
                                                                 </tr>
                                                                 <tr className="border-b border-slate-100 print:border-slate-300">
                                                                     <td className="px-3 py-1 font-semibold text-slate-600">{tD.ratedFlow}</td>
