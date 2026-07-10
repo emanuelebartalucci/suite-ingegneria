@@ -1011,8 +1011,11 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             : 0;
 
         // Allineamento prevalenza: la prevalenza della pompa deve coprire l'aumento richiesto dai terminali se superiore
-        if (max_terminal_boost > prevalenza_richiesta_bar) {
-            prevalenza_richiesta_bar = max_terminal_boost;
+        if (max_terminal_boost > 0) {
+            const terminal_boost_with_safety = max_terminal_boost * (1 + safety_margin_val);
+            if (terminal_boost_with_safety > prevalenza_richiesta_bar) {
+                prevalenza_richiesta_bar = terminal_boost_with_safety;
+            }
         }
 
         // Sovrascrittura della prevalenza in caso di impostazione manuale della pressione a valle (pressioneInizioTratto)

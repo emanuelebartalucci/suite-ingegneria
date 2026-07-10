@@ -342,22 +342,8 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
 
       // Classifica l'angolo della condotta per distribuire i testi ed evitare sovrapposizioni reciproche
       // angle è in radianti (da -PI a PI)
-      let labelFraction = 0.5;
-      let dzFraction = 0.5;
-
-      if (angle < -0.2 && angle > -1.3) {
-        // Linea inclinata verso l'alto (es. BC): sposta l'etichetta verso l'inizio, il dz verso la fine
-        labelFraction = 0.33;
-        dzFraction = 0.67;
-      } else if (angle > 0.2 && angle < 1.3) {
-        // Linea inclinata verso il basso (es. CD): sposta l'etichetta verso la fine, il dz verso l'inizio
-        labelFraction = 0.67;
-        dzFraction = 0.33;
-      } else if (Math.abs(angle) >= 1.3) {
-        // Linea quasi verticale (es. CF): posiziona l'etichetta in basso (75%) e la quota geodetica in alto (25%) per evitare le diagonali in alto
-        labelFraction = 0.75;
-        dzFraction = 0.25;
-      }
+      const labelFraction = 0.5;
+      const dzFraction = 0.5;
 
       const midX_label = startX + dx_val * labelFraction;
       const midY_label = startY + dy_val * labelFraction;
@@ -415,7 +401,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       labels.push({
         x: textX,
         y: textY,
-        text: `${node.tag} (${Number(node.length).toFixed(0)}m)`,
+        text: `${node.tag} (${parseFloat(Number(node.length).toFixed(2)).toString().replace('.', ',')}m)`,
         title: `${node.name}\nv = ${node.velocity?.toFixed(2)} m/s\n∆P = ${node.loss_tot_mbar?.toFixed(1)} mbar\n∆z = ${dz >= 0 ? '+' : ''}${dz} m\nP_nodo = ${pNodo !== undefined ? pNodo.toFixed(3) : '—'} barg`,
         dir,
         anchor: textAnchor
