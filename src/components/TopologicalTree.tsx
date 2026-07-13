@@ -1,4 +1,5 @@
 import React, { useMemo, useEffect } from 'react';
+import { formatNumber } from '../utils/format';
 
 export interface TrattoNode {
   tag: string;
@@ -22,6 +23,7 @@ interface TopologicalTreeProps {
   activeTag?: string;
   onSelectTag?: (tag: string) => void;
   pressionePartenza?: number | string; // pressione alla radice (barg)
+  mode?: 'gas' | 'electric';
 }
 
 interface MapNode extends TrattoNode {
@@ -60,9 +62,10 @@ interface VisualLabel {
   title: string;
   dir: 'H' | 'V';
   anchor?: "end" | "inherit" | "start" | "middle";
+  isAlarm?: boolean;
 }
 
-export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressionePartenza = 0 }: TopologicalTreeProps) {
+export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressionePartenza = 0, mode = 'gas' }: TopologicalTreeProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -221,6 +224,8 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       return false;
     };
 
+    const visited = new Set<string>();
+
     // Algoritmo ricorsivo per posizionare i nodi in modo ortogonale perpendicolare
     const layoutNode = (
       node: MapNode, 
@@ -232,6 +237,11 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       childIndex: number,
       intendedDir: 'H' | 'V'
     ): void => {
+      if (!node || visited.has(node.tag)) {
+        return;
+      }
+      visited.add(node.tag);
+
       const visualLen = getVisualLength(node.length);
       const startX = parentEndX;
       const startY = parentEndY;
@@ -317,23 +327,35 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       let lineColor = "#3b82f6";
       const isAsp = node.tipoCondotto === 'aspirazione';
 
-      if (node.hierarchy === 'dorsale_principale') {
-        lineThickness = 5;
-        lineColor = isAsp ? "#ea580c" : "#1d4ed8";
-      } else if (node.hierarchy === 'dorsale_secondaria') {
-        lineThickness = 3.5;
-        lineColor = isAsp ? "#f97316" : "#0ea5e9";
-      } else if (node.hierarchy === 'dorsale_terziaria') {
-        lineThickness = 2.5;
-        lineColor = isAsp ? "#fb923c" : "#10b981";
+      if (mode === 'electric') {
+        if (node.hierarchy === 'dorsale_principale') {
+          lineThickness = 5;
+          lineColor = "#3b82f6";
+        } else {
+          lineThickness = 3;
+          lineColor = "#64748b";
+        }
       } else {
-        lineThickness = 1.5;
-        lineColor = isAsp ? "#d97706" : "#64748b";
+        if (node.hierarchy === 'dorsale_principale') {
+          lineThickness = 5;
+          lineColor = isAsp ? "#ea580c" : "#1d4ed8";
+        } else if (node.hierarchy === 'dorsale_secondaria') {
+          lineThickness = 3.5;
+          lineColor = isAsp ? "#f97316" : "#0ea5e9";
+        } else if (node.hierarchy === 'dorsale_terziaria') {
+          lineThickness = 2.5;
+          lineColor = isAsp ? "#fb923c" : "#10b981";
+        } else {
+          lineThickness = 1.5;
+          lineColor = isAsp ? "#d97706" : "#64748b";
+        }
       }
 
       const pNodo = node.pressioneNodo;
       const pMin = Number(node.pressioneMinimaRichiesta) || 0;
-      const hasAlarm = pNodo !== undefined && pNodo < pMin;
+      const hasAlarm = mode === 'electric' 
+        ? (pNodo !== undefined && pNodo > (pMin || 50)) 
+        : (pNodo !== undefined && pNodo < pMin);
 
       // Calcolo dell'angolo e dei vettori per il posizionamento ortogonale ed evitamento delle collisioni delle etichette
       const dx_val = endX - startX;
@@ -356,7 +378,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       const py = Math.cos(angle);
 
       // Shifta l'etichetta del tratto perpendicolarmente per non sovrapporsi al tubo (sopra/destra)
-      const offsetDist = 13;
+      const offsetDist = mode === 'electric' ? 20 : 13;
       const textX = midX_label - px * offsetDist;
       const textY = midY_label - py * offsetDist;
 
@@ -401,11 +423,26 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       labels.push({
         x: textX,
         y: textY,
-        text: `${node.tag} (${parseFloat(Number(node.length).toFixed(2)).toString().replace('.', ',')}m)`,
-        title: `${node.name}\nv = ${node.velocity?.toFixed(2)} m/s\n∆P = ${node.loss_tot_mbar?.toFixed(1)} mbar\n∆z = ${dz >= 0 ? '+' : ''}${dz} m\nP_nodo = ${pNodo !== undefined ? pNodo.toFixed(3) : '—'} barg`,
+        text: `${node.tag} (${formatNumber(node.length, 2).replace(',00', '')}m)`,
+        title: mode === 'electric' 
+          ? `${node.name}\nLunghezza: ${formatNumber(node.length, 1)} m\nRiempimento: ${pNodo !== undefined ? formatNumber(pNodo, 1) : '—'}%`
+          : `${node.name}\nv = ${formatNumber(node.velocity, 2)} m/s\n∆P = ${formatNumber(node.loss_tot_mbar, 1)} mbar\n∆z = ${dz >= 0 ? '+' : ''}${formatNumber(dz, 1)} m\nP_nodo = ${pNodo !== undefined ? formatNumber(pNodo, 3) : '—'} barg`,
         dir,
         anchor: textAnchor
       });
+
+      // Aggiungi la label della percentuale di riempimento sotto (modalità elettrica)
+      if (mode === 'electric' && pNodo !== undefined) {
+        labels.push({
+          x: textX,
+          y: textY + 10,
+          text: `Riempimento: ${formatNumber(pNodo, 1)}%`,
+          title: `${node.name}\nLunghezza: ${formatNumber(node.length, 1)} m\nRiempimento: ${formatNumber(pNodo, 1)}%`,
+          dir,
+          anchor: textAnchor,
+          isAlarm: hasAlarm
+        });
+      }
 
       // Ricorsione sui figli
       const sortedChildren = [...node.children].sort((a, b) => a.tag.localeCompare(b.tag));
@@ -542,10 +579,14 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
               <g key={`root-node-${i}`}>
                 {/* Cerchio radice con indicazione pressione partenza */}
                 <circle cx={l.x1} cy={l.y1} r="7" fill="#1e293b" stroke="#94a3b8" strokeWidth="1.5" />
-                <text x={l.x1} y={l.y1 - 12} textAnchor="middle" fill="#1e293b" fontSize="8" fontWeight="bold">
-                  {Number(pressionePartenza).toFixed(2)} barg
+                {mode !== 'electric' && (
+                  <text x={l.x1} y={l.y1 - 12} textAnchor="middle" fill="#1e293b" fontSize="8" fontWeight="bold">
+                    {`${formatNumber(pressionePartenza, 2)} barg`}
+                  </text>
+                )}
+                <text x={l.x1} y={l.y1 - 3} textAnchor="middle" fill="white" fontSize="6" fontWeight="bold">
+                  {mode === 'electric' ? "" : "P₀"}
                 </text>
-                <text x={l.x1} y={l.y1 - 3} textAnchor="middle" fill="white" fontSize="6" fontWeight="bold">P₀</text>
               </g>
             ));
           })()}
@@ -553,8 +594,8 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
           {/* Disegnamo i tratti reali di fluido ortogonali */}
           {lines.map((l) => {
             const isActive = activeTag === l.tag;
-            const dz = Number(l.dislivello) || 0;
-            const dzLabel = dz !== 0 ? (dz > 0 ? `↑${dz}m` : `↓${Math.abs(dz)}m`) : null;
+            const dz = mode === 'electric' ? 0 : (Number(l.dislivello) || 0);
+            const dzLabel = mode === 'electric' ? null : (dz !== 0 ? (dz > 0 ? `↑${dz}m` : `↓${Math.abs(dz)}m`) : null);
 
             return (
               <g 
@@ -570,7 +611,9 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                 }}
               >
                 <title>
-                  {`${l.name}\nLunghezza: ${l.length} m\nVelocità: ${l.velocity?.toFixed(2)} m/s\nPerdita: ${l.loss?.toFixed(1)} mbar\n∆z: ${dz >= 0 ? '+' : ''}${dz} m\nP_nodo: ${l.pressioneNodo !== undefined ? l.pressioneNodo.toFixed(3) : '—'} barg`}
+                  {mode === 'electric' 
+                    ? `${l.name}\nLunghezza: ${formatNumber(l.length, 1)} m\nRiempimento: ${l.pressioneNodo !== undefined ? formatNumber(l.pressioneNodo, 1) : '—'}%` 
+                    : `${l.name}\nLunghezza: ${formatNumber(l.length, 1)} m\nVelocità: ${formatNumber(l.velocity, 2)} m/s\nPerdita: ${formatNumber(l.loss, 1)} mbar\n∆z: ${dz >= 0 ? '+' : ''}${formatNumber(dz, 1)} m\nP_nodo: ${l.pressioneNodo !== undefined ? formatNumber(l.pressioneNodo, 3) : '—'} barg`}
                 </title>
                 {/* Linea di hover/attiva */}
                 <line 
@@ -677,7 +720,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                         fontSize="7.5"
                         fontWeight="bold"
                       >
-                        ⚠ P&lt;min
+                        {mode === 'electric' ? "⚠ >50%" : "⚠ P<min"}
                       </text>
                       <text
                         x={alarmX}
@@ -687,7 +730,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                         fontSize="7.5"
                         fontWeight="bold"
                       >
-                        ⚠ P&lt;min
+                        {mode === 'electric' ? "⚠ >50%" : "⚠ P<min"}
                       </text>
                     </g>
                   );
@@ -695,6 +738,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
 
                 {/* Etichetta pressione al nodo di arrivo con outline e spostata per non sovrapporsi */}
                 {l.pressioneNodo !== undefined && (() => {
+                  if (mode === 'electric') return null;
                   const hasPumpAtEnd = pumpLocations.some(p => Math.abs(p.x - l.x2) < 0.1 && Math.abs(p.y - l.y2) < 0.1);
                   let labelX = l.x2;
                   let labelY = l.y2;
@@ -729,7 +773,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                         fontSize="7.5"
                         fontWeight="600"
                       >
-                        {l.pressioneNodo.toFixed(2)} barg
+                        {mode === 'electric' ? `${formatNumber(l.pressioneNodo, 1)}%` : `${formatNumber(l.pressioneNodo, 2)} barg`}
                       </text>
                       <text
                         x={labelX}
@@ -739,7 +783,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                         fontSize="7.5"
                         fontWeight="600"
                       >
-                        {l.pressioneNodo.toFixed(2)} barg
+                        {mode === 'electric' ? `${formatNumber(l.pressioneNodo, 1)}%` : `${formatNumber(l.pressioneNodo, 2)} barg`}
                       </text>
                     </g>
                   );
@@ -789,7 +833,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                       fontSize="7.5" 
                       fontWeight="bold"
                     >
-                      {pStart.toFixed(2)} barg
+                      {formatNumber(pStart, 2)} barg
                     </text>
                     <text 
                       x={labelX} 
@@ -799,7 +843,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                       fontSize="7.5" 
                       fontWeight="bold"
                     >
-                      {pStart.toFixed(2)} barg
+                      {formatNumber(pStart, 2)} barg
                     </text>
                   </g>
                 )}
@@ -828,7 +872,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
               <text 
                 x={lbl.x} y={lbl.y} 
                 textAnchor={lbl.anchor || (lbl.dir === 'H' ? "middle" : "start")} 
-                fill="#334155" 
+                fill={lbl.isAlarm ? "#ef4444" : "#334155"} 
                 fontSize="9" 
                 fontWeight="bold" 
                 className="font-semibold"
@@ -838,15 +882,29 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
             </g>
           ))}
         </svg>
-      <div className="flex flex-wrap gap-4 justify-center mt-3 text-[10px] text-slate-400 print:hidden">
-        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1.5 bg-[#1d4ed8]"></span> Dorsale Principale (Mandata)</div>
-        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1.5 bg-[#ea580c]"></span> Dorsale Principale (Aspirazione)</div>
-        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-[#0ea5e9]"></span> Dorsale Secondaria (Mandata)</div>
-        <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-[#f97316]"></span> Dorsale Secondaria (Aspirazione)</div>
-        <div className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-white border border-[#1e293b] font-bold text-[9px] inline-flex items-center justify-center leading-none">P</span> Pompa</div>
-        <div className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-full bg-red-400 border-2 border-red-500"></span> Pressione &lt; Minima</div>
-        <div className="flex items-center gap-1.5"><span className="text-orange-500 font-bold">↑</span><span className="text-cyan-600 font-bold">↓</span> Dislivello (m)</div>
-      </div>
+      {mode === 'electric' ? (
+        <div className="flex flex-wrap gap-4 justify-center mt-3 text-[10px] text-slate-500 font-semibold print:hidden">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block w-4 h-1 bg-[#3b82f6]"></span> Canale Principale
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block w-4 h-1 bg-[#64748b]"></span> Derivazione
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded-full bg-red-400 border-2 border-red-500"></span> Riempimento &gt; 50% (Allarme)
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-4 justify-center mt-3 text-[10px] text-slate-400 print:hidden">
+          <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1.5 bg-[#1d4ed8]"></span> Dorsale Principale (Mandata)</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1.5 bg-[#ea580c]"></span> Dorsale Principale (Aspirazione)</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-[#0ea5e9]"></span> Dorsale Secondaria (Mandata)</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block w-4 h-1 bg-[#f97316]"></span> Dorsale Secondaria (Aspirazione)</div>
+          <div className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full bg-white border border-[#1e293b] font-bold text-[9px] inline-flex items-center justify-center leading-none">P</span> Pompa</div>
+          <div className="flex items-center gap-1.5"><span className="inline-block w-3 h-3 rounded-full bg-red-400 border-2 border-red-500"></span> Pressione &lt; Minima</div>
+          <div className="flex items-center gap-1.5"><span className="text-orange-500 font-bold">↑</span><span className="text-cyan-600 font-bold">↓</span> Dislivello (m)</div>
+        </div>
+      )}
     </div>
   );
 }

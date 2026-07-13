@@ -147,30 +147,19 @@ export function ToolCalcoliElettrici({ projectData, setProjectData, setAppMode }
 
   return (
     <div className="bg-slate-100 rounded-3xl p-6 md:p-8 animate-in fade-in duration-300">
-      {/* Header dello strumento */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-4 border-b border-slate-200 print:hidden">
-        <div>
-          <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-            <span className="p-2 bg-amber-100 text-amber-600 rounded-2xl"><Zap className="w-6 h-6" /></span>
-            Calcoli Elettrici Rapidi
-          </h2>
-          <p className="text-slate-500 text-xs mt-1">
-            Dimensionamento cavi BT in rame e verifica della caduta di tensione percentuale
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <ProjectStorage 
-            toolType="calcoli_elettrici" 
-            currentData={data} 
-            onLoadProject={handleLoadProject} 
-            projectInfo={projectData} 
-            setProjectInfo={setProjectData} 
-          />
-        </div>
-      </div>
-
       {/* Intestazione del progetto standard */}
       <ProjectHeader pData={projectData} setPData={setProjectData} title="Calcoli Elettrici Rapidi" setAppMode={setAppMode} iconColor="orange" />
+
+      {/* Gestione Progetti Condivisi (Full-width) */}
+      <div className="print:hidden mb-6">
+        <ProjectStorage 
+          toolType="calcoli_elettrici" 
+          currentData={data} 
+          onLoadProject={handleLoadProject} 
+          projectInfo={projectData} 
+          setProjectInfo={setProjectData} 
+        />
+      </div>
 
       {/* Contenitore Principale a due colonne */}
       <div className="flex flex-col md:flex-row gap-6 items-start">

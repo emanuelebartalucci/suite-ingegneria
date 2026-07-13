@@ -99,7 +99,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
                     <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Note Tecniche</label>
                         <p className="hidden print:block text-sm text-slate-600 whitespace-pre-wrap">{pData.notes || 'Nessuna nota.'}</p>
-                        <textarea rows={2} value={pData.notes} onChange={e => setPData({...pData, notes: e.target.value})} placeholder="Inserisci note sul progetto..." className="w-full bg-transparent text-sm text-slate-600 focus:outline-none border-b border-slate-300 resize-none print:hidden"></textarea>
+                        <input type="text" value={pData.notes} onChange={e => setPData({...pData, notes: e.target.value})} placeholder="Inserisci note sul progetto..." className="w-full bg-transparent text-sm font-medium text-slate-700 focus:outline-none border-b border-slate-300 print:hidden" />
                     </div>
                 </div>
             </div>

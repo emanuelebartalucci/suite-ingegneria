@@ -15,8 +15,12 @@ import { ToolCalcoliVari } from './tools/ToolCalcoliVari';
 import { ToolHVAC } from './tools/ToolHVAC';
 import { ToolPompeFognarie } from './tools/ToolPompeFognarie';
 import { ToolAspiratore } from './tools/ToolAspiratore';
+import { ToolDimensionamentoCanali } from './tools/ToolDimensionamentoCanali';
+import { DatabaseManager } from './components/DatabaseManager';
+import { seedThermodynamicCatalog } from './utils/thermodynamicDbHelper';
+import { seedElectricalCatalog } from './utils/electricalDbHelper';
 import { IconWaves, IconFlame, IconThermometer, IconArrowUp, IconWind, IconPump, IconImpeller } from './components/Icons';
-import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap, Scale, Fan } from 'lucide-react';
+import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap, Scale, Fan, Layers } from 'lucide-react';
 
 import logoImg from './assets/Logo.png';
 
@@ -99,7 +103,7 @@ export default function App() {
     const [dashboardSection, setDashboardSection] = useState<'home' | 'termoidraulica' | 'elettrica'>('home');
     
     const [projectData, setProjectData] = useState<ProjectData>({
-        client: 'Progetto Impianto',
+        client: '',
         author: '',
         date: new Date().toISOString().split('T')[0],
         notes: ''
@@ -163,6 +167,16 @@ export default function App() {
             if (window.suiteUI) delete window.suiteUI;
         };
     }, []);
+
+    // Seeding dei cataloghi su Firestore all'avvio dell'applicazione
+    useEffect(() => {
+        if (db && !isFirebaseMock) {
+            seedThermodynamicCatalog(db);
+            seedElectricalCatalog(db);
+        }
+    }, [db]);
+
+
 
     // Ascolto dello stato dell'autenticazione Firebase e caricamento profilo
     useEffect(() => {
@@ -545,6 +559,7 @@ export default function App() {
                         {appMode === 'hvac' && <>🌀 <span className="inline-block pb-1 pr-2 bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">Dimensionamento Impianto di Climatizzazione</span></>}
                         {appMode === 'pompe_fognarie' && <>🔧 <span className="inline-block pb-1 bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent">Pompe di Sollevamento Fognario</span></>}
                         {appMode === 'aspiratore' && <>🌪️ <span className="inline-block pb-1 bg-gradient-to-r from-cyan-600 to-sky-600 bg-clip-text text-transparent">Aspiratore / Ventilatore Industriale</span></>}
+                        {appMode === 'dimensionamento_canali' && <>⚡ <span className="inline-block pb-1 bg-gradient-to-r from-amber-500 to-yellow-600 bg-clip-text text-transparent">Dimensionamento Canale e Tubazioni</span></>}
                     </h1>
                 </div>
             )}
@@ -610,7 +625,14 @@ export default function App() {
                                         <span className="p-1.5 bg-blue-100 text-brand-600 rounded-lg flex items-center justify-center"><IconWaves className="w-4 h-4" /></span>
                                         Termoidraulica & Fluidi
                                     </h3>
-                                    <div className="w-[84px] hidden sm:block" /> {/* Bilanciamento spaziale */}
+                                    <button
+                                        onClick={() => setAppMode('database_termo')}
+                                        className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl shadow transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 border border-slate-700"
+                                    >
+                                        🗄️ Database
+                                    </button>
+
+
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-6 text-left">
@@ -694,11 +716,25 @@ export default function App() {
                                         <span className="p-1.5 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center"><Zap className="w-4 h-4" /></span>
                                         Impianti Elettrici
                                     </h3>
-                                    <div className="w-[84px] hidden sm:block" /> {/* Bilanciamento spaziale */}
+                                    <button
+                                        onClick={() => setAppMode('database_elettrico')}
+                                        className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl shadow transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 border border-slate-700"
+                                    >
+                                        🗄️ Database
+                                    </button>
+
+
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 text-left">
-                                    {/* 1. Calcoli Elettrici Rapidi */}
+                                    {/* 1. Dimensionamento Canale e Tubazioni */}
+                                    <button onClick={() => setAppMode('dimensionamento_canali')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-amber-500 hover:bg-amber-50 transition-all text-left cursor-pointer w-full">
+                                        <div className="w-14 h-14 bg-amber-100 text-amber-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><Layers className="w-7 h-7" /></div>
+                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Dimensionamento Canale e Tubazioni</h2>
+                                        <p className="text-[11px] text-slate-500 text-center leading-relaxed">Verifica sfilabilità e tasso di riempimento per cavi elettrici (CEI 64-8).</p>
+                                    </button>
+
+                                    {/* 2. Calcoli Elettrici Rapidi */}
                                     <button onClick={() => setAppMode('calcoli_elettrici')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-amber-500 hover:bg-amber-50 transition-all text-left cursor-pointer w-full">
                                         <div className="w-14 h-14 bg-amber-100 text-amber-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><Zap className="w-7 h-7" /></div>
                                         <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Calcoli Elettrici Rapidi</h2>
@@ -720,7 +756,9 @@ export default function App() {
                 {appMode === 'hvac' && <ToolHVAC projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 {appMode === 'pompe_fognarie' && <ToolPompeFognarie projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 {appMode === 'aspiratore' && <ToolAspiratore projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
-
+                {appMode === 'dimensionamento_canali' && <ToolDimensionamentoCanali projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
+                {appMode === 'database_termo' && <DatabaseManager type="termo" setAppMode={setAppMode} projectData={projectData} />}
+                {appMode === 'database_elettrico' && <DatabaseManager type="elettrico" setAppMode={setAppMode} projectData={projectData} />}
             </div>
 
             {/* Footer con firma discreta, invisibile in stampa */}
