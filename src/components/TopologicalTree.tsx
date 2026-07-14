@@ -16,6 +16,8 @@ export interface TrattoNode {
   tipoCondotto?: 'aspirazione' | 'mandata';
   pressioneInizioTratto?: number;
   children?: TrattoNode[];
+  da?: string;
+  a?: string;
 }
 
 interface TopologicalTreeProps {
@@ -53,6 +55,8 @@ interface VisualLine {
   dzY?: number;
   dzAnchor?: "end" | "inherit" | "start" | "middle";
   pressioneInizioTratto?: number;
+  da?: string;
+  a?: string;
 }
 
 interface VisualLabel {
@@ -328,13 +332,8 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       const isAsp = node.tipoCondotto === 'aspirazione';
 
       if (mode === 'electric') {
-        if (node.hierarchy === 'dorsale_principale') {
-          lineThickness = 5;
-          lineColor = "#3b82f6";
-        } else {
-          lineThickness = 3;
-          lineColor = "#64748b";
-        }
+        lineThickness = 4;
+        lineColor = "#3b82f6";
       } else {
         if (node.hierarchy === 'dorsale_principale') {
           lineThickness = 5;
@@ -417,6 +416,8 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
         dzY: dz !== 0 ? dzY : undefined,
         dzAnchor: dz !== 0 ? dzAnchor : undefined,
         pressioneInizioTratto: node.pressioneInizioTratto,
+        da: node.da,
+        a: node.a
       });
 
       // Label principale: TAG + lunghezza
@@ -425,7 +426,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
         y: textY,
         text: `${node.tag} (${formatNumber(node.length, 2).replace(',00', '')}m)`,
         title: mode === 'electric' 
-          ? `${node.name}\nLunghezza: ${formatNumber(node.length, 1)} m\nRiempimento: ${pNodo !== undefined ? formatNumber(pNodo, 1) : '—'}%`
+          ? `${node.name} (${node.tag})\nPercorso: ${node.da || 'Partenza generica'} ➔ ${node.a || 'Destinazione generica'}\nLunghezza: ${formatNumber(node.length, 1)} m\nRiempimento: ${pNodo !== undefined ? formatNumber(pNodo, 1) : '—'}%`
           : `${node.name}\nv = ${formatNumber(node.velocity, 2)} m/s\n∆P = ${formatNumber(node.loss_tot_mbar, 1)} mbar\n∆z = ${dz >= 0 ? '+' : ''}${formatNumber(dz, 1)} m\nP_nodo = ${pNodo !== undefined ? formatNumber(pNodo, 3) : '—'} barg`,
         dir,
         anchor: textAnchor
@@ -554,6 +555,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
           <style>{`
             @media print {
               .topo-highlight-line { display: none !important; }
+              .topo-line-electric           { stroke: #3b82f6 !important; stroke-width: 4px !important; }
               .topo-line-dorsale-principale { stroke: #1d4ed8 !important; stroke-width: 5px !important; }
               .topo-line-dorsale-secondaria { stroke: #0ea5e9 !important; stroke-width: 3.5px !important; }
               .topo-line-dorsale-terziaria  { stroke: #10b981 !important; stroke-width: 2.5px !important; }
@@ -612,7 +614,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
               >
                 <title>
                   {mode === 'electric' 
-                    ? `${l.name}\nLunghezza: ${formatNumber(l.length, 1)} m\nRiempimento: ${l.pressioneNodo !== undefined ? formatNumber(l.pressioneNodo, 1) : '—'}%` 
+                    ? `${l.name} (${l.tag})\nPercorso: ${l.da || 'Partenza generica'} ➔ ${l.a || 'Destinazione generica'}\nLunghezza: ${formatNumber(l.length, 1)} m\nRiempimento: ${l.pressioneNodo !== undefined ? formatNumber(l.pressioneNodo, 1) : '—'}%` 
                     : `${l.name}\nLunghezza: ${formatNumber(l.length, 1)} m\nVelocità: ${formatNumber(l.velocity, 2)} m/s\nPerdita: ${formatNumber(l.loss, 1)} mbar\n∆z: ${dz >= 0 ? '+' : ''}${formatNumber(dz, 1)} m\nP_nodo: ${l.pressioneNodo !== undefined ? formatNumber(l.pressioneNodo, 3) : '—'} barg`}
                 </title>
                 {/* Linea di hover/attiva */}
@@ -630,9 +632,11 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                   strokeLinecap="round"
                   markerEnd={l.thickness <= 2 ? "url(#arrow)" : undefined}
                   className={`transition-colors group-hover:stroke-green-500 ${
-                    l.color === "#1d4ed8" ? "topo-line-dorsale-principale" :
-                    l.color === "#0ea5e9" ? "topo-line-dorsale-secondaria" :
-                    l.color === "#10b981" ? "topo-line-dorsale-terziaria" : "topo-line-utenza"
+                    mode === 'electric' ? "topo-line-electric" : (
+                      l.color === "#1d4ed8" ? "topo-line-dorsale-principale" :
+                      l.color === "#0ea5e9" ? "topo-line-dorsale-secondaria" :
+                      l.color === "#10b981" ? "topo-line-dorsale-terziaria" : "topo-line-utenza"
+                    )
                   }`}
                 />
 
@@ -885,10 +889,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       {mode === 'electric' ? (
         <div className="flex flex-wrap gap-4 justify-center mt-3 text-[10px] text-slate-500 font-semibold print:hidden">
           <div className="flex items-center gap-1.5">
-            <span className="inline-block w-4 h-1 bg-[#3b82f6]"></span> Canale Principale
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block w-4 h-1 bg-[#64748b]"></span> Derivazione
+            <span className="inline-block w-4 h-1 bg-[#3b82f6]"></span> Canale / Tubazione
           </div>
           <div className="flex items-center gap-1.5">
             <span className="inline-block w-3 h-3 rounded-full bg-red-400 border-2 border-red-500"></span> Riempimento &gt; 50% (Allarme)

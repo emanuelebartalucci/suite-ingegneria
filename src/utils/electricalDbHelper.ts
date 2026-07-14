@@ -55,6 +55,26 @@ export async function seedElectricalCatalog(db: Firestore): Promise<void> {
       }
       
       console.log("Seeding completato con successo!");
+      return;
+    }
+
+    // Verifichiamo se mancano i nuovi cavi, le formazioni o le nuove famiglie di condotti
+    const fg16om16Doc = querySnapshot.docs.find(d => d.id === 'fg16om16');
+    const isCablesOutdated = !fg16om16Doc || !fg16om16Doc.data().formations || fg16om16Doc.data().formations.length < 50;
+    const hasNewCables = querySnapshot.docs.some(d => d.id === 'fg16r16');
+    const hasPasserellaFilo = querySnapshot.docs.some(d => d.id === 'passerella_filo');
+
+    if (isCablesOutdated || !hasNewCables || !hasPasserellaFilo) {
+      console.log("Rilevata versione precedente o parziale su Firestore. Avvio allineamento complessivo (cavi e condotti)...");
+      // Allineamento cavi
+      for (const cavo of INITIAL_CABLES) {
+        await setDoc(doc(db, COLLECTION_NAME, cavo.id), cavo);
+      }
+      // Allineamento contenitori
+      for (const contenitore of INITIAL_CONTAINERS) {
+        await setDoc(doc(db, COLLECTION_NAME, contenitore.id), contenitore);
+      }
+      console.log("Allineamento Firestore completato con successo!");
     }
   } catch (error) {
     console.error("Errore nel seeding del catalogo elettrico:", error);
@@ -66,14 +86,21 @@ export async function seedElectricalCatalog(db: Firestore): Promise<void> {
  */
 export async function fetchElectricalCables(db: Firestore, isDemo: boolean): Promise<CableProduct[]> {
   if (isDemo) {
-    return getLocalCatalog().cables;
+    const catalog = getLocalCatalog();
+    const fg16om16 = catalog.cables.find(c => c.id === 'fg16om16');
+    const isOutdated = !fg16om16 || !fg16om16.formations || fg16om16.formations.length < 50;
+    if (isOutdated || !catalog.cables.some(c => c.id === 'fg16r16') || !catalog.containers.some(c => c.id === 'passerella_filo')) {
+      saveLocalCatalog(INITIAL_CABLES, INITIAL_CONTAINERS);
+      return INITIAL_CABLES;
+    }
+    return catalog.cables;
   }
   
   try {
     const q = query(collection(db, COLLECTION_NAME), where("type", "==", "cavo"));
     const querySnapshot = await getDocs(q);
     
-    // Se per qualche motivo il DB è vuoto e il seeding non è ancora scattato, usa i dati iniziali
+    // Se per qualche motivo il DB è vuoto, usa i dati iniziali
     if (querySnapshot.empty) {
       await seedElectricalCatalog(db);
       const secondSnap = await getDocs(q);
@@ -88,6 +115,22 @@ export async function fetchElectricalCables(db: Firestore, isDemo: boolean): Pro
     querySnapshot.forEach(d => {
       results.push(d.data() as CableProduct);
     });
+
+    // Se mancano i nuovi cavi o le formazioni su Firestore, allineiamo
+    const fg16om16 = results.find(c => c.id === 'fg16om16');
+    const isOutdated = !fg16om16 || fg16om16.formations.length < 50;
+
+    if (isOutdated || !results.some(c => c.id === 'fg16r16')) {
+      console.log("Rilevata assenza o versione parziale su Firestore, eseguo allineamento...");
+      await seedElectricalCatalog(db);
+      const updatedSnap = await getDocs(q);
+      const updatedResults: CableProduct[] = [];
+      updatedSnap.forEach(d => {
+        updatedResults.push(d.data() as CableProduct);
+      });
+      return updatedResults;
+    }
+    
     return results;
   } catch (e) {
     console.error("Errore recupero cavi da Firestore, uso fallback locale:", e);
@@ -100,7 +143,12 @@ export async function fetchElectricalCables(db: Firestore, isDemo: boolean): Pro
  */
 export async function fetchElectricalContainers(db: Firestore, isDemo: boolean): Promise<ContainerFamily[]> {
   if (isDemo) {
-    return getLocalCatalog().containers;
+    const catalog = getLocalCatalog();
+    if (!catalog.containers.some(c => c.id === 'passerella_filo')) {
+      saveLocalCatalog(catalog.cables, INITIAL_CONTAINERS);
+      return INITIAL_CONTAINERS;
+    }
+    return catalog.containers;
   }
   
   try {
@@ -121,6 +169,18 @@ export async function fetchElectricalContainers(db: Firestore, isDemo: boolean):
     querySnapshot.forEach(d => {
       results.push(d.data() as ContainerFamily);
     });
+
+    if (!results.some(c => c.id === 'passerella_filo')) {
+      console.log("Rilevata assenza di passerella_filo su Firestore, eseguo allineamento...");
+      await seedElectricalCatalog(db);
+      const updatedSnap = await getDocs(q);
+      const updatedResults: ContainerFamily[] = [];
+      updatedSnap.forEach(d => {
+        updatedResults.push(d.data() as ContainerFamily);
+      });
+      return updatedResults;
+    }
+    
     return results;
   } catch (e) {
     console.error("Errore recupero contenitori da Firestore, uso fallback locale:", e);
