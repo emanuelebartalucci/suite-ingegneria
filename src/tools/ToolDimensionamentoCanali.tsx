@@ -189,7 +189,8 @@ const defaultState: ToolState = {
       hasCover: false,
       cables: [],
       da: 'Cabina elettrica',
-      a: 'Quadro elettrico'
+      a: 'Quadro elettrico',
+      dislivelloGeodetico: 0
     }
   ],
   activeTrattaTag: 'AB'
@@ -1197,7 +1198,8 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
           customCoverWeight: t.customCoverWeight,
           customBaseWeight: t.customBaseWeight,
           da: typeof t.da === 'string' && t.da ? t.da : (t.parentId === null ? 'Cabina elettrica' : 'Partenza generica'),
-          a: typeof t.a === 'string' && t.a ? t.a : 'Destinazione generica'
+          a: typeof t.a === 'string' && t.a ? t.a : 'Destinazione generica',
+          dislivelloGeodetico: t.dislivelloGeodetico !== undefined ? t.dislivelloGeodetico : 0
         }));
 
       if (validatedTratte.length > 0) {
