@@ -195,15 +195,15 @@ const defaultState: ToolState = {
   activeTrattaTag: 'AB'
 };
 
-// Componente di rendering 2D Canvas per la sezione
 const SezioneCanvas: React.FC<{
   tratta: TrattaProgetto;
   family?: ContainerFamily;
   size?: ContainerSize;
   fillRate: number;
 }> = ({ tratta, family, size, fillRate }) => {
-
+ 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const dpr = 3; // Risoluzione 3x per garantire nitidezza eccezionale in stampa e su schermi Retina
 
   // Calcola le dimensioni reali
   const isRect = family ? family.sectionType === 'rettangolare' : (tratta.selectedFamilyId === 'personalizzato' && tratta.customWidth !== undefined);
@@ -263,35 +263,23 @@ const SezioneCanvas: React.FC<{
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+ 
+    // Applica scala ad alta definizione
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
 
     // Ripartiamo i cavi in modo bilanciato tra le N linee parallele
     const N = tratta.lineQty || (tratta.doubleLine ? 2 : 1);
     const cablesForLines = partitionCablesAcrossLines(tratta.cables || [], N);
+ 
+    // Resetta canvas nelle coordinate logiche
+    ctx.clearRect(0, 0, 480, 320);
+ 
 
-    // Resetta canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Disegna griglia ingegneristica di sfondo
-    ctx.save();
-    ctx.strokeStyle = '#f1f5f9';
-    ctx.lineWidth = 1;
-    for (let x = 10; x < canvas.width; x += 10) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.stroke();
-    }
-    for (let y = 10; y < canvas.height; y += 10) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
-    }
-    ctx.restore();
-
-    // Dimensioni canvas per disegno
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2 - 10; // Spostato leggermente in alto per evitare tagli dei titoli sul fondo
+ 
+    // Dimensioni canvas per disegno (coordinate logiche)
+    const cx = 480 / 2;
+    const cy = 320 / 2 - 10; // Spostato leggermente in alto per evitare tagli dei titoli sul fondo
 
     const drawCableCircle = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string) => {
       ctx.save();
@@ -345,7 +333,7 @@ const SezioneCanvas: React.FC<{
       const totalWidth = cols * width + (cols - 1) * (width * 0.25);
       const totalHeight = rows * height + (rows - 1) * (height * 0.25);
       
-      const scale = Math.min((canvas.width - 100) / totalWidth, (canvas.height - 90) / totalHeight);
+      const scale = Math.min((480 - 100) / totalWidth, (320 - 90) / totalHeight);
       
       const drawSingleChannel = (xOffset: number, yOffset: number, title: string, lineCables: CavoSelezionato[]) => {
         const wScaled = width * scale;
@@ -370,24 +358,25 @@ const SezioneCanvas: React.FC<{
           ctx.fillRect(xStart + wScaled, yStart - 4, 3, 7); // Tab destro
         }
 
-        // Sfondo del canale (gradiente soft)
-        const channelGrad = ctx.createLinearGradient(xStart, yStart, xStart, yStart + hScaled);
-        channelGrad.addColorStop(0, '#ffffff');
-        channelGrad.addColorStop(1, '#f8fafc');
+
+
+        // Disegno contorni e ombre reali della canala (chiusa o aperta a U)
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.05)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 4;
 
         ctx.strokeStyle = '#334155';
         ctx.lineWidth = Math.min(3, Math.max(1.5, 3.5 * scale * 0.8));
-        ctx.fillStyle = channelGrad;
-
-        // Disegna canale con angoli smussati per un aspetto realistico
-        drawRoundedRect(ctx, xStart, yStart, wScaled, hScaled, 6);
-        ctx.fill();
 
         if (tratta.hasCover) {
+          drawRoundedRect(ctx, xStart, yStart, wScaled, hScaled, 6);
           ctx.stroke();
         } else {
           strokeOpenRoundedRect(ctx, xStart, yStart, wScaled, hScaled, 6);
         }
+        ctx.restore();
         ctx.restore();
 
         // Disegno setto separatore
@@ -548,7 +537,7 @@ const SezioneCanvas: React.FC<{
       const totalWidth = cols * outerDiameter + (cols - 1) * (outerDiameter * 0.25);
       const totalHeight = rows * outerDiameter + (rows - 1) * (outerDiameter * 0.25);
       
-      const scale = Math.min((canvas.width - 100) / totalWidth, (canvas.height - 90) / totalHeight);
+      const scale = Math.min((480 - 100) / totalWidth, (320 - 90) / totalHeight);
 
       const drawSinglePipe = (xOffset: number, yOffset: number, title: string, pipeCables: CavoSelezionato[]) => {
         const outerScaled = (outerDiameter / 2) * scale;
@@ -780,7 +769,7 @@ const SezioneCanvas: React.FC<{
         Riempimento: {formatNumber(fillRate, 1)}%
       </div>
       <div className="w-full flex-1 flex items-center justify-center mt-6">
-        <canvas ref={canvasRef} width={480} height={320} className="w-full max-w-[480px] aspect-[3/2] rounded-2xl bg-white border border-slate-100 shadow-xs" />
+        <canvas ref={canvasRef} width={480 * dpr} height={320 * dpr} className="w-full max-w-[480px] aspect-[3/2] rounded-2xl bg-white border border-slate-100 shadow-xs" />
       </div>
       <div className="text-[10px] text-slate-500 mt-4 text-center italic leading-relaxed px-2">
         {isRect ? "Simulazione riempimento dal basso" : "Simulazione riempimento dal basso per tubazioni"}
