@@ -36,6 +36,8 @@ export interface HVACDoorLeak {
   adjacentPressure_Pa: number; // pressione del locale confinante
   description: string;
   adjacentRoomId?: string; // ID del locale confinante
+  customDoorWidth?: number;  // m
+  customDoorHeight?: number; // m
 }
 
 export interface PeopleActivityData {
@@ -373,8 +375,14 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
       let infiltrationFlow = 0;
       let exfiltrationFlow = 0;
       room.doors.forEach(door => {
-        const l = door.type === 'singola' ? 5.1 : door.type === 'doppia' ? 5.8 : (num(door.customLength) || 5.1);
-        const s = (door.type === 'singola' || door.type === 'doppia') ? 0.002 : (num(door.customWidth) || 2) * 0.001;
+        const l = door.type === 'singola' 
+          ? 5.1 
+          : door.type === 'doppia' 
+            ? 5.8 
+            : (door.customDoorWidth !== undefined && door.customDoorHeight !== undefined)
+              ? (num(door.customDoorWidth) + 2 * num(door.customDoorHeight))
+              : (num(door.customLength) || 5.1);
+        const s = 0.002;
         const alpha = num(door.customAlpha) || 0.85;
         
         let adjP = num(door.adjacentPressure_Pa);
@@ -2017,7 +2025,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                               <span className="text-[8px] sm:text-[9px] text-slate-450 block font-bold uppercase tracking-tighter break-words leading-tight">
                                 Persone (Sens / Lat)
                               </span>
-                              <span className="text-xs font-black font-mono text-slate-800 block truncate">
+                              <span className="text-[10px] sm:text-xs font-black font-mono text-slate-800 block whitespace-normal break-words">
                                 {formatNumber(rCalc.peopleSensible, 0)} / {formatNumber(rCalc.peopleLatent, 0)} W
                               </span>
                             </div>
@@ -2419,8 +2427,14 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                                 : num(door.adjacentPressure_Pa);
                             const dp = num(selectedRoom.pressure_Pa) - adjPressure;
                             
-                            const l = door.type === 'singola' ? 5.1 : door.type === 'doppia' ? 5.8 : (num(door.customLength) || 5.1);
-                            const s = (door.type === 'singola' || door.type === 'doppia') ? 0.002 : (num(door.customWidth) || 2) * 0.001;
+                            const l = door.type === 'singola' 
+                              ? 5.1 
+                              : door.type === 'doppia' 
+                                ? 5.8 
+                                : (door.customDoorWidth !== undefined && door.customDoorHeight !== undefined)
+                                  ? (num(door.customDoorWidth) + 2 * num(door.customDoorHeight))
+                                  : (num(door.customLength) || 5.1);
+                            const s = 0.002;
                             const alpha = num(door.customAlpha) || 0.85;
                             const flow = Math.ceil(l * s * alpha * 3600 * Math.sqrt(Math.abs(dp)));
 
@@ -2446,24 +2460,24 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                                   {door.type === 'personalizzata' && (
                                     <div className="grid grid-cols-2 gap-1.5 mt-1.5">
                                       <div>
-                                        <label className="block text-[8px] font-bold text-slate-400 uppercase">Perimetro fess. <span className="normal-case">(m)</span></label>
+                                        <label className="block text-[8px] font-bold text-slate-400 uppercase">Larghezza <span className="normal-case">(m)</span></label>
                                         <input
                                           type="number"
-                                          step="0.1"
-                                          placeholder="5.1"
-                                          value={door.customLength ?? ''}
-                                          onChange={e => handleUpdateDoor(selectedRoom.id, door.id, 'customLength', e.target.value === '' ? '' : Number(e.target.value))}
+                                          step="0.05"
+                                          placeholder="0.9"
+                                          value={door.customDoorWidth ?? ''}
+                                          onChange={e => handleUpdateDoor(selectedRoom.id, door.id, 'customDoorWidth', e.target.value === '' ? '' : Number(e.target.value))}
                                           className="w-full p-0.5 border border-slate-150 rounded text-slate-800 text-[9px] font-mono"
                                         />
                                       </div>
                                       <div>
-                                        <label className="block text-[8px] font-bold text-slate-400 uppercase">Spessore fess. <span className="normal-case">(mm)</span></label>
+                                        <label className="block text-[8px] font-bold text-slate-400 uppercase">Altezza <span className="normal-case">(m)</span></label>
                                         <input
                                           type="number"
-                                          step="0.1"
-                                          placeholder="2"
-                                          value={door.customWidth ?? ''}
-                                          onChange={e => handleUpdateDoor(selectedRoom.id, door.id, 'customWidth', e.target.value === '' ? '' : Number(e.target.value))}
+                                          step="0.05"
+                                          placeholder="2.1"
+                                          value={door.customDoorHeight ?? ''}
+                                          onChange={e => handleUpdateDoor(selectedRoom.id, door.id, 'customDoorHeight', e.target.value === '' ? '' : Number(e.target.value))}
                                           className="w-full p-0.5 border border-slate-150 rounded text-slate-800 text-[9px] font-mono"
                                         />
                                       </div>
@@ -2570,15 +2584,15 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                           </div>
                           <div className="p-3 bg-green-50/50 rounded-2xl border border-green-150">
                             <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Infiltrazioni (In)</p>
-                            <p className="text-lg font-black font-mono text-green-700">+{rCalc.infiltrationFlow} <span className="text-xs font-normal">m³/h</span></p>
+                            <p className="text-lg font-black font-mono text-green-700">{rCalc.infiltrationFlow} <span className="text-xs font-normal">m³/h</span></p>
                           </div>
                           <div className="p-3 bg-red-50/50 rounded-2xl border border-red-150">
                             <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Trafilamenti (Out)</p>
-                            <p className="text-lg font-black font-mono text-red-750">-{rCalc.exfiltrationFlow} <span className="text-xs font-normal">m³/h</span></p>
+                            <p className="text-lg font-black font-mono text-red-750">{rCalc.exfiltrationFlow} <span className="text-xs font-normal">m³/h</span></p>
                           </div>
                           <div className="p-3 bg-rose-50/50 rounded-2xl border border-rose-150">
                             <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Asp. Locale (Out)</p>
-                            <p className="text-lg font-black font-mono text-rose-700">-{num(rCalc.room.exhaustFlow)} <span className="text-xs font-normal">m³/h</span></p>
+                            <p className="text-lg font-black font-mono text-rose-700">{num(rCalc.room.exhaustFlow)} <span className="text-xs font-normal">m³/h</span></p>
                           </div>
                           {(() => {
                             const isAlarm = rCalc.rawRipresaFlow < 0;
@@ -2808,31 +2822,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                         </div>
                       </div>
 
-                      {/* Mass Balance Check Box */}
-                      <div className="p-4 bg-slate-50 border border-slate-200/60 rounded-2xl text-[10px] space-y-2">
-                        <div className="font-bold text-slate-800 uppercase text-[9px] tracking-wider">
-                          ⚖️ Verifica Bilancio di Massa dell'Unità di Trattamento Aria (UTA)
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-                          <div className="p-2 bg-white rounded-lg border border-slate-100">
-                            <span className="text-slate-500 text-[10px] block uppercase font-bold">Flussi in Ingresso in UTA</span>
-                            <div className="mt-1 text-slate-800">
-                              Aria Esterna ({s.Q_ariaEsterna}) + Ripresa ({s.Q_ripresa}) = <span className="font-black text-blue-600">{s.Q_ariaEsterna + s.Q_ripresa} m³/h</span>
-                            </div>
-                          </div>
-                          <div className="p-2 bg-white rounded-lg border border-slate-100">
-                            <span className="text-slate-500 text-[10px] block uppercase font-bold">Flussi in Uscita da UTA</span>
-                            <div className="mt-1 text-slate-800">
-                              Mandata ({s.Q_mandata}) + Espulsione HVAC ({s.Q_espulsaHvac}) = <span className="font-black text-emerald-600">{s.Q_mandata + s.Q_espulsaHvac} m³/h</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-[9px] text-slate-400 italic mt-1">
-                          {s.Q_ariaEsterna + s.Q_ripresa === s.Q_mandata + s.Q_espulsaHvac 
-                            ? '✅ Bilancio di massa UTA perfettamente verificato (0 m³/h di disavanzo).' 
-                            : '⚠️ Lieve scostamento nel bilancio dovuto all\'arrotondamento separato dei singoli flussi.'}
-                        </div>
-                      </div>
+
                     </div>
                   );
                 })}
@@ -3306,8 +3296,8 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
               <div className="print:hidden bg-amber-50 text-amber-900 text-[10px] p-3 rounded-2xl border border-amber-250/60 leading-relaxed">
                 <strong>Equazioni e Note:</strong>
                 <ul className="list-disc pl-4 space-y-1 mt-1">
-                  <li><strong>Potenza di Post-Riscaldo ($kcal/h$)</strong> = Portata Aria ($m^3/h$) × (T_valle - T_monte) × 0.3.</li>
-                  <li><strong>Portata Acqua ($l/h$)</strong> = Potenza ($kW$) × 860 / Delta T.</li>
+                  <li><strong>Potenza di Post-Riscaldo (kcal/h)</strong> = Portata Aria (m³/h) × (T<sub>valle</sub> - T<sub>monte</sub>) × 0.3.</li>
+                  <li><strong>Portata Acqua (l/h)</strong> = Potenza (kW) × 860 / ΔT.</li>
                   <li>La potenza finale di progetto di ciascuna batteria di post-riscaldo è presa come la <strong>maggiore delle due potenze di progetto</strong> calcolate per la stagione invernale e per la stagione estiva.</li>
                   <li>Il sovradimensionamento viene prelevato in automatico dal fattore specificato per ciascun sistema nel tab *4. Riepilogo Portate HVAC*.</li>
                   <li><strong>Nota sui Diametri e Valvole (di primo tentativo):</strong> I diametri della linea tubo e i Kvs delle valvole consigliati sono indicativi (di primo tentativo) e devono essere verificati e confermati con le perdite di carico effettive della rete di distribuzione idronica.</li>
@@ -3645,7 +3635,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                           
                           {/* Diametro Tubo (Select Override) */}
                           <td className="py-2 px-2">
-                            <span className="hidden print:inline font-mono font-bold text-slate-850">
+                            <span className="hidden print:inline font-mono font-bold text-slate-855">
                               {isUmid ? '-' : hasValidDT ? dnFinal : '-'}
                             </span>
                             <select
@@ -3658,7 +3648,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                               disabled={isUmid || !hasValidDT}
                             >
                               <option value="auto">
-                                {isUmid ? '-' : hasValidDT ? `Consigliato (&quot;${dnCalcolato}&quot;)` : '-'}
+                                {isUmid ? '-' : hasValidDT ? `Consigliato ("${dnCalcolato}")` : '-'}
                               </option>
                               {!isUmid && hasValidDT && PIPE_DN_OPTIONS.map(dn => (
                                 <option key={dn} value={dn}>{dn}</option>
@@ -3668,7 +3658,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                           
                           {/* Valvola (Select Override) */}
                           <td className="py-2 px-2">
-                            <span className="hidden print:inline font-mono font-bold text-slate-850">
+                            <span className="hidden print:inline font-mono font-bold text-slate-855">
                               {isUmid ? '-' : hasValidDT ? valveFinal : '-'}
                             </span>
                             <select
@@ -3681,7 +3671,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                               disabled={isUmid || !hasValidDT}
                             >
                               <option value="auto">
-                                {isUmid ? '-' : hasValidDT ? `Consigliata (&quot;${valveCalcolata}&quot;)` : '-'}
+                                {isUmid ? '-' : hasValidDT ? `Consigliata ("${valveCalcolata}")` : '-'}
                               </option>
                               {!isUmid && hasValidDT && VALVE_KVS_OPTIONS.map(v => (
                                 <option key={v} value={v}>{v}</option>
@@ -3997,8 +3987,14 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                             : null;
 
                           // Calculate flow rate
-                          const l = door.type === 'singola' ? 5.1 : door.type === 'doppia' ? 5.8 : (num(door.customLength) || 5.1);
-                          const s = (door.type === 'singola' || door.type === 'doppia') ? 0.002 : (num(door.customWidth) || 2) * 0.001;
+                          const l = door.type === 'singola' 
+                            ? 5.1 
+                            : door.type === 'doppia' 
+                              ? 5.8 
+                              : (door.customDoorWidth !== undefined && door.customDoorHeight !== undefined)
+                                ? (num(door.customDoorWidth) + 2 * num(door.customDoorHeight))
+                                : (num(door.customLength) || 5.1);
+                          const s = 0.002;
                           const alpha = num(door.customAlpha) || 0.85;
                           const adjPressure = r2Calc ? num(r2Calc.room.pressure_Pa) : num(door.adjacentPressure_Pa);
                           const dp = num(c1.room.pressure_Pa) - adjPressure;
@@ -4312,11 +4308,11 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                       <div className="font-black text-slate-800 font-mono text-[11px]">{sys.id}</div>
                       <div className="flex justify-between text-[10px]">
                         <span className="text-slate-500">Portata Mandata</span>
-                        <span className="font-mono font-bold">{formatNumber(sc.totalMandataSovr, 0)} m³/h</span>
+                        <span className="font-mono font-bold">{formatNumber(sc.Q_mandata, 0)} m³/h</span>
                       </div>
                       <div className="flex justify-between text-[10px]">
                         <span className="text-slate-500">Portata Ripresa</span>
-                        <span className="font-mono font-bold">{formatNumber(sc.totalRipresaSovr, 0)} m³/h</span>
+                        <span className="font-mono font-bold">{formatNumber(sc.Q_ripresa, 0)} m³/h</span>
                       </div>
                       <div className="flex justify-between text-[10px]">
                         <span className="text-slate-500">Potenza Post-Riscaldo</span>
