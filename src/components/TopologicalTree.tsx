@@ -121,9 +121,10 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       const maxY1 = Math.max(y1, y2);
       const isH1 = (y1 === y2);
 
-      // 1. Evitamento allineamento parallelo sulle quote
+      // 1. Evitamento allineamento parallelo sulle quote (solo per rami vicini verticalmente)
       if (isH1) {
         for (const line of placedLines) {
+          if (Math.abs(y2 - line.y2) > 120) continue;
           if (Math.abs(x2 - line.x1) < 15 && !(x2 === line.x1 && y2 === line.y1)) {
             return true;
           }
@@ -133,6 +134,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
         }
       } else {
         for (const line of placedLines) {
+          if (Math.abs(x2 - line.x2) > 120) continue;
           if (Math.abs(y2 - line.y1) < 15 && !(x2 === line.x1 && y2 === line.y1)) {
             return true;
           }
@@ -212,9 +214,10 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
         }
       }
 
-      // 3. Prossimità degli endpoint dei rami (aumentato il minimo)
+      // 3. Prossimità degli endpoint dei rami
       const minDistance = 50;
       for (const line of placedLines) {
+        if (Math.abs(y2 - line.y2) > 120 && Math.abs(y2 - line.y1) > 120 && Math.abs(y1 - line.y2) > 120) continue;
         const dStart = Math.hypot(x2 - line.x1, y2 - line.y1);
         if (dStart < minDistance && !(x2 === line.x1 && y2 === line.y1)) {
           return true;
@@ -593,12 +596,12 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
             ));
           })()}
 
-          {/* Disegnamo i tratti reali di fluido ortogonali */}
+          {/* Disegnamo i tratti reali di fluido */}
           {lines.map((l) => {
             const isActive = activeTag === l.tag;
-            const dz = mode === 'electric' ? 0 : (Number(l.dislivello) || 0);
-            const dzLabel = mode === 'electric' ? null : (dz !== 0 ? (dz > 0 ? `↑${dz}m` : `↓${Math.abs(dz)}m`) : null);
-
+            const dz = Number(l.dislivello) || 0;
+            const dzLabel = dz !== 0 ? (dz > 0 ? `↑${dz}m` : `↓${Math.abs(dz)}m`) : null;
+ 
             return (
               <g 
                 key={l.tag} 
@@ -614,7 +617,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
               >
                 <title>
                   {mode === 'electric' 
-                    ? `${l.name} (${l.tag})\nPercorso: ${l.da || 'Partenza generica'} ➔ ${l.a || 'Destinazione generica'}\nLunghezza: ${formatNumber(l.length, 1)} m\nRiempimento: ${l.pressioneNodo !== undefined ? formatNumber(l.pressioneNodo, 1) : '—'}%` 
+                    ? `${l.name} (${l.tag})\nPercorso: ${l.da || 'Partenza generica'} ➔ ${l.a || 'Destinazione generica'}\nLunghezza: ${formatNumber(l.length, 1)} m\nDislivello: ${dz >= 0 ? '+' : ''}${formatNumber(dz, 1)} m\nRiempimento: ${l.pressioneNodo !== undefined ? formatNumber(l.pressioneNodo, 1) : '—'}%` 
                     : `${l.name}\nLunghezza: ${formatNumber(l.length, 1)} m\nVelocità: ${formatNumber(l.velocity, 2)} m/s\nPerdita: ${formatNumber(l.loss, 1)} mbar\n∆z: ${dz >= 0 ? '+' : ''}${formatNumber(dz, 1)} m\nP_nodo: ${l.pressioneNodo !== undefined ? formatNumber(l.pressioneNodo, 3) : '—'} barg`}
                 </title>
                 {/* Linea di hover/attiva */}
@@ -893,6 +896,9 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
           </div>
           <div className="flex items-center gap-1.5">
             <span className="inline-block w-3 h-3 rounded-full bg-red-400 border-2 border-red-500"></span> Riempimento &gt; 50% (Allarme)
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-orange-500 font-bold">↑</span><span className="text-cyan-600 font-bold">↓</span> Dislivello (m)
           </div>
         </div>
       ) : (

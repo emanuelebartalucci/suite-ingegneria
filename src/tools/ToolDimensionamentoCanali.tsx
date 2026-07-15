@@ -76,6 +76,7 @@ interface TrattaProgetto {
   da?: string;
   a?: string;
   originalTagForMap?: string; // Campo interno temporaneo usato da regenerateTratteTags
+  dislivelloGeodetico?: number | string;
 }
 
 interface ToolState {
@@ -290,7 +291,7 @@ const SezioneCanvas: React.FC<{
 
     // Dimensioni canvas per disegno
     const cx = canvas.width / 2;
-    const cy = canvas.height / 2 + 15;
+    const cy = canvas.height / 2 - 10; // Spostato leggermente in alto per evitare tagli dei titoli sul fondo
 
     const drawCableCircle = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string) => {
       ctx.save();
@@ -375,7 +376,7 @@ const SezioneCanvas: React.FC<{
         channelGrad.addColorStop(1, '#f8fafc');
 
         ctx.strokeStyle = '#334155';
-        ctx.lineWidth = Math.max(1.5, 3.5 * scale * 0.8);
+        ctx.lineWidth = Math.min(3, Math.max(1.5, 3.5 * scale * 0.8));
         ctx.fillStyle = channelGrad;
 
         // Disegna canale con angoli smussati per un aspetto realistico
@@ -457,7 +458,7 @@ const SezioneCanvas: React.FC<{
           const maxRowWidth = xMax - xMin - 8; // Margine sinistro/destro di 4px
 
           cablesForCanvas.forEach(c => {
-            const rScaled = (c.diameter / 2) * scale * 0.76;
+            const rScaled = (c.diameter / 2) * scale * 0.88;
             const dScaled = rScaled * 2;
             let placed = false;
 
@@ -519,9 +520,13 @@ const SezioneCanvas: React.FC<{
         }
 
         // Titolo Canale
+        ctx.save();
         ctx.fillStyle = '#475569';
-        ctx.font = `bold ${Math.max(7, 9 * scale * 0.85)}px sans-serif`;
-        ctx.fillText(title, xStart + 2, yStart + hScaled + Math.max(10, 12 * scale * 0.8));
+        const fontSize = Math.min(13, Math.max(8, 9 * scale * 0.85));
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        const titleOffsetY = Math.min(22, Math.max(10, 12 * scale * 0.8));
+        ctx.fillText(title, xStart + 2, yStart + hScaled + titleOffsetY);
+        ctx.restore();
       };
 
       cablesForLines.forEach((lineCables, idx) => {
@@ -567,7 +572,7 @@ const SezioneCanvas: React.FC<{
         ctx.fillStyle = outerGrad;
         ctx.fill();
         ctx.strokeStyle = '#334155';
-        ctx.lineWidth = Math.max(1, 1.5 * scale * 0.8);
+        ctx.lineWidth = Math.min(2.5, Math.max(1, 1.5 * scale * 0.8));
         ctx.stroke();
 
         // Interno Tubo (Vuoto interno)
@@ -576,7 +581,7 @@ const SezioneCanvas: React.FC<{
         ctx.fillStyle = '#ffffff';
         ctx.fill();
         ctx.strokeStyle = '#475569';
-        ctx.lineWidth = Math.max(1.5, 2.5 * scale * 0.8);
+        ctx.lineWidth = Math.min(3, Math.max(1.5, 2.5 * scale * 0.8));
         ctx.stroke();
         ctx.restore();
 
@@ -644,124 +649,97 @@ const SezioneCanvas: React.FC<{
         const pipeCablesForCanvas = flatCables.slice(0, MAX_PIPE_CABLES);
         const pipeCablesTooMany = flatCables.length > MAX_PIPE_CABLES;
 
-        interface PipeRowData {
-          yFloor: number;
-          currentWidth: number;
-          maxHeight: number;
-          cables: { x: number; y: number; r: number; color: string }[];
+        // Algoritmo di Rilassamento Fisico (Verlet Physics) per adagiare i cavi sul fondo del tubo per gravità
+        const iterations = 180;
+        const gravity = 2.0;
+
+        const placedCables = pipeCablesForCanvas.map((c, idx) => {
+          const r = (c.diameter / 2) * scale * 0.88;
+          // Sfalsa le posizioni iniziali orizzontalmente per evitare sovrapposizioni perfette
+          const offsetFrac = pipeCablesForCanvas.length > 1
+            ? (idx / (pipeCablesForCanvas.length - 1) - 0.5)
+            : 0;
+          const startX = px + offsetFrac * (innerScaled * 0.6);
+          const startY = py; // Parte dal centro per facilitare l'adagiamento sul fondo
+          return {
+            x: startX,
+            y: startY,
+            r: r,
+            color: c.color,
+            compartment: c.compartment
+          };
+        });
+
+        // Risoluzione iterativa dei vincoli di gravità, collisione e contenimento circolare
+        for (let step = 0; step < iterations; step++) {
+          // 1. Gravità
+          placedCables.forEach(c => {
+            c.y += gravity;
+          });
+
+          // Esegue la risoluzione dei vincoli per 3 volte di fila per far convergere perfettamente la fisica
+          for (let sub = 0; sub < 3; sub++) {
+            // 2. Repulsione mutua tra cavi per evitare sovrapposizioni (con 1px di spazio di tolleranza)
+            for (let i = 0; i < placedCables.length; i++) {
+              for (let j = i + 1; j < placedCables.length; j++) {
+                const c1 = placedCables[i];
+                const c2 = placedCables[j];
+
+                const dx = c2.x - c1.x;
+                const dy = c2.y - c1.y;
+                const dist = Math.hypot(dx, dy);
+                const minDist = c1.r + c2.r + 1.0; // 1px di sicurezza tra i cavi
+
+                if (dist < minDist) {
+                  const overlap = minDist - dist;
+                  const nx = dist > 0.001 ? dx / dist : (Math.random() - 0.5);
+                  const ny = dist > 0.001 ? dy / dist : 1;
+
+                  c1.x -= nx * overlap * 0.5;
+                  c1.y -= ny * overlap * 0.5;
+                  c2.x += nx * overlap * 0.5;
+                  c2.y += ny * overlap * 0.5;
+                }
+              }
+            }
+
+            // 3. Collisione con setto separatore verticale (se presente)
+            if (tratta.hasSeparator) {
+              placedCables.forEach(c => {
+                if (c.compartment === 'vano1' || !c.compartment) {
+                  if (c.x > px - c.r - 0.5) {
+                    c.x = px - c.r - 0.5;
+                  }
+                } else if (c.compartment === 'vano2') {
+                  if (c.x < px + c.r + 0.5) {
+                    c.x = px + c.r + 0.5;
+                  }
+                }
+              });
+            }
+
+            // 4. Vincolo interno alla circonferenza (il cavo non deve compenetrare la parete interna)
+            placedCables.forEach(c => {
+              const dx = c.x - px;
+              const dy = c.y - py;
+              const distFromCenter = Math.hypot(dx, dy);
+              // Sottrae 3.5px di margine di sicurezza per evitare compenetrazioni grafiche con lo stroke del tubo
+              const maxAllowedDist = innerScaled - c.r - 3.5;
+
+              if (distFromCenter > maxAllowedDist) {
+                const nx = distFromCenter > 0.001 ? dx / distFromCenter : 0;
+                const ny = distFromCenter > 0.001 ? dy / distFromCenter : 1;
+
+                c.x = px + nx * maxAllowedDist;
+                c.y = py + ny * maxAllowedDist;
+              }
+            });
+          }
         }
 
-        const rowsV1: PipeRowData[] = [];
-        const rowsV2: PipeRowData[] = [];
-
-        const placeCableInZone = (
-          c: typeof flatCables[0], 
-          rows: PipeRowData[], 
-          isLeftZone: boolean | null // true = Vano 1, false = Vano 2, null = intero
-        ) => {
-          const rScaled = (c.diameter / 2) * scale * 0.76;
-          const dScaled = rScaled * 2;
-          let placed = false;
-
-          for (let i = 0; i < rows.length; i++) {
-            const rData = rows[i];
-            const yFloor = rData.yFloor;
-            const dy = yFloor - py;
-            let halfChord = 0;
-            if (Math.abs(dy) < innerScaled) {
-              halfChord = Math.sqrt(innerScaled ** 2 - dy ** 2);
-            }
-            
-            let xMin = px - halfChord + 4;
-            let xMax = px + halfChord - 4;
-            
-            if (isLeftZone === true) {
-               xMax = px - 2;
-            } else if (isLeftZone === false) {
-               xMin = px + 2;
-            }
-            
-            const maxRowWidth = xMax - xMin;
-            
-            if (rData.currentWidth + dScaled <= maxRowWidth) {
-              const xCenter = xMin + rData.currentWidth + rScaled;
-              const yCenter = yFloor - rScaled;
-              
-              const topY = yCenter - rScaled;
-              const topDy = topY - py;
-              let topHalfChord = 0;
-              if (Math.abs(topDy) < innerScaled) {
-                topHalfChord = Math.sqrt(innerScaled ** 2 - topDy ** 2);
-              }
-              const txMin = px - topHalfChord + 4;
-              const txMax = px + topHalfChord - 4;
-              
-              if (xCenter - rScaled >= txMin && xCenter + rScaled <= txMax) {
-                rData.cables.push({ x: xCenter, y: yCenter, r: rScaled, color: c.color });
-                rData.currentWidth += dScaled + 2;
-                rData.maxHeight = Math.max(rData.maxHeight, dScaled);
-                placed = true;
-                break;
-              }
-            }
-          }
-
-          if (!placed) {
-            let nextYFloor = py + innerScaled - 4;
-            if (rows.length > 0) {
-              const lastRow = rows[rows.length - 1];
-              nextYFloor = lastRow.yFloor - lastRow.maxHeight - 2;
-            }
-            
-            const dy = nextYFloor - py;
-            let halfChord = 0;
-            if (Math.abs(dy) < innerScaled) {
-              halfChord = Math.sqrt(innerScaled ** 2 - dy ** 2);
-            }
-            
-            let xMin = px - halfChord + 4;
-            let xMax = px + halfChord - 4;
-            
-            if (isLeftZone === true) {
-              xMax = px - 2;
-            } else if (isLeftZone === false) {
-              xMin = px + 2;
-            }
-            
-            const xCenter = xMin + rScaled;
-            const yCenter = nextYFloor - rScaled;
-            
-            const newRow: PipeRowData = {
-              yFloor: nextYFloor,
-              currentWidth: dScaled + 2,
-              maxHeight: dScaled,
-              cables: [{ x: xCenter, y: yCenter, r: rScaled, color: c.color }]
-            };
-            rows.push(newRow);
-          }
-        };
-
-        pipeCablesForCanvas.forEach(c => {
-          if (tratta.hasSeparator) {
-            if (c.compartment === 'vano2') {
-              placeCableInZone(c, rowsV2, false);
-            } else {
-              placeCableInZone(c, rowsV1, true);
-            }
-          } else {
-            placeCableInZone(c, rowsV1, null);
-          }
-        });
-
-        rowsV1.forEach(r => {
-          r.cables.forEach(cable => {
-            drawCableCircle(ctx, cable.x, cable.y, cable.r, cable.color);
-          });
-        });
-        rowsV2.forEach(r => {
-          r.cables.forEach(cable => {
-            drawCableCircle(ctx, cable.x, cable.y, cable.r, cable.color);
-          });
+        // Disegna tutti i cavi posizionati
+        placedCables.forEach(cable => {
+          drawCableCircle(ctx, cable.x, cable.y, cable.r, cable.color);
         });
 
         if (pipeCablesTooMany) {
@@ -773,10 +751,15 @@ const SezioneCanvas: React.FC<{
           ctx.restore();
         }
 
-        // Titolo
+        // Titolo (centrato rispetto al tubo per pulizia di design, con limiti di dimensione)
+        ctx.save();
         ctx.fillStyle = '#475569';
-        ctx.font = `bold ${Math.max(7, 9 * scale * 0.85)}px sans-serif`;
-        ctx.fillText(title, px - outerScaled, py + outerScaled + Math.max(10, 12 * scale * 0.8));
+        const fontSize = Math.min(13, Math.max(8, 9 * scale * 0.85));
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        const titleOffsetY = Math.min(22, Math.max(12, 14 * scale * 0.8));
+        ctx.fillText(title, px, py + outerScaled + titleOffsetY);
+        ctx.restore();
       };
 
       cablesForLines.forEach((lineCables, idx) => {
@@ -1038,7 +1021,8 @@ export function regenerateTratteTags(
     if (newParentId) {
       const parentNode = updatedTratte.find(ut => ut.tag === newParentId);
       if (parentNode) {
-        childDa = parentNode.a || 'Quadro elettrico';
+        const parentA = parentNode.a || 'Destinazione generica';
+        childDa = parentA === 'Destinazione generica' ? 'Partenza generica' : parentA;
       }
     } else {
       childDa = node.da || 'Cabina elettrica';
@@ -1289,6 +1273,7 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
         name: t.name,
         pressioneNodo: comp?.fillRate || 0,
         pressioneMinimaRichiesta: 50,
+        dislivelloGeodetico: t.dislivelloGeodetico || 0,
         da: t.da,
         a: t.a
       };
@@ -1313,7 +1298,8 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
       hasCover: false,
       cables: [],
       da: activeTratta.a || 'Quadro elettrico',
-      a: 'Destinazione generica'
+      a: 'Destinazione generica',
+      dislivelloGeodetico: 0
     };
     setState(prev => {
       const newList = [...prev.tratte, newTratta];
@@ -1377,7 +1363,8 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
       // Prima applica il cambio di valore
       let tempTratte = prev.tratte.map(t => {
         if (field === 'a' && t.parentId === tag) {
-          return { ...t, da: value };
+          const newDa = value === 'Destinazione generica' ? 'Partenza generica' : value;
+          return { ...t, da: newDa };
         }
         if (t.tag === tag) {
           const nt = { ...t, [field]: value } as TrattaProgetto;
@@ -1385,6 +1372,10 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
             const family = containersCatalog.find(f => f.id === value);
             nt.selectedSizeCode = family?.sizes[0]?.code || 'personalizzato';
             nt.containmentType = family?.installationType === 'cavidotto' ? 'cavidotto' : 'vista';
+            if (family && family.sectionType === 'circolare') {
+              nt.hasSeparator = false;
+              nt.hasCover = false;
+            }
           }
           if (field === 'lineQty') {
             nt.doubleLine = value > 1;
@@ -1728,7 +1719,7 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nome Tratta</label>
                   <input 
@@ -1745,6 +1736,16 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
                     min="1"
                     value={activeTratta.length}
                     onChange={e => updateTrattaField(activeTratta.tag, 'length', e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Dislivello +/- (m)</label>
+                  <input 
+                    type="number"
+                    value={activeTratta.dislivelloGeodetico !== undefined ? activeTratta.dislivelloGeodetico : ''}
+                    onChange={e => updateTrattaField(activeTratta.tag, 'dislivelloGeodetico', e.target.value === '' ? '' : (parseFloat(e.target.value) || 0))}
+                    placeholder="Salita + / Discesa -"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400"
                   />
                 </div>
@@ -1766,17 +1767,27 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 pb-4 border-b border-slate-100">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Partenza (DA)</label>
-                  <select 
-                    value={activeTratta.da || 'Partenza generica'}
-                    onChange={e => updateTrattaField(activeTratta.tag, 'da', e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                  >
-                    <option value="Cabina elettrica">Cabina elettrica</option>
-                    <option value="Contatore di energia">Contatore di energia</option>
-                    <option value="Quadro elettrico">Quadro elettrico</option>
-                    <option value="Scatola di derivazione">Scatola di derivazione</option>
-                    <option value="Partenza generica">Partenza generica</option>
-                  </select>
+                  {activeTratta.parentId !== null ? (
+                    <input 
+                      type="text"
+                      readOnly
+                      disabled
+                      value={activeTratta.da || 'Partenza generica'}
+                      className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-400 cursor-not-allowed opacity-80"
+                    />
+                  ) : (
+                    <select 
+                      value={activeTratta.da || 'Partenza generica'}
+                      onChange={e => updateTrattaField(activeTratta.tag, 'da', e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    >
+                      <option value="Cabina elettrica">Cabina elettrica</option>
+                      <option value="Contatore di energia">Contatore di energia</option>
+                      <option value="Quadro elettrico">Quadro elettrico</option>
+                      <option value="Scatola di derivazione">Scatola di derivazione</option>
+                      <option value="Partenza generica">Partenza generica</option>
+                    </select>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Arrivo (A)</label>
@@ -1863,16 +1874,18 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
               <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/60 text-xs font-semibold space-y-3 mb-4">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Opzioni e Accessori</span>
                 <div className="flex flex-wrap gap-6">
-                  <label className="flex items-center gap-1.5 cursor-pointer">
-                    <input 
-                      type="checkbox" 
-                      checked={activeTratta.hasSeparator} 
-                      onChange={e => updateTrattaField(activeTratta.tag, 'hasSeparator', e.target.checked)}
-                      className="rounded border-slate-350 text-amber-500 focus:ring-amber-400"
-                    />
-                    <span>Aggiungi Setto Separatore</span>
-                  </label>
-                  {selectedFamily?.sectionType === 'rettangolare' && (
+                  {(selectedFamily?.sectionType === 'rettangolare' || activeTratta.selectedFamilyId === 'personalizzato') && (
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={activeTratta.hasSeparator} 
+                        onChange={e => updateTrattaField(activeTratta.tag, 'hasSeparator', e.target.checked)}
+                        className="rounded border-slate-350 text-amber-500 focus:ring-amber-400"
+                      />
+                      <span>Aggiungi Setto Separatore</span>
+                    </label>
+                  )}
+                  {(selectedFamily?.sectionType === 'rettangolare' || activeTratta.selectedFamilyId === 'personalizzato') && (
                     <label className="flex items-center gap-1.5 cursor-pointer">
                       <input 
                         type="checkbox" 
@@ -2257,7 +2270,7 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
                     <td className="py-2.5 px-2 text-center font-mono">{formatNumber(t.length, 0)}</td>
                     <td className="py-2.5 px-2">
                       <div className="font-semibold text-slate-700">
-                        {t.containmentType === 'vista' ? 'A vista' : t.containmentType === 'cavidotto' ? 'Cavidotto' : 'Tubo "tazza"'}
+                        {t.containmentType === 'vista' ? 'A vista' : t.containmentType === 'cavidotto' ? 'Interrato' : 'Tubo "tazza"'}
                       </div>
                       <div className="text-[10px] text-slate-500">
                         {fam?.name} ({formatContainerSizeLabel(fam, sz, t)}) {N_lines > 1 ? `x ${N_lines} linee` : ''}
