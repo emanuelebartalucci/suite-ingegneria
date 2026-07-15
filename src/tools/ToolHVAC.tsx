@@ -340,6 +340,36 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
     return rooms.find(r => r.id === selectedRoomId) || null;
   }, [rooms, selectedRoomId]);
 
+  const visibleDoors = useMemo(() => {
+    if (!selectedRoom) return [];
+    
+    // Porte di proprietà del locale selezionato
+    const owned = selectedRoom.doors.map(d => ({
+      ...d,
+      isOwned: true,
+      ownerRoomId: selectedRoom.id,
+      displayAdjacentRoomId: d.adjacentRoomId
+    }));
+    
+    // Porte di altri locali che confinano con questo locale
+    const linked: any[] = [];
+    rooms.forEach(r => {
+      if (r.id === selectedRoom.id) return;
+      r.doors.forEach(d => {
+        if (d.adjacentRoomId === selectedRoom.id) {
+          linked.push({
+            ...d,
+            isOwned: false,
+            ownerRoomId: r.id,
+            displayAdjacentRoomId: r.id
+          });
+        }
+      });
+    });
+    
+    return [...owned, ...linked];
+  }, [selectedRoom, rooms]);
+
   // Calculations for each room (heat loads, airflows, leakages, reheaters)
   const roomCalculations = useMemo(() => {
     return rooms.map(room => {
@@ -374,6 +404,8 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
 
       let infiltrationFlow = 0;
       let exfiltrationFlow = 0;
+      
+      // 1. Porte di proprietà del locale
       room.doors.forEach(door => {
         const l = door.type === 'singola' 
           ? 5.1 
@@ -400,6 +432,32 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
         } else {
           exfiltrationFlow += flow;
         }
+      });
+
+      // 2. Porte di altri locali che confinano con questo locale (trafilamento simmetrico)
+      rooms.forEach(otherRoom => {
+        if (otherRoom.id === room.id) return;
+        otherRoom.doors.forEach(door => {
+          if (door.adjacentRoomId === room.id) {
+            const l = door.type === 'singola' 
+              ? 5.1 
+              : door.type === 'doppia' 
+                ? 5.8 
+                : (door.customDoorWidth !== undefined && door.customDoorHeight !== undefined)
+                  ? (num(door.customDoorWidth) + 2 * num(door.customDoorHeight))
+                  : (num(door.customLength) || 5.1);
+            const s = 0.002;
+            const alpha = num(door.customAlpha) || 0.85;
+            const dp = num(room.pressure_Pa) - num(otherRoom.pressure_Pa);
+            const flow = Math.ceil(l * s * alpha * 3600 * Math.sqrt(Math.abs(dp)));
+            
+            if (dp < 0) {
+              infiltrationFlow += flow;
+            } else {
+              exfiltrationFlow += flow;
+            }
+          }
+        });
       });
 
       // Calcolo trafilamento controsoffitto
@@ -2414,12 +2472,26 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                           </tr>
                         </thead>
                         <tbody>
-                          {selectedRoom.doors.map(door => {
-                            const isAdjacentRoom = door.adjacentRoomId && door.adjacentRoomId !== 'esterno' && door.adjacentRoomId !== 'altro';
-                            const isEsterno = door.adjacentRoomId === 'esterno' || !door.adjacentRoomId;
-                            const isAltro = door.adjacentRoomId === 'altro';
+                          {(() => {
+                            const ownedDoors = selectedRoom.doors.map(d => ({ ...d, ownerRoomId: selectedRoom.id, isOwned: true }));
+                            const incomingDoors = rooms.flatMap(r => 
+                              r.doors.filter(d => d.adjacentRoomId === selectedRoom.id).map(d => ({ ...d, ownerRoomId: r.id, isOwned: false }))
+                            );
+                            return [...ownedDoors, ...incomingDoors];
+                          })().map(door => {
+                            const isAdjacentRoom = door.isOwned
+                              ? (door.adjacentRoomId && door.adjacentRoomId !== 'esterno' && door.adjacentRoomId !== 'altro')
+                              : true;
+                            const isEsterno = door.isOwned
+                              ? (door.adjacentRoomId === 'esterno' || !door.adjacentRoomId)
+                              : false;
+                            const isAltro = door.isOwned
+                              ? (door.adjacentRoomId === 'altro')
+                              : false;
 
-                            const adjRoom = isAdjacentRoom ? rooms.find(r => r.id === door.adjacentRoomId) : null;
+                            const adjRoom = isAdjacentRoom 
+                              ? (door.isOwned ? rooms.find(r => r.id === door.adjacentRoomId) : rooms.find(r => r.id === door.ownerRoomId))
+                              : null;
                             const adjPressure = adjRoom 
                               ? num(adjRoom.pressure_Pa) 
                               : isEsterno 
@@ -2444,13 +2516,13 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                                   <input
                                     type="text"
                                     value={door.description}
-                                    onChange={e => handleUpdateDoor(selectedRoom.id, door.id, 'description', e.target.value)}
+                                    onChange={e => handleUpdateDoor(door.ownerRoomId, door.id, 'description', e.target.value)}
                                     className="w-full p-1 bg-slate-50 border border-slate-150 rounded-lg text-slate-800 text-[10px] mb-1"
                                     placeholder="Descrizione porta"
                                   />
                                   <select
                                     value={door.type}
-                                    onChange={e => handleUpdateDoor(selectedRoom.id, door.id, 'type', e.target.value)}
+                                    onChange={e => handleUpdateDoor(door.ownerRoomId, door.id, 'type', e.target.value)}
                                     className="w-full p-1 bg-slate-50 border border-slate-150 rounded-lg font-semibold cursor-pointer text-slate-700 text-[10px]"
                                   >
                                     <option value="singola">Singola (0.9x2.1m, perimetro 5.1m, spessore 2mm)</option>
@@ -2466,7 +2538,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                                           step="0.05"
                                           placeholder="0.9"
                                           value={door.customDoorWidth ?? ''}
-                                          onChange={e => handleUpdateDoor(selectedRoom.id, door.id, 'customDoorWidth', e.target.value === '' ? '' : Number(e.target.value))}
+                                          onChange={e => handleUpdateDoor(door.ownerRoomId, door.id, 'customDoorWidth', e.target.value === '' ? '' : Number(e.target.value))}
                                           className="w-full p-0.5 border border-slate-150 rounded text-slate-800 text-[9px] font-mono"
                                         />
                                       </div>
@@ -2477,7 +2549,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                                           step="0.05"
                                           placeholder="2.1"
                                           value={door.customDoorHeight ?? ''}
-                                          onChange={e => handleUpdateDoor(selectedRoom.id, door.id, 'customDoorHeight', e.target.value === '' ? '' : Number(e.target.value))}
+                                          onChange={e => handleUpdateDoor(door.ownerRoomId, door.id, 'customDoorHeight', e.target.value === '' ? '' : Number(e.target.value))}
                                           className="w-full p-0.5 border border-slate-150 rounded text-slate-800 text-[9px] font-mono"
                                         />
                                       </div>
@@ -2485,45 +2557,61 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                                   )}
                                 </td>
                                 <td className="py-2.5 pr-2">
-                                  <select
-                                    value={door.adjacentRoomId || 'esterno'}
-                                    onChange={e => {
-                                      const val = e.target.value;
-                                      const updates: any = { adjacentRoomId: val };
-                                      if (val === 'esterno') {
-                                        updates.adjacentPressure_Pa = 0;
-                                      } else if (val !== 'altro') {
-                                        const adj = rooms.find(r => r.id === val);
-                                        if (adj) {
-                                          updates.adjacentPressure_Pa = adj.pressure_Pa;
-                                        }
-                                      }
-                                      handleUpdateDoorFields(selectedRoom.id, door.id, updates);
-                                    }}
-                                    className="w-full p-1 bg-slate-50 border border-slate-150 rounded-lg font-semibold cursor-pointer text-slate-700 text-[10px] mb-1"
-                                  >
-                                    <option value="esterno">Esterno</option>
-                                    <option value="altro">Altro</option>
-                                    {rooms.filter(r => r.id !== selectedRoom.id).map(r => (
-                                      <option key={r.id} value={r.id}>
-                                        {r.code} - {r.description}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-[8px] text-slate-400 font-bold uppercase shrink-0">Pressione confine:</span>
-                                    <input
-                                      type="number"
-                                      step="any"
-                                      value={isAdjacentRoom ? adjPressure : isEsterno ? 0 : door.adjacentPressure_Pa}
-                                      disabled={isAdjacentRoom || isEsterno}
-                                      onChange={e => handleUpdateDoor(selectedRoom.id, door.id, 'adjacentPressure_Pa', e.target.value === '' ? '' : Number(e.target.value))}
-                                      className={`w-12 p-0.5 border border-slate-150 rounded font-mono text-center text-[10px] ${
-                                        (isAdjacentRoom || isEsterno) ? 'bg-slate-100 text-slate-500' : 'bg-slate-50 text-slate-800'
-                                      }`}
-                                    />
-                                    <span className="text-[8px] text-slate-400 font-bold">Pa</span>
-                                  </div>
+                                  {door.isOwned ? (
+                                    <>
+                                      <select
+                                        value={door.adjacentRoomId || 'esterno'}
+                                        onChange={e => {
+                                          const val = e.target.value;
+                                          const updates: any = { adjacentRoomId: val };
+                                          if (val === 'esterno') {
+                                            updates.adjacentPressure_Pa = 0;
+                                          } else if (val !== 'altro') {
+                                            const adj = rooms.find(r => r.id === val);
+                                            if (adj) {
+                                              updates.adjacentPressure_Pa = adj.pressure_Pa;
+                                            }
+                                          }
+                                          handleUpdateDoorFields(selectedRoom.id, door.id, updates);
+                                        }}
+                                        className="w-full p-1 bg-slate-50 border border-slate-150 rounded-lg font-semibold cursor-pointer text-slate-700 text-[10px] mb-1"
+                                      >
+                                        <option value="esterno">Esterno</option>
+                                        <option value="altro">Altro</option>
+                                        {rooms.filter(r => r.id !== selectedRoom.id).map(r => (
+                                          <option key={r.id} value={r.id}>
+                                            {r.code} - {r.description}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-[8px] text-slate-400 font-bold uppercase shrink-0">Pressione confine:</span>
+                                        <input
+                                          type="number"
+                                          step="any"
+                                          value={isAdjacentRoom ? adjPressure : isEsterno ? 0 : door.adjacentPressure_Pa}
+                                          disabled={isAdjacentRoom || isEsterno}
+                                          onChange={e => handleUpdateDoor(selectedRoom.id, door.id, 'adjacentPressure_Pa', e.target.value === '' ? '' : Number(e.target.value))}
+                                          className={`w-12 p-0.5 border border-slate-150 rounded font-mono text-center text-[10px] ${
+                                            (isAdjacentRoom || isEsterno) ? 'bg-slate-100 text-slate-500' : 'bg-slate-50 text-slate-800'
+                                          }`}
+                                        />
+                                        <span className="text-[8px] text-slate-400 font-bold">Pa</span>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="p-2 bg-slate-100/60 rounded-lg border border-slate-200/80 space-y-1">
+                                      <div className="text-[9px] font-bold text-slate-700">
+                                        Locale: <span className="font-mono">{adjRoom?.code || 'Sconosciuto'}</span>
+                                      </div>
+                                      <div className="text-[8px] text-slate-450 font-bold uppercase">
+                                        Pressione: <span className="font-mono text-slate-600">{adjPressure} Pa</span>
+                                      </div>
+                                      <div className="text-[8px] text-orange-600 font-black italic">
+                                        Definita in {adjRoom?.code}
+                                      </div>
+                                    </div>
+                                  )}
                                 </td>
                                 <td className="py-2.5 pr-2">
                                   <div className="font-bold font-mono text-slate-700 text-[10px] mb-1">
@@ -2544,7 +2632,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                                 </td>
                                 <td className="py-2.5 text-right print:hidden">
                                   <button
-                                    onClick={() => handleRemoveDoor(selectedRoom.id, door.id)}
+                                    onClick={() => handleRemoveDoor(door.ownerRoomId, door.id)}
                                     className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer print:hidden"
                                     title="Rimuovi porta"
                                   >
@@ -2554,7 +2642,13 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                               </tr>
                             );
                           })}
-                          {selectedRoom.doors.length === 0 && (
+                          {(() => {
+                            const ownedDoors = selectedRoom.doors;
+                            const incomingDoors = rooms.flatMap(r => 
+                              r.doors.filter(d => d.adjacentRoomId === selectedRoom.id)
+                            );
+                            return [...ownedDoors, ...incomingDoors].length === 0;
+                          })() && (
                             <tr>
                               <td colSpan={5} className="text-center py-4 text-slate-450 italic">
                                 Nessuna fessura porta configurata per questo locale.
@@ -2565,8 +2659,6 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                       </table>
                     </div>
                   </div>
-
-                  {/* Mass balance details */}
                   {(() => {
                     const rCalc = roomCalculations.find(c => c.room.id === selectedRoom.id);
                     if (!rCalc) return null;
