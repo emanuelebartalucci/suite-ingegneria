@@ -3,7 +3,7 @@ import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
 import { formatNumber } from '../utils/format';
 import TopologicalTree, { TrattoNode } from '../components/TopologicalTree';
-import { PIPE_CATALOG, getExternalDiameter } from '../data/pipeCatalog';
+import { PIPE_CATALOG, getExternalDiameter, PipeMaterial } from '../data/pipeCatalog';
 import { getGasEquivalentLength, GAS_FITTINGS_PRESETS } from '../data/gasEquivalentLengths';
 import { IconPlus, IconTrash, IconCopy, IconWind } from '../components/Icons';
 
@@ -11,6 +11,8 @@ interface ToolDimensionamentoGasProps {
   projectData: ProjectData;
   setProjectData: (data: any) => void;
   setAppMode: (mode: string) => void;
+  pipeCatalog?: Record<string, PipeMaterial>;
+  gasEquivalentLengths?: Record<string, Record<number, number>>;
 }
 
 interface UtilityItem {
@@ -63,8 +65,11 @@ const GAS_PRESETS: GasPreset[] = [
 export function ToolDimensionamentoGas({
   projectData,
   setProjectData,
-  setAppMode
+  setAppMode,
+  pipeCatalog,
+  gasEquivalentLengths
 }: ToolDimensionamentoGasProps) {
+  const catalog = pipeCatalog || PIPE_CATALOG;
   // --- Parametri Generali ---
   const [gasType, setGasType] = useState<string>('metano');
   const [customRho0, setCustomRho0] = useState<number | string>(0.717);
@@ -241,9 +246,9 @@ export function ToolDimensionamentoGas({
         dInt = Number(b.dIntManual) || 50;
         dExt = Number(b.dExtManual) || 60;
         roughness = Number(b.roughnessManual) || 0.1;
-      } else if (PIPE_CATALOG[b.material]) {
-        roughness = PIPE_CATALOG[b.material].roughness;
-        const matSpecs = PIPE_CATALOG[b.material].specs[b.DN];
+      } else if (catalog[b.material]) {
+        roughness = catalog[b.material].roughness;
+        const matSpecs = catalog[b.material].specs[b.DN];
         if (matSpecs) {
           dInt = matSpecs[b.PN] || Number(b.DN);
           dExt = getExternalDiameter(b.material, b.DN, dInt);
@@ -295,11 +300,11 @@ export function ToolDimensionamentoGas({
         const kTot = nV * 10 + nG * 1.5 + nTD * 0.9 + nTL * 2.0 + nR * 0.35;
         lEq = lambda > 0 ? (kTot * dIntM) / lambda : 0;
       } else {
-        lEq = nV * getGasEquivalentLength('valvola_sfera', dInt) +
-              nG * getGasEquivalentLength('angolo_90', dInt) +
-              nTD * getGasEquivalentLength('tee_diretto', dInt) +
-              nTL * getGasEquivalentLength('tee_laterale', dInt) +
-              nR * getGasEquivalentLength('nipplo_riduzione', dInt);
+        lEq = nV * getGasEquivalentLength('valvola_sfera', dInt, gasEquivalentLengths) +
+              nG * getGasEquivalentLength('angolo_90', dInt, gasEquivalentLengths) +
+              nTD * getGasEquivalentLength('tee_diretto', dInt, gasEquivalentLengths) +
+              nTL * getGasEquivalentLength('tee_laterale', dInt, gasEquivalentLengths) +
+              nR * getGasEquivalentLength('nipplo_riduzione', dInt, gasEquivalentLengths);
       }
 
       const pConcFinalKg2 = Math.pow(pStartKg, 2) - lEq * Rt * Math.pow(qN_s, 2);
@@ -491,9 +496,9 @@ export function ToolDimensionamentoGas({
   const addBranch = () => {
     const defaultParent = branches[branches.length - 1]?.id || null;
     const newId = branches.length > 0 ? Math.max(...branches.map(b => b.id)) + 1 : 1;
-    const defaultMat = Object.keys(PIPE_CATALOG)[0];
-    const defaultDN = Object.keys(PIPE_CATALOG[defaultMat].specs)[0];
-    const defaultPN = Object.keys(PIPE_CATALOG[defaultMat].specs[defaultDN])[0];
+    const defaultMat = Object.keys(catalog)[0];
+    const defaultDN = Object.keys(catalog[defaultMat].specs)[0];
+    const defaultPN = Object.keys(catalog[defaultMat].specs[defaultDN])[0];
     setBranches([...branches, {
       id: newId,
       parentId: defaultParent,
@@ -520,15 +525,15 @@ export function ToolDimensionamentoGas({
       if (b.id === id) {
         const updated = { ...b, [field]: val } as BranchItem;
         
-        if (field === 'material' && val !== 'manuale' && PIPE_CATALOG[val]) {
-          const firstDN = Object.keys(PIPE_CATALOG[val].specs)[0];
-          const firstPN = Object.keys(PIPE_CATALOG[val].specs[firstDN])[0];
+        if (field === 'material' && val !== 'manuale' && catalog[val]) {
+          const firstDN = Object.keys(catalog[val].specs)[0];
+          const firstPN = Object.keys(catalog[val].specs[firstDN])[0];
           updated.DN = firstDN;
           updated.PN = firstPN;
-        } else if (field === 'DN' && updated.material !== 'manuale' && PIPE_CATALOG[updated.material]) {
+        } else if (field === 'DN' && updated.material !== 'manuale' && catalog[updated.material]) {
           let currentPN = updated.PN;
-          if (!PIPE_CATALOG[updated.material].specs[val][currentPN]) {
-            currentPN = Object.keys(PIPE_CATALOG[updated.material].specs[val])[0];
+          if (!catalog[updated.material].specs[val][currentPN]) {
+            currentPN = Object.keys(catalog[updated.material].specs[val])[0];
           }
           updated.PN = currentPN;
         }
@@ -634,7 +639,7 @@ export function ToolDimensionamentoGas({
       return ` (K = ${kValue})`;
     } else {
       const dIntVal = selectedBranchFull.dInt || 50;
-      const eqLen = getGasEquivalentLength(type, dIntVal);
+      const eqLen = getGasEquivalentLength(type, dIntVal, gasEquivalentLengths);
       return ` (da tab: ${formatNumber(eqLen, 1)}m)`;
     }
   };
@@ -659,23 +664,23 @@ export function ToolDimensionamentoGas({
           <tbody>
             <tr className="border-b border-slate-100 hover:bg-slate-100/50">
               <td className="py-0.5">Valvola a sfera</td>
-              <td className="py-0.5 text-right font-bold">{formatNumber(getGasEquivalentLength('valvola_sfera', selectedBranchFull.dInt), 1)} m</td>
+              <td className="py-0.5 text-right font-bold">{formatNumber(getGasEquivalentLength('valvola_sfera', selectedBranchFull.dInt, gasEquivalentLengths), 1)} m</td>
             </tr>
             <tr className="border-b border-slate-100 hover:bg-slate-100/50">
               <td className="py-0.5">Gomito 90°</td>
-              <td className="py-0.5 text-right font-bold">{formatNumber(getGasEquivalentLength('angolo_90', selectedBranchFull.dInt), 1)} m</td>
+              <td className="py-0.5 text-right font-bold">{formatNumber(getGasEquivalentLength('angolo_90', selectedBranchFull.dInt, gasEquivalentLengths), 1)} m</td>
             </tr>
             <tr className="border-b border-slate-100 hover:bg-slate-100/50">
               <td className="py-0.5">T pass. diretto</td>
-              <td className="py-0.5 text-right font-bold">{formatNumber(getGasEquivalentLength('tee_diretto', selectedBranchFull.dInt), 1)} m</td>
+              <td className="py-0.5 text-right font-bold">{formatNumber(getGasEquivalentLength('tee_diretto', selectedBranchFull.dInt, gasEquivalentLengths), 1)} m</td>
             </tr>
             <tr className="border-b border-slate-100 hover:bg-slate-100/50">
               <td className="py-0.5">T pass. laterale</td>
-              <td className="py-0.5 text-right font-bold">{formatNumber(getGasEquivalentLength('tee_laterale', selectedBranchFull.dInt), 1)} m</td>
+              <td className="py-0.5 text-right font-bold">{formatNumber(getGasEquivalentLength('tee_laterale', selectedBranchFull.dInt, gasEquivalentLengths), 1)} m</td>
             </tr>
             <tr className="hover:bg-slate-100/50">
               <td className="py-0.5">Riduzione/Nipplo</td>
-              <td className="py-0.5 text-right font-bold">{formatNumber(getGasEquivalentLength('nipplo_riduzione', selectedBranchFull.dInt), 1)} m</td>
+              <td className="py-0.5 text-right font-bold">{formatNumber(getGasEquivalentLength('nipplo_riduzione', selectedBranchFull.dInt, gasEquivalentLengths), 1)} m</td>
             </tr>
           </tbody>
         </table>
@@ -941,7 +946,7 @@ export function ToolDimensionamentoGas({
                         className="bg-transparent font-semibold text-slate-700 focus:outline-none cursor-pointer"
                         onClick={e => e.stopPropagation()}
                       >
-                        {Object.keys(PIPE_CATALOG).map(m => (
+                        {Object.keys(catalog).map(m => (
                           <option key={m} value={m}>{m}</option>
                         ))}
                         <option value="manuale">Manuale...</option>
@@ -958,7 +963,7 @@ export function ToolDimensionamentoGas({
                             className="bg-transparent font-mono text-slate-700 focus:outline-none cursor-pointer"
                             onClick={e => e.stopPropagation()}
                           >
-                            {Object.keys(PIPE_CATALOG[b.material]?.specs || {}).map(dn => (
+                            {Object.keys(catalog[b.material]?.specs || {}).map(dn => (
                               <option key={dn} value={dn}>DN{dn}</option>
                             ))}
                           </select>
@@ -968,7 +973,7 @@ export function ToolDimensionamentoGas({
                             className="bg-transparent font-mono text-slate-700 focus:outline-none cursor-pointer"
                             onClick={e => e.stopPropagation()}
                           >
-                            {Object.keys(PIPE_CATALOG[b.material]?.specs[b.DN] || {}).map(pn => (
+                            {Object.keys(catalog[b.material]?.specs[b.DN] || {}).map(pn => (
                               <option key={pn} value={pn}>{pn}</option>
                             ))}
                           </select>

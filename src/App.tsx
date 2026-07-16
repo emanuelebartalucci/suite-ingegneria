@@ -17,8 +17,18 @@ import { ToolPompeFognarie } from './tools/ToolPompeFognarie';
 import { ToolAspiratore } from './tools/ToolAspiratore';
 import { ToolDimensionamentoCanali } from './tools/ToolDimensionamentoCanali';
 import { DatabaseManager } from './components/DatabaseManager';
-import { seedThermodynamicCatalog } from './utils/thermodynamicDbHelper';
-import { seedElectricalCatalog } from './utils/electricalDbHelper';
+import { 
+    seedThermodynamicCatalog,
+    fetchPipeCatalog,
+    fetchEquivalentLengths,
+    fetchGasEquivalentLengths,
+    fetchClimateData
+} from './utils/thermodynamicDbHelper';
+import { PipeMaterial } from './data/pipeCatalog';
+import { EquivalentLengthPiece } from './data/equivalentLengths';
+import { ProvinceClimateData } from './data/climateData';
+import { seedElectricalCatalog, fetchElectricalCables, fetchElectricalContainers } from './utils/electricalDbHelper';
+import { CableProduct, ContainerFamily } from './data/electricalDatabase';
 import { IconWaves, IconFlame, IconThermometer, IconArrowUp, IconWind, IconPump, IconImpeller } from './components/Icons';
 import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap, Scale, Fan, Layers } from 'lucide-react';
 
@@ -121,6 +131,62 @@ export default function App() {
     const [adminActiveTab, setAdminActiveTab] = useState<'risorse' | 'ruoli'>('risorse');
     const [selectedEmailForAdmin, setSelectedEmailForAdmin] = useState<string>('');
 
+    // Stati per database termodinamico centralizzato (cache)
+    const [pipeCatalog, setPipeCatalog] = useState<Record<string, PipeMaterial> | null>(null);
+    const [equivalentLengths, setEquivalentLengths] = useState<Record<string, EquivalentLengthPiece> | null>(null);
+    const [gasEquivalentLengths, setGasEquivalentLengths] = useState<Record<string, Record<number, number>> | null>(null);
+    const [climateData, setClimateData] = useState<ProvinceClimateData[] | null>(null);
+    const [loadingThermoDbs, setLoadingThermoDbs] = useState<boolean>(false);
+
+    const loadThermodynamicDbs = async (force = false) => {
+        if (!force && pipeCatalog && equivalentLengths && gasEquivalentLengths && climateData) {
+            return; // Già caricati
+        }
+        setLoadingThermoDbs(true);
+        const isDemo = isFirebaseMock || (projectData && (projectData as any).isDemo);
+        try {
+            const [pipes, eq, gas, climate] = await Promise.all([
+                fetchPipeCatalog(db, isDemo),
+                fetchEquivalentLengths(db, isDemo),
+                fetchGasEquivalentLengths(db, isDemo),
+                fetchClimateData(db, isDemo)
+            ]);
+            setPipeCatalog(pipes);
+            setEquivalentLengths(eq);
+            setGasEquivalentLengths(gas);
+            setClimateData(climate);
+        } catch (e) {
+            console.error("Errore nel caricamento del database termoidraulico:", e);
+        } finally {
+            setLoadingThermoDbs(false);
+        }
+    };
+
+    // Stati per database elettrico centralizzato (cache)
+    const [cablesCatalog, setCablesCatalog] = useState<CableProduct[] | null>(null);
+    const [containersCatalog, setContainersCatalog] = useState<ContainerFamily[] | null>(null);
+    const [loadingElectricalDbs, setLoadingElectricalDbs] = useState<boolean>(false);
+
+    const loadElectricalDbs = async (force = false) => {
+        if (!force && cablesCatalog && containersCatalog) {
+            return; // Già caricati
+        }
+        setLoadingElectricalDbs(true);
+        const isDemo = isFirebaseMock || (projectData && (projectData as any).isDemo);
+        try {
+            const [cables, containers] = await Promise.all([
+                fetchElectricalCables(db, isDemo),
+                fetchElectricalContainers(db, isDemo)
+            ]);
+            setCablesCatalog(cables);
+            setContainersCatalog(containers);
+        } catch (e) {
+            console.error("Errore nel caricamento del database elettrico:", e);
+        } finally {
+            setLoadingElectricalDbs(false);
+        }
+    };
+
     const nonAdminMembers = useMemo(() => {
         return registryList.filter(m => m.role !== 'admin');
     }, [registryList]);
@@ -129,6 +195,21 @@ export default function App() {
     const [toasts, setToasts] = useState<ToastItem[]>([]);
     const [confirmModal, setConfirmModal] = useState<ConfirmModalState>({ visible: false, message: '', title: '', resolve: null });
     const [alertModal, setAlertModal] = useState<AlertModalState>({ visible: false, message: '', title: '', resolve: null });
+
+    // Caricamento automatico al cambio di tool
+    useEffect(() => {
+        const thermoModes = ['idraulico', 'termico', 'dispersione', 'verifica_linee', 'gas', 'calcoli_vari', 'hvac', 'database_termo'];
+        if (thermoModes.includes(appMode)) {
+            loadThermodynamicDbs();
+        }
+    }, [appMode, projectData]);
+
+    useEffect(() => {
+        const electricalModes = ['calcoli_elettrici', 'dimensionamento_canali', 'database_elettrico'];
+        if (electricalModes.includes(appMode)) {
+            loadElectricalDbs();
+        }
+    }, [appMode, projectData]);
 
     // Seed automatico dell'anagrafica dopo il login (evita errore di autorizzazione a sessione non attiva)
     useEffect(() => {
@@ -746,19 +827,19 @@ export default function App() {
                     </div>
                 )}
 
-                {appMode === 'idraulico' && <ToolProfiloIdraulico projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
-                {appMode === 'termico' && <ToolCarichiTermici projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
-                {appMode === 'dispersione' && <ToolDispersione projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
-                {appMode === 'verifica_linee' && <ToolVerificaLinee projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
-                {appMode === 'gas' && <ToolDimensionamentoGas projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
-                {appMode === 'calcoli_vari' && <ToolCalcoliVari projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
+                {appMode === 'idraulico' && <ToolProfiloIdraulico projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} pipeCatalog={pipeCatalog || undefined} />}
+                {appMode === 'termico' && <ToolCarichiTermici projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} pipeCatalog={pipeCatalog || undefined} />}
+                {appMode === 'dispersione' && <ToolDispersione projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} pipeCatalog={pipeCatalog || undefined} />}
+                {appMode === 'verifica_linee' && <ToolVerificaLinee projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} pipeCatalog={pipeCatalog || undefined} equivalentLengths={equivalentLengths || undefined} />}
+                {appMode === 'gas' && <ToolDimensionamentoGas projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} pipeCatalog={pipeCatalog || undefined} gasEquivalentLengths={gasEquivalentLengths || undefined} />}
+                {appMode === 'calcoli_vari' && <ToolCalcoliVari projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} pipeCatalog={pipeCatalog || undefined} />}
                 {appMode === 'calcoli_elettrici' && <ToolCalcoliElettrici projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
-                {appMode === 'hvac' && <ToolHVAC projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
+                {appMode === 'hvac' && <ToolHVAC projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} climateData={climateData || undefined} />}
                 {appMode === 'pompe_fognarie' && <ToolPompeFognarie projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 {appMode === 'aspiratore' && <ToolAspiratore projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
-                {appMode === 'dimensionamento_canali' && <ToolDimensionamentoCanali projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
-                {appMode === 'database_termo' && <DatabaseManager type="termo" setAppMode={setAppMode} projectData={projectData} />}
-                {appMode === 'database_elettrico' && <DatabaseManager type="elettrico" setAppMode={setAppMode} projectData={projectData} />}
+                {appMode === 'dimensionamento_canali' && <ToolDimensionamentoCanali projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} cablesCatalog={cablesCatalog || undefined} containersCatalog={containersCatalog || undefined} />}
+                {appMode === 'database_termo' && <DatabaseManager type="termo" setAppMode={setAppMode} projectData={projectData} pipeCatalog={pipeCatalog || undefined} equivalentLengths={equivalentLengths || undefined} gasEquivalentLengths={gasEquivalentLengths || undefined} climateData={climateData || undefined} onDatabaseChange={() => loadThermodynamicDbs(true)} />}
+                {appMode === 'database_elettrico' && <DatabaseManager type="elettrico" setAppMode={setAppMode} projectData={projectData} cablesCatalog={cablesCatalog || undefined} containersCatalog={containersCatalog || undefined} onDatabaseChange={() => loadElectricalDbs(true)} />}
             </div>
 
             {/* Footer con firma discreta, invisibile in stampa */}

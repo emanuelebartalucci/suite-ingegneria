@@ -3,13 +3,14 @@ import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
 import { Scale, Ruler, Database, Wind, Printer, Waves, Clock, Droplet } from 'lucide-react';
 import { BEAM_CATALOG } from '../data/beamCatalog';
-import { PIPE_CATALOG, getExternalDiameter } from '../data/pipeCatalog';
+import { PIPE_CATALOG, getExternalDiameter, PipeMaterial } from '../data/pipeCatalog';
 import { formatNumber } from '../utils/format';
 
 interface ToolCalcoliVariProps {
   projectData: ProjectData;
   setProjectData: (data: any) => void;
   setAppMode: (mode: string) => void;
+  pipeCatalog?: Record<string, PipeMaterial>;
 }
 
 interface CalcoliVariData {
@@ -437,7 +438,8 @@ const MATERIAL_PROPERTIES = {
   'Cemento': { name: 'Cemento', E: 30000, sigma: 2.0, rho: 2400 }
 };
 
-export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: ToolCalcoliVariProps) {
+export function ToolCalcoliVari({ projectData, setProjectData, setAppMode, pipeCatalog }: ToolCalcoliVariProps) {
+  const catalog = pipeCatalog || PIPE_CATALOG;
   const [data, setData] = useState<CalcoliVariData>(defaultData);
 
   const traviLVal = parseFloat(data.traviL) || 0;
@@ -1996,7 +1998,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                         value={data.appoggiMateriale}
                         onChange={e => {
                           const mat = e.target.value as any;
-                          const inCatalog = !!PIPE_CATALOG[mat];
+                          const inCatalog = !!catalog[mat];
                           setData(prev => {
                             const updated = {
                               ...prev,
@@ -2004,7 +2006,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                               appoggiUsaCatalog: inCatalog
                             };
                             if (inCatalog) {
-                              const specs = PIPE_CATALOG[mat].specs;
+                              const specs = catalog[mat].specs;
                               const dnList = Object.keys(specs);
                               if (dnList.length > 0) {
                                 const dn = dnList[0];
@@ -2045,7 +2047,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                     </div>
                   </div>
 
-                  {!!PIPE_CATALOG[data.appoggiMateriale] && (
+                  {!!catalog[data.appoggiMateriale] && (
                     <div className="flex items-center gap-2 mb-2 ml-1">
                       <input
                         type="checkbox"
@@ -2057,7 +2059,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                             const updated = { ...prev, appoggiUsaCatalog: val };
                             if (val) {
                               const mat = prev.appoggiMateriale;
-                              const specs = PIPE_CATALOG[mat].specs;
+                              const specs = catalog[mat].specs;
                               const dn = prev.appoggiDN || Object.keys(specs)[0];
                               const pn = prev.appoggiPN || Object.keys(specs[dn] || {})[0];
                               
@@ -2082,7 +2084,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                     </div>
                   )}
 
-                  {data.appoggiUsaCatalog && PIPE_CATALOG[data.appoggiMateriale] ? (
+                  {data.appoggiUsaCatalog && catalog[data.appoggiMateriale] ? (
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1 ml-1">Diametro Nominale (DN)</label>
@@ -2092,7 +2094,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                             const dn = e.target.value;
                             setData(prev => {
                               const mat = prev.appoggiMateriale;
-                              const specs = PIPE_CATALOG[mat].specs;
+                              const specs = catalog[mat].specs;
                               let pn = prev.appoggiPN;
                               if (!specs[dn] || !specs[dn][pn]) {
                                 pn = Object.keys(specs[dn] || {})[0] || '';
@@ -2113,7 +2115,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                           }}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
                         >
-                          {Object.keys(PIPE_CATALOG[data.appoggiMateriale].specs).map(dn => (
+                          {Object.keys(catalog[data.appoggiMateriale].specs).map(dn => (
                             <option key={dn} value={dn}>DN {dn}</option>
                           ))}
                         </select>
@@ -2126,7 +2128,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                             const pn = e.target.value;
                             setData(prev => {
                               const mat = prev.appoggiMateriale;
-                              const specs = PIPE_CATALOG[mat].specs;
+                              const specs = catalog[mat].specs;
                               const dn = prev.appoggiDN;
                               
                               const dIntMm = specs[dn][pn];
@@ -2143,7 +2145,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode }: Too
                           }}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
                         >
-                          {Object.keys(PIPE_CATALOG[data.appoggiMateriale].specs[data.appoggiDN] || {}).map(pn => (
+                          {Object.keys(catalog[data.appoggiMateriale].specs[data.appoggiDN] || {}).map(pn => (
                             <option key={pn} value={pn}>{pn}</option>
                           ))}
                         </select>

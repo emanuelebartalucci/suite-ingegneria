@@ -5,8 +5,8 @@ import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
 import { formatNumber } from '../utils/format';
 import TopologicalTree, { TrattoNode } from '../components/TopologicalTree';
-import { PIPE_CATALOG, INSULATION_CATALOG, getExternalDiameter } from '../data/pipeCatalog';
-import { getEquivalentLength } from '../data/equivalentLengths';
+import { PIPE_CATALOG, INSULATION_CATALOG, getExternalDiameter, PipeMaterial } from '../data/pipeCatalog';
+import { getEquivalentLength, EquivalentLengthPiece } from '../data/equivalentLengths';
 import { 
   IconArrowUp, 
   IconPlus, 
@@ -18,6 +18,8 @@ interface ToolVerificaLineeProps {
   projectData: ProjectData;
   setProjectData: (data: any) => void;
   setAppMode: (mode: string) => void;
+  pipeCatalog?: Record<string, PipeMaterial>;
+  equivalentLengths?: Record<string, EquivalentLengthPiece>;
 }
 
 export interface PerditaAggiuntiva {
@@ -550,7 +552,8 @@ function SVGGradienteSovrapposto({ tratto }: SVGGradienteSovrappostoProps) {
   );
 }
 
-export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: ToolVerificaLineeProps) {
+export function ToolVerificaLinee({ projectData, setProjectData, setAppMode, pipeCatalog, equivalentLengths }: ToolVerificaLineeProps) {
+    const catalog = pipeCatalog || PIPE_CATALOG;
     const [glycolEtPercent, setGlycolEtPercent] = useState<number | ''>(0); // %
     const [glycolPrPercent, setGlycolPrPercent] = useState<number | ''>(0); // %
     const [tratti, setTratti] = useState<TrattoLine[]>([]);
@@ -709,10 +712,10 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             if (t.material === 'manuale') {
                 d_int = Number(t.D) || 50;
                 roughness = Number(t.roughness) || 0.02;
-            } else if (PIPE_CATALOG[t.material]) {
-                const dnSpecs = PIPE_CATALOG[t.material].specs[t.DN];
+            } else if (catalog[t.material]) {
+                const dnSpecs = catalog[t.material].specs[t.DN];
                 if (dnSpecs) d_int = dnSpecs[t.PN] || 50;
-                roughness = PIPE_CATALOG[t.material].roughness;
+                roughness = catalog[t.material].roughness;
             }
 
             const isoType   = t.isoType || 'pur';
@@ -738,10 +741,10 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             const roughnessRel = d_int > 0 ? (roughness / d_int) : 0;
             const lambda       = solveColebrookWhite(Re, roughnessRel);
 
-            const leq_valvola   = getEquivalentLength('valvola_diaframma', t.DN);
-            const leq_riduzione = getEquivalentLength('riduzione', t.DN);
-            const leq_curva     = getEquivalentLength('curva_d', t.DN);
-            const leq_tee       = getEquivalentLength('innesto_t', t.DN);
+            const leq_valvola   = getEquivalentLength('valvola_diaframma', t.DN, equivalentLengths);
+            const leq_riduzione = getEquivalentLength('riduzione', t.DN, equivalentLengths);
+            const leq_curva     = getEquivalentLength('curva_d', t.DN, equivalentLengths);
+            const leq_tee       = getEquivalentLength('innesto_t', t.DN, equivalentLengths);
             const leq_tot = (Number(t.n_valvole)  || 0) * leq_valvola
                           + (Number(t.n_riduzioni) || 0) * leq_riduzione
                           + (Number(t.n_curve)     || 0) * leq_curva
@@ -821,8 +824,8 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
 
             // Calcolo termico
             let d_ext = d_int + 10;
-            if (t.material && t.DN && PIPE_CATALOG[t.material]) {
-                const specs = PIPE_CATALOG[t.material].specs[t.DN];
+            if (t.material && t.DN && catalog[t.material]) {
+                const specs = catalog[t.material].specs[t.DN];
                 if (specs) d_ext = getExternalDiameter(t.material, t.DN, specs[t.PN] || d_int);
             } else if (t.D) { d_ext = Number(t.D) + 10; }
 
@@ -830,7 +833,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             const r_ext_m = d_ext / 2000;
             const s_iso_m = activeIsoThick / 1000;
             const r_iso_m = r_ext_m + s_iso_m;
-            const lp = (PIPE_CATALOG[t.material] && PIPE_CATALOG[t.material].lambda) || 50.0;
+            const lp = (catalog[t.material] && catalog[t.material].lambda) || 50.0;
             const R_int  = d_int_m > 0 ? 1/(1163*d_int_m) : 0;
             const R_pipe = r_int_m > 0 ? Math.log(r_ext_m/r_int_m)/(2*lp) : 0;
             let R_iso = 0;
@@ -1100,9 +1103,9 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
             tag: `L${newId}`, 
             name: `Linea Tratto ${newId}`, 
             portata: parent ? parent.portata : '', 
-            material: parent ? parent.material : Object.keys(PIPE_CATALOG)[0], 
-            DN: parent ? parent.DN : Object.keys(PIPE_CATALOG[Object.keys(PIPE_CATALOG)[0]].specs)[0], 
-            PN: parent ? parent.PN : Object.keys(PIPE_CATALOG[Object.keys(PIPE_CATALOG)[0]].specs[Object.keys(PIPE_CATALOG[Object.keys(PIPE_CATALOG)[0]].specs)[0]])[0], 
+            material: parent ? parent.material : Object.keys(catalog)[0], 
+            DN: parent ? parent.DN : Object.keys(catalog[Object.keys(catalog)[0]].specs)[0], 
+            PN: parent ? parent.PN : Object.keys(catalog[Object.keys(catalog)[0]].specs[Object.keys(catalog[Object.keys(catalog)[0]].specs)[0]])[0], 
             length: '', 
             n_valvole: 0, 
             n_riduzioni: 0, 
@@ -1205,14 +1208,14 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                 }
                 
                 if (field === 'material' && val !== 'manuale') {
-                    const firstDN = Object.keys(PIPE_CATALOG[val].specs)[0];
-                    const firstPN = Object.keys(PIPE_CATALOG[val].specs[firstDN])[0];
+                    const firstDN = Object.keys(catalog[val].specs)[0];
+                    const firstPN = Object.keys(catalog[val].specs[firstDN])[0];
                     updated.DN = firstDN; updated.PN = firstPN;
                 }
                 else if (field === 'DN' && updated.material !== 'manuale') {
                     let currentPN = updated.PN;
-                    if (!PIPE_CATALOG[updated.material].specs[val][currentPN]) {
-                        currentPN = Object.keys(PIPE_CATALOG[updated.material].specs[val])[0];
+                    if (!catalog[updated.material].specs[val][currentPN]) {
+                        currentPN = Object.keys(catalog[updated.material].specs[val])[0];
                     }
                     updated.PN = currentPN;
                 }
@@ -2126,7 +2129,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                     className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-semibold text-slate-800 focus:border-brand-500 focus:outline-none cursor-pointer"
                                                 >
                                                     <option value="manuale">Manuale...</option>
-                                                    {Object.keys(PIPE_CATALOG).map(m => <option key={m} value={m}>{m}</option>)}
+                                                    {Object.keys(catalog).map(m => <option key={m} value={m}>{m}</option>)}
                                                 </select>
                                             </div>
                                         </div>
@@ -2140,7 +2143,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                         onChange={e => updateTratto(activeTratto.id, 'DN', e.target.value)} 
                                                         className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-semibold text-slate-800 focus:border-brand-500 focus:outline-none cursor-pointer"
                                                     >
-                                                        {Object.keys(PIPE_CATALOG[activeTratto.material]?.specs || {}).map(dn => <option key={dn} value={dn}>DN{dn}</option>)}
+                                                        {Object.keys(catalog[activeTratto.material]?.specs || {}).map(dn => <option key={dn} value={dn}>DN{dn}</option>)}
                                                     </select>
                                                 </div>
                                                 <div>
@@ -2150,7 +2153,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode }: T
                                                         onChange={e => updateTratto(activeTratto.id, 'PN', e.target.value)} 
                                                         className="w-full text-xs p-1.5 border border-slate-300 rounded bg-white font-semibold text-slate-800 focus:border-brand-500 focus:outline-none cursor-pointer"
                                                     >
-                                                        {Object.keys(PIPE_CATALOG[activeTratto.material]?.specs[activeTratto.DN] || {}).map(pn => <option key={pn} value={pn}>{pn}</option>)}
+                                                        {Object.keys(catalog[activeTratto.material]?.specs[activeTratto.DN] || {}).map(pn => <option key={pn} value={pn}>{pn}</option>)}
                                                     </select>
                                                 </div>
                                             </div>

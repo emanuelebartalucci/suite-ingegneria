@@ -55,14 +55,9 @@ export const EQUIVALENT_LENGTHS_TABLE: Record<string, EquivalentLengthPiece> = {
   }
 };
 
-/**
- * Calcola la lunghezza equivalente in metri per un dato pezzo speciale e un dato DN.
- * @param {string} type - Tipo di pezzo speciale (es. 'valvola_diaframma')
- * @param {number|string} dn - Diametro nominale (o indicatore) in mm
- * @returns {number} Lunghezza equivalente in metri
- */
-export function getEquivalentLength(type: string, dn: number | string): number {
-  const piece = EQUIVALENT_LENGTHS_TABLE[type];
+export function getEquivalentLength(type: string, dn: number | string, customTable?: Record<string, EquivalentLengthPiece>): number {
+  const table = customTable || EQUIVALENT_LENGTHS_TABLE;
+  const piece = table[type];
   if (!piece) return 0;
 
   const targetDN = Number(dn);

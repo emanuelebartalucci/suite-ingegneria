@@ -2,7 +2,7 @@
 import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
 import { formatNumber } from '../utils/format';
-import { CLIMATE_DATA } from '../data/climateData';
+import { CLIMATE_DATA, ProvinceClimateData } from '../data/climateData';
 import { 
   IconWind, 
   IconTrash, 
@@ -231,13 +231,15 @@ interface ToolHVACProps {
   projectData: ProjectData;
   setProjectData: (data: any) => void;
   setAppMode: (mode: string) => void;
+  climateData?: ProvinceClimateData[];
 }
 
 // Default empty systems and rooms
 const DEFAULT_SYSTEMS: HVACSystem[] = [];
 const DEFAULT_ROOMS: HVACRoom[] = [];
 
-export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACProps) {
+export function ToolHVAC({ projectData, setProjectData, setAppMode, climateData }: ToolHVACProps) {
+  const climate = climateData || CLIMATE_DATA;
   const num = (val: any): number => {
     if (val === undefined || val === null || val === '') return 0;
     const n = Number(val);
@@ -1442,7 +1444,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                         const val = e.target.value;
                         setLocation(val);
                         if (val !== 'custom') {
-                          const found = CLIMATE_DATA.find(p => p.provincia === val);
+                          const found = climate.find(p => p.provincia === val);
                           if (found) {
                             setExtTempSummer(found.tSummer);
                             setExtRhSummer(found.rhSummer);
@@ -1454,7 +1456,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode }: ToolHVACPr
                       className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl outline-none font-semibold focus:border-blue-500 cursor-pointer"
                     >
                       <option value="custom">Personalizzata...</option>
-                      {[...CLIMATE_DATA].sort((a, b) => a.provincia.localeCompare(b.provincia)).map(p => (
+                      {[...climate].sort((a, b) => a.provincia.localeCompare(b.provincia)).map(p => (
                         <option key={p.sigla} value={p.provincia}>{p.provincia} ({p.sigla})</option>
                       ))}
                     </select>

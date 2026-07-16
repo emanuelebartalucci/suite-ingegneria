@@ -35,11 +35,9 @@ export const GAS_FITTINGS_PRESETS: GasFittingPreset[] = [
   { value: "nipplo_riduzione", label: "Nipplo di riduzione" }
 ];
 
-/**
- * Recupera la lunghezza equivalente in metri per un tipo di raccordi ed un dato diametro (mm)
- */
-export function getGasEquivalentLength(type: string, dn: number | string): number {
-  const pieceValues = GAS_EQUIVALENT_LENGTHS[type];
+export function getGasEquivalentLength(type: string, dn: number | string, customTable?: Record<string, Record<number, number>>): number {
+  const table = customTable || GAS_EQUIVALENT_LENGTHS;
+  const pieceValues = table[type];
   if (!pieceValues) return 0;
 
   const targetDN = Number(dn);

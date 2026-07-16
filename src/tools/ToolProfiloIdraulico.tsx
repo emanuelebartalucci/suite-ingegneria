@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
 import { formatNumber } from '../utils/format';
-import { PIPE_CATALOG, K_PRESETS } from '../data/pipeCatalog';
+import { PIPE_CATALOG, K_PRESETS, PipeMaterial } from '../data/pipeCatalog';
 import { 
   IconArrowUp, 
   IconPlus, 
@@ -16,6 +16,7 @@ interface ToolProfiloIdraulicoProps {
   projectData: ProjectData;
   setProjectData: (data: any) => void;
   setAppMode: (mode: string) => void;
+  pipeCatalog?: Record<string, PipeMaterial>;
 }
 
 interface LocalLossItem {
@@ -48,7 +49,8 @@ interface ChartIdraulicoProps {
   baseElev: number;
 }
 
-export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }: ToolProfiloIdraulicoProps) {
+export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode, pipeCatalog }: ToolProfiloIdraulicoProps) {
+    const catalog = pipeCatalog || PIPE_CATALOG;
     const [flowRate, setFlowRate] = useState<number | ''>('');
     const [recircFactor, setRecircFactor] = useState<number | ''>(1);
     const [referenceElevation, setReferenceElevation] = useState<number | ''>(0);
@@ -114,16 +116,16 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
                 }
                 if (e.type === 'pipe') {
                     if (field === 'material' && value !== 'manuale') {
-                        const matData = PIPE_CATALOG[value];
+                        const matData = catalog[value];
                         const firstDN = Object.keys(matData.specs)[0];
                         const firstPN = Object.keys(matData.specs[firstDN])[0];
                         updated.DN = firstDN; updated.PN = firstPN; updated.roughness = matData.roughness; updated.D = matData.specs[firstDN][firstPN]; updated.name = `Tubo ${value} DN${firstDN}`;
                     } else if (field === 'DN' && updated.material && updated.material !== 'manuale') {
                         let pn = updated.PN || '';
-                        if (!PIPE_CATALOG[updated.material].specs[value][pn]) pn = Object.keys(PIPE_CATALOG[updated.material].specs[value])[0]; 
-                        updated.PN = pn; updated.D = PIPE_CATALOG[updated.material].specs[value][pn]; updated.name = `Tubo ${updated.material} DN${value}`;
+                        if (!catalog[updated.material].specs[value][pn]) pn = Object.keys(catalog[updated.material].specs[value])[0]; 
+                        updated.PN = pn; updated.D = catalog[updated.material].specs[value][pn]; updated.name = `Tubo ${updated.material} DN${value}`;
                     } else if (field === 'PN' && updated.material && updated.material !== 'manuale' && updated.DN) {
-                        updated.D = PIPE_CATALOG[updated.material].specs[updated.DN][value];
+                        updated.D = catalog[updated.material].specs[updated.DN][value];
                     }
                 }
                 return updated;
@@ -508,11 +510,11 @@ export function ToolProfiloIdraulico({ projectData, setProjectData, setAppMode }
                                 <div className="col-span-2 md:col-span-4 bg-slate-50 p-2 rounded border border-slate-100 space-y-2">
                                     <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                                         <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Lunghezza ({displayUnit})</label><input type="number" step={displayUnit==='cm'?"1":"0.5"} value={el.L === '' ? '' : toU(el.L || 0)} onChange={e => updateElement(el.id, 'L', e.target.value === '' ? '' : frmU(e.target.value))} className="w-full p-1 bg-white border border-slate-300 rounded text-sm outline-none"/></div>
-                                        <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Materiale</label><select value={el.material} onChange={e => updateElement(el.id, 'material', e.target.value)} className="w-full p-1 bg-white border border-slate-300 rounded text-sm outline-none"><option value="manuale">Manuale...</option>{Object.keys(PIPE_CATALOG).map(m=><option key={m} value={m}>{m}</option>)}</select></div>
+                                        <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Materiale</label><select value={el.material} onChange={e => updateElement(el.id, 'material', e.target.value)} className="w-full p-1 bg-white border border-slate-300 rounded text-sm outline-none"><option value="manuale">Manuale...</option>{Object.keys(catalog).map(m=><option key={m} value={m}>{m}</option>)}</select></div>
                                         {el.material !== 'manuale' ? (
                                             <>
-                                                <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">DN</label><select value={el.DN} onChange={e => updateElement(el.id, 'DN', e.target.value)} className="w-full p-1 bg-white border border-slate-300 rounded text-sm outline-none">{Object.keys(PIPE_CATALOG[el.material || ''].specs).map(dn=><option key={dn} value={dn}>{dn}</option>)}</select></div>
-                                                <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Classe</label><select value={el.PN} onChange={e => updateElement(el.id, 'PN', e.target.value)} className="w-full p-1 bg-white border border-slate-300 rounded text-sm outline-none">{Object.keys(PIPE_CATALOG[el.material || ''].specs[el.DN || '']||{}).map(pn=><option key={pn} value={pn}>{pn}</option>)}</select></div>
+                                                <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">DN</label><select value={el.DN} onChange={e => updateElement(el.id, 'DN', e.target.value)} className="w-full p-1 bg-white border border-slate-300 rounded text-sm outline-none">{Object.keys(catalog[el.material || ''].specs).map(dn=><option key={dn} value={dn}>{dn}</option>)}</select></div>
+                                                <div><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Classe</label><select value={el.PN} onChange={e => updateElement(el.id, 'PN', e.target.value)} className="w-full p-1 bg-white border border-slate-300 rounded text-sm outline-none">{Object.keys(catalog[el.material || ''].specs[el.DN || '']||{}).map(pn=><option key={pn} value={pn}>{pn}</option>)}</select></div>
                                                 <div><label className="block text-[10px] font-bold text-brand-500 uppercase mb-1">D. Int. (mm)</label><div className="w-full p-1 bg-brand-50 border border-brand-200 rounded text-sm text-brand-700 font-mono text-center font-bold">{formatNumber(el.D || 0, 1)}</div></div>
                                             </>
                                         ) : (

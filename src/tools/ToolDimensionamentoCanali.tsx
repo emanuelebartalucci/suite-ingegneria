@@ -39,6 +39,8 @@ interface ToolDimensionamentoCanaliProps {
   projectData: ProjectData;
   setProjectData: (data: any) => void;
   setAppMode: (mode: string) => void;
+  cablesCatalog?: CableProduct[];
+  containersCatalog?: ContainerFamily[];
 }
 
 interface CavoSelezionato {
@@ -1098,22 +1100,37 @@ export function regenerateTratteTags(
 }
 
 
-export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppMode }: ToolDimensionamentoCanaliProps) {
+export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppMode, cablesCatalog: propCablesCatalog, containersCatalog: propContainersCatalog }: ToolDimensionamentoCanaliProps) {
   // Stati principali dello strumento
   const [state, setState] = useState<ToolState>(defaultState);
   const [activeTab, setActiveTab] = useState<'calcoli' | 'topologia' | 'database'>('calcoli');
 
   // Stati del catalogo (Firestore)
-  const [cablesCatalog, setCablesCatalog] = useState<CableProduct[]>([]);
-  const [containersCatalog, setContainersCatalog] = useState<ContainerFamily[]>([]);
+  const [cablesCatalog, setCablesCatalog] = useState<CableProduct[]>(propCablesCatalog || []);
+  const [containersCatalog, setContainersCatalog] = useState<ContainerFamily[]>(propContainersCatalog || []);
   const [loadingDb, setLoadingDb] = useState<boolean>(false);
   const [dbActiveCategory, setDbActiveCategory] = useState<'cavi' | 'contenitori'>('cavi');
   
   // Cache per evitare letture Firestore duplicate nella sessione
   const [dbCacheLoaded, setDbCacheLoaded] = useState<{ cables: boolean; containers: boolean }>({
-    cables: false,
-    containers: false
+    cables: !!propCablesCatalog,
+    containers: !!propContainersCatalog
   });
+
+  // Sincronizzazione con le props se caricate dall'alto
+  useEffect(() => {
+    if (propCablesCatalog) {
+      setCablesCatalog(propCablesCatalog);
+      setDbCacheLoaded(prev => ({ ...prev, cables: true }));
+    }
+  }, [propCablesCatalog]);
+
+  useEffect(() => {
+    if (propContainersCatalog) {
+      setContainersCatalog(propContainersCatalog);
+      setDbCacheLoaded(prev => ({ ...prev, containers: true }));
+    }
+  }, [propContainersCatalog]);
 
   // Stati per editing database
   const [editCableId, setEditCableId] = useState<string | null>(null);
@@ -1123,6 +1140,11 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
 
   // Caricamento del catalogo per il dimensionamento
   const initDbForSizing = async () => {
+    if (propCablesCatalog && propContainersCatalog) {
+      setCablesCatalog(propCablesCatalog);
+      setContainersCatalog(propContainersCatalog);
+      return;
+    }
     try {
       const isDemoMode = isFirebaseMock || (projectData && (projectData as any).isDemo);
       const cab = await fetchElectricalCables(db, isDemoMode);
@@ -1136,7 +1158,7 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
 
   useEffect(() => {
     initDbForSizing();
-  }, [projectData]);
+  }, [projectData, propCablesCatalog, propContainersCatalog]);
 
   // Caricamento condizionale per la scheda del database (lazy load & caching)
   const loadDatabaseCategory = async (category: 'cavi' | 'contenitori', force = false) => {
@@ -1389,7 +1411,7 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
 
   // Gestione Cavi della tratta attiva
   const handleAddCableToTratta = () => {
-    const defaultCable = cablesCatalog[0] || { id: 'personalizzato', name: 'Personalizzato' };
+    const defaultCable = cablesCatalog[0] || ({ id: 'personalizzato', name: 'Personalizzato', description: '', formations: [], type: 'cavo' } as CableProduct);
     const defaultFormation = defaultCable.formations?.[0]?.formation || 'Personalizzato';
     const defaultDiameter = defaultCable.formations?.[0]?.diameter || 10;
     const defaultWeight = defaultCable.formations?.[0]?.weight || 0.15;
@@ -1545,7 +1567,7 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
   return (
     <div className="bg-slate-100 rounded-3xl p-6 md:p-8 animate-in fade-in duration-300">
       {/* Intestazione del progetto standard */}
-      <ProjectHeader pData={projectData} setPData={setProjectData} title="Dimensionamento Canale e Tubazioni" setAppMode={setAppMode} iconColor="amber" />
+      <ProjectHeader pData={projectData} setPData={setProjectData} title="Dimensionamento Canale e Tubazioni" setAppMode={setAppMode} iconColor="orange" />
 
       {/* Gestione Progetti Condivisi (Full-width) */}
       <div className="print:hidden mb-6">

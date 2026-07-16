@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
 import { formatNumber } from '../utils/format';
-import { PIPE_CATALOG } from '../data/pipeCatalog';
+import { PIPE_CATALOG, PipeMaterial } from '../data/pipeCatalog';
 import { 
   IconFlame, 
   IconCopy, 
@@ -14,6 +14,7 @@ interface ToolCarichiTermiciProps {
   projectData: ProjectData;
   setProjectData: (data: any) => void;
   setAppMode: (mode: string) => void;
+  pipeCatalog?: Record<string, PipeMaterial>;
 }
 
 interface LoadItem {
@@ -32,7 +33,8 @@ interface LoadItem {
   realVelocity?: number;
 }
 
-export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: ToolCarichiTermiciProps) {
+export function ToolCarichiTermici({ projectData, setProjectData, setAppMode, pipeCatalog }: ToolCarichiTermiciProps) {
+    const catalog = pipeCatalog || PIPE_CATALOG;
     const [fluidType, setFluidType] = useState<string>('automatico');
     const [fluidTemp, setFluidTemp] = useState<number | ''>(55); // °C
     const [glycolEtPercent, setGlycolEtPercent] = useState<number | ''>(0); // %
@@ -92,8 +94,8 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
             let realD: number | null = null, realVelocity = 0;
 
             if (load.material && load.DN && load.PN) {
-                if (PIPE_CATALOG[load.material] && PIPE_CATALOG[load.material].specs[load.DN] && PIPE_CATALOG[load.material].specs[load.DN][load.PN]) {
-                    realD = PIPE_CATALOG[load.material].specs[load.DN][load.PN];
+                if (catalog[load.material] && catalog[load.material].specs[load.DN] && catalog[load.material].specs[load.DN][load.PN]) {
+                    realD = catalog[load.material].specs[load.DN][load.PN];
                 }
                 if (realD) {
                     const realArea = Math.PI * Math.pow(realD / 2000, 2);
@@ -123,15 +125,15 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                 let updated = { ...l, [field]: val } as LoadItem;
                 
                 if (field === 'material') {
-                    const matData = PIPE_CATALOG[val];
+                    const matData = catalog[val];
                     const firstDN = Object.keys(matData.specs)[0];
                     const firstPN = Object.keys(matData.specs[firstDN])[0];
                     updated.DN = firstDN; updated.PN = firstPN;
                 } 
                 else if (field === 'DN') {
                     let currentPN = updated.PN;
-                    if (!PIPE_CATALOG[updated.material].specs[val][currentPN]) {
-                        currentPN = Object.keys(PIPE_CATALOG[updated.material].specs[val])[0];
+                    if (!catalog[updated.material].specs[val][currentPN]) {
+                        currentPN = Object.keys(catalog[updated.material].specs[val])[0];
                     }
                     updated.PN = currentPN;
                 }
@@ -653,7 +655,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                                         onChange={e => updateLoad(load.id, 'DN', e.target.value)} 
                                         className="w-full text-xs p-1.5 border border-slate-300 rounded-lg outline-none bg-slate-50"
                                     >
-                                        {Object.keys(PIPE_CATALOG[load.material]?.specs || {}).map(dn=><option key={dn} value={dn}>{dn}</option>)}
+                                        {Object.keys(catalog[load.material]?.specs || {}).map(dn=><option key={dn} value={dn}>{dn}</option>)}
                                     </select>
                                 </div>
                                 <div className="col-span-2">
@@ -663,7 +665,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode }: 
                                         onChange={e => updateLoad(load.id, 'PN', e.target.value)} 
                                         className="w-full text-xs p-1.5 border border-slate-300 rounded-lg outline-none bg-slate-50"
                                     >
-                                        {Object.keys(PIPE_CATALOG[load.material]?.specs[load.DN] || {}).map(pn=><option key={pn} value={pn}>{pn}</option>)}
+                                        {Object.keys(catalog[load.material]?.specs[load.DN] || {}).map(pn=><option key={pn} value={pn}>{pn}</option>)}
                                     </select>
                                 </div>
                             </div>

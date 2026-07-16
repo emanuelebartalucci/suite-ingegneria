@@ -5,7 +5,8 @@ import { formatNumber } from '../utils/format';
 import { 
   PIPE_CATALOG, 
   INSULATION_CATALOG, 
-  getExternalDiameter 
+  getExternalDiameter,
+  PipeMaterial
 } from '../data/pipeCatalog';
 import { 
   IconThermometer, 
@@ -18,6 +19,7 @@ interface ToolDispersioneProps {
   projectData: ProjectData;
   setProjectData: (data: any) => void;
   setAppMode: (mode: string) => void;
+  pipeCatalog?: Record<string, PipeMaterial>;
 }
 
 interface SVGGradienteSovrappostoProps {
@@ -417,7 +419,8 @@ interface DispersioneLine {
   d_iso_mm?: number;
 }
 
-export function ToolDispersione({ projectData, setProjectData, setAppMode }: ToolDispersioneProps) {
+export function ToolDispersione({ projectData, setProjectData, setAppMode, pipeCatalog }: ToolDispersioneProps) {
+    const catalog = pipeCatalog || PIPE_CATALOG;
     const [tAmbGlobal, setTAmbGlobal] = useState<number | ''>(-5); // °C
     const [tFluidGlobal, setTFluidGlobal] = useState<number | ''>(55); // °C
     const [alphaInt, setAlphaInt] = useState<number | ''>(1163); // W/m2K
@@ -441,13 +444,13 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }: Too
             const tAmb = Number(tAmbGlobal) || 0;
 
             // Validazione base
-            if (line.material && line.DN && line.PN && PIPE_CATALOG[line.material] && PIPE_CATALOG[line.material].specs[line.DN]) {
-                const d_int_mm = PIPE_CATALOG[line.material].specs[line.DN][line.PN];
+            if (line.material && line.DN && line.PN && catalog[line.material] && catalog[line.material].specs[line.DN]) {
+                const d_int_mm = catalog[line.material].specs[line.DN][line.PN];
                 if (d_int_mm) {
                     d_int_m = d_int_mm / 1000;
                     d_ext_m = getExternalDiameter(line.material, line.DN, d_int_mm) / 1000;
                     
-                    const lambda_pipe = PIPE_CATALOG[line.material].lambda;
+                    const lambda_pipe = catalog[line.material].lambda;
                     const lambda_iso = Number(line.isoLambda) || 0.035;
                     const s_m = (Number(line.isoThick) || 0) / 1000;
                     d_iso_m = d_ext_m + 2 * s_m;
@@ -517,14 +520,14 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }: Too
                 let updated = { ...l, [field]: val } as DispersioneLine;
                 
                 if (field === 'material') {
-                    const firstDN = Object.keys(PIPE_CATALOG[val].specs)[0];
-                    const firstPN = Object.keys(PIPE_CATALOG[val].specs[firstDN])[0];
+                    const firstDN = Object.keys(catalog[val].specs)[0];
+                    const firstPN = Object.keys(catalog[val].specs[firstDN])[0];
                     updated.DN = firstDN; updated.PN = firstPN;
                 } 
                 else if (field === 'DN') {
                     let currentPN = updated.PN;
-                    if (!PIPE_CATALOG[updated.material].specs[val][currentPN]) {
-                        currentPN = Object.keys(PIPE_CATALOG[updated.material].specs[val])[0];
+                    if (!catalog[updated.material].specs[val][currentPN]) {
+                        currentPN = Object.keys(catalog[updated.material].specs[val])[0];
                     }
                     updated.PN = currentPN;
                 }
@@ -731,7 +734,7 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }: Too
                                             onChange={e => updateLine(line.id, 'material', e.target.value)} 
                                             className="w-full text-xs p-1.5 border border-slate-200 rounded-lg outline-none bg-slate-50 focus:border-redbrand-500 cursor-pointer"
                                         >
-                                            {Object.keys(PIPE_CATALOG).map(m=><option key={m} value={m}>{m}</option>)}
+                                            {Object.keys(catalog).map(m=><option key={m} value={m}>{m}</option>)}
                                         </select>
                                     </div>
                                     <div>
@@ -741,7 +744,7 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }: Too
                                             onChange={e => updateLine(line.id, 'DN', e.target.value)} 
                                             className="w-full text-xs p-1.5 border border-slate-200 rounded-lg outline-none bg-slate-50 cursor-pointer"
                                         >
-                                            {Object.keys(PIPE_CATALOG[line.material]?.specs || {}).map(dn=><option key={dn} value={dn}>{dn}</option>)}
+                                            {Object.keys(catalog[line.material]?.specs || {}).map(dn=><option key={dn} value={dn}>{dn}</option>)}
                                         </select>
                                     </div>
                                     <div>
@@ -751,7 +754,7 @@ export function ToolDispersione({ projectData, setProjectData, setAppMode }: Too
                                             onChange={e => updateLine(line.id, 'PN', e.target.value)} 
                                             className="w-full text-xs p-1.5 border border-slate-200 rounded-lg outline-none bg-slate-50 cursor-pointer"
                                         >
-                                            {Object.keys(PIPE_CATALOG[line.material]?.specs[line.DN] || {}).map(pn=><option key={pn} value={pn}>{pn}</option>)}
+                                            {Object.keys(catalog[line.material]?.specs[line.DN] || {}).map(pn=><option key={pn} value={pn}>{pn}</option>)}
                                         </select>
                                     </div>
 

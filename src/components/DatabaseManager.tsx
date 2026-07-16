@@ -33,7 +33,8 @@ import {
   Search, 
   Edit3, 
   Settings,
-  ArrowLeft
+  ArrowLeft,
+  Zap
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -41,23 +42,59 @@ interface DatabaseManagerProps {
   type: 'termo' | 'elettrico';
   setAppMode: (mode: string) => void;
   projectData: any;
+  pipeCatalog?: Record<string, PipeMaterial>;
+  equivalentLengths?: Record<string, EquivalentLengthPiece>;
+  gasEquivalentLengths?: Record<string, Record<number, number>>;
+  climateData?: ProvinceClimateData[];
+  cablesCatalog?: CableProduct[];
+  containersCatalog?: ContainerFamily[];
+  onDatabaseChange?: () => void;
 }
 
-export function DatabaseManager({ type, setAppMode, projectData }: DatabaseManagerProps) {
+export function DatabaseManager({ 
+  type, 
+  setAppMode, 
+  projectData,
+  pipeCatalog: propPipeCatalog,
+  equivalentLengths: propEquivalentLengths,
+  gasEquivalentLengths: propGasEquivalentLengths,
+  climateData: propClimateData,
+  cablesCatalog: propCablesCatalog,
+  containersCatalog: propContainersCatalog,
+  onDatabaseChange
+}: DatabaseManagerProps) {
   const isDemoMode = isFirebaseMock || (projectData && projectData.isDemo);
 
   // Stato navigazione tab
   const [activeTab, setActiveTab] = useState<string>('');
 
   // Stati cataloghi Termoidraulici
-  const [pipeCatalog, setPipeCatalog] = useState<Record<string, PipeMaterial>>({});
-  const [equivalentLengths, setEquivalentLengths] = useState<Record<string, EquivalentLengthPiece>>({});
-  const [gasEquivalentLengths, setGasEquivalentLengths] = useState<Record<string, Record<number, number>>>({});
-  const [climateData, setClimateData] = useState<ProvinceClimateData[]>([]);
+  const [pipeCatalog, setPipeCatalog] = useState<Record<string, PipeMaterial>>(propPipeCatalog || {});
+  const [equivalentLengths, setEquivalentLengths] = useState<Record<string, EquivalentLengthPiece>>(propEquivalentLengths || {});
+  const [gasEquivalentLengths, setGasEquivalentLengths] = useState<Record<string, Record<number, number>>>(propGasEquivalentLengths || {});
+  const [climateData, setClimateData] = useState<ProvinceClimateData[]>(propClimateData || []);
 
   // Stati cataloghi Elettrici
-  const [cablesCatalog, setCablesCatalog] = useState<CableProduct[]>([]);
-  const [containersCatalog, setContainersCatalog] = useState<ContainerFamily[]>([]);
+  const [cablesCatalog, setCablesCatalog] = useState<CableProduct[]>(propCablesCatalog || []);
+  const [containersCatalog, setContainersCatalog] = useState<ContainerFamily[]>(propContainersCatalog || []);
+
+  // Cache tab per evitare interrogazioni a Firebase
+  const [dbCacheLoaded, setDbCacheLoaded] = useState<Record<string, boolean>>({
+    tubi: !!propPipeCatalog,
+    fluidi_eq: !!propEquivalentLengths,
+    gas_eq: !!propGasEquivalentLengths,
+    climatici: !!propClimateData,
+    cavi: !!propCablesCatalog,
+    contenitori: !!propContainersCatalog
+  });
+
+  // Sync con props esterne
+  useEffect(() => { if (propPipeCatalog) { setPipeCatalog(propPipeCatalog); setDbCacheLoaded(p => ({ ...p, tubi: true })); } }, [propPipeCatalog]);
+  useEffect(() => { if (propEquivalentLengths) { setEquivalentLengths(propEquivalentLengths); setDbCacheLoaded(p => ({ ...p, fluidi_eq: true })); } }, [propEquivalentLengths]);
+  useEffect(() => { if (propGasEquivalentLengths) { setGasEquivalentLengths(propGasEquivalentLengths); setDbCacheLoaded(p => ({ ...p, gas_eq: true })); } }, [propGasEquivalentLengths]);
+  useEffect(() => { if (propClimateData) { setClimateData(propClimateData); setDbCacheLoaded(p => ({ ...p, climatici: true })); } }, [propClimateData]);
+  useEffect(() => { if (propCablesCatalog) { setCablesCatalog(propCablesCatalog); setDbCacheLoaded(p => ({ ...p, cavi: true })); } }, [propCablesCatalog]);
+  useEffect(() => { if (propContainersCatalog) { setContainersCatalog(propContainersCatalog); setDbCacheLoaded(p => ({ ...p, contenitori: true })); } }, [propContainersCatalog]);
 
   // Stato loading ed editing
   const [loading, setLoading] = useState<boolean>(false);
@@ -67,47 +104,89 @@ export function DatabaseManager({ type, setAppMode, projectData }: DatabaseManag
   const [selectedMaterial, setSelectedMaterial] = useState<string>('');
   const [selectedFitting, setSelectedFitting] = useState<string>('');
   const [selectedGasFitting, setSelectedGasFitting] = useState<string>('');
+  const [newColName, setNewColName] = useState<string>('');
+  const [newRowDN, setNewRowDN] = useState<string>('');
 
-  // Stati per aggiunta/editing
-  const [editCableId, setEditCableId] = useState<string | null>(null);
-  const [editContainerId, setEditContainerId] = useState<string | null>(null);
+  // Stati di selezione per sottomenu Elettrica
+  const [selectedCableId, setSelectedCableId] = useState<string>('');
+  const [selectedContainerId, setSelectedContainerId] = useState<string>('');
   const [newCableName, setNewCableName] = useState<string>('');
   const [newCableDesc, setNewCableDesc] = useState<string>('');
+  const [newContainerFamilyName, setNewContainerFamilyName] = useState<string>('');
+  const [newContainerSectionType, setNewContainerSectionType] = useState<'rettangolare' | 'circolare'>('rettangolare');
+  const [newContainerInstallationType, setNewContainerInstallationType] = useState<'vista' | 'cavidotto' | 'tazze'>('vista');
+
+  // Auto-seleziona il primo elemento al caricamento
+  useEffect(() => {
+    if (cablesCatalog.length > 0 && !selectedCableId) {
+      setSelectedCableId(cablesCatalog[0].id);
+    }
+  }, [cablesCatalog, selectedCableId]);
+
+  useEffect(() => {
+    if (containersCatalog.length > 0 && !selectedContainerId) {
+      setSelectedContainerId(containersCatalog[0].id);
+    }
+  }, [containersCatalog, selectedContainerId]);
 
   // Caricamento dati lazy in base al tab selezionato
   const loadTabDb = async (tab: string, force = false) => {
+    if (!force && dbCacheLoaded[tab]) {
+      // Già in cache, evita la chiamata
+      if (tab === 'tubi' && !selectedMaterial) {
+        setSelectedMaterial(Object.keys(pipeCatalog)[0] || '');
+      } else if (tab === 'fluidi_eq' && !selectedFitting) {
+        setSelectedFitting(Object.keys(equivalentLengths)[0] || '');
+      } else if (tab === 'gas_eq' && !selectedGasFitting) {
+        setSelectedGasFitting(Object.keys(gasEquivalentLengths)[0] || '');
+      }
+      return;
+    }
+
     setLoading(true);
     try {
       if (type === 'elettrico') {
         if (tab === 'cavi') {
           const res = await fetchElectricalCables(db, isDemoMode);
           setCablesCatalog(res);
+          setDbCacheLoaded(p => ({ ...p, cavi: true }));
+          if (!selectedCableId || force) {
+            setSelectedCableId(res[0]?.id || '');
+          }
         } else if (tab === 'contenitori') {
           const res = await fetchElectricalContainers(db, isDemoMode);
           setContainersCatalog(res);
+          setDbCacheLoaded(p => ({ ...p, contenitori: true }));
+          if (!selectedContainerId || force) {
+            setSelectedContainerId(res[0]?.id || '');
+          }
         }
       } else {
         if (tab === 'tubi') {
           const res = await fetchPipeCatalog(db, isDemoMode);
           setPipeCatalog(res);
+          setDbCacheLoaded(p => ({ ...p, tubi: true }));
           if (!selectedMaterial || force) {
             setSelectedMaterial(Object.keys(res)[0] || '');
           }
         } else if (tab === 'fluidi_eq') {
           const res = await fetchEquivalentLengths(db, isDemoMode);
           setEquivalentLengths(res);
+          setDbCacheLoaded(p => ({ ...p, fluidi_eq: true }));
           if (!selectedFitting || force) {
             setSelectedFitting(Object.keys(res)[0] || '');
           }
         } else if (tab === 'gas_eq') {
           const res = await fetchGasEquivalentLengths(db, isDemoMode);
           setGasEquivalentLengths(res);
+          setDbCacheLoaded(p => ({ ...p, gas_eq: true }));
           if (!selectedGasFitting || force) {
             setSelectedGasFitting(Object.keys(res)[0] || '');
           }
         } else if (tab === 'climatici') {
           const res = await fetchClimateData(db, isDemoMode);
           setClimateData(res);
+          setDbCacheLoaded(p => ({ ...p, climatici: true }));
         }
       }
     } catch (e) {
@@ -137,6 +216,7 @@ export function DatabaseManager({ type, setAppMode, projectData }: DatabaseManag
     setLoading(true);
     try {
       await savePipeCatalog(db, isDemoMode, pipeCatalog);
+      onDatabaseChange?.();
       if (window.suiteUI) window.suiteUI.toast("Catalogo tubi salvato con successo!", "success");
     } catch (e) {
       if (window.suiteUI) window.suiteUI.toast("Errore nel salvataggio del catalogo", "error");
@@ -149,6 +229,7 @@ export function DatabaseManager({ type, setAppMode, projectData }: DatabaseManag
     setLoading(true);
     try {
       await saveEquivalentLengths(db, isDemoMode, equivalentLengths);
+      onDatabaseChange?.();
       if (window.suiteUI) window.suiteUI.toast("Lunghezze equivalenti salvate con successo!", "success");
     } catch (e) {
       if (window.suiteUI) window.suiteUI.toast("Errore nel salvataggio delle lunghezze equivalenti", "error");
@@ -161,6 +242,7 @@ export function DatabaseManager({ type, setAppMode, projectData }: DatabaseManag
     setLoading(true);
     try {
       await saveGasEquivalentLengths(db, isDemoMode, gasEquivalentLengths);
+      onDatabaseChange?.();
       if (window.suiteUI) window.suiteUI.toast("Lunghezze equivalenti gas salvate!", "success");
     } catch (e) {
       if (window.suiteUI) window.suiteUI.toast("Errore nel salvataggio", "error");
@@ -174,6 +256,7 @@ export function DatabaseManager({ type, setAppMode, projectData }: DatabaseManag
     try {
       const dataToSave = updatedData || climateData;
       await saveClimateData(db, isDemoMode, dataToSave);
+      onDatabaseChange?.();
       if (window.suiteUI) window.suiteUI.toast("Dati climatici salvati con successo!", "success");
     } catch (e) {
       if (window.suiteUI) window.suiteUI.toast("Errore nel salvataggio dei dati climatici", "error");
@@ -208,7 +291,7 @@ export function DatabaseManager({ type, setAppMode, projectData }: DatabaseManag
   const handleSaveCableToDb = async (cable: CableProduct) => {
     try {
       await saveElectricalItem(db, isDemoMode, cable);
-      setEditCableId(null);
+      onDatabaseChange?.();
       if (window.suiteUI) window.suiteUI.toast("Cavo salvato con successo!", "success");
       loadTabDb('cavi', true);
     } catch (e) {
@@ -221,6 +304,7 @@ export function DatabaseManager({ type, setAppMode, projectData }: DatabaseManag
     if (!confirmed) return;
     try {
       await deleteElectricalItem(db, isDemoMode, id, 'cavo');
+      onDatabaseChange?.();
       if (window.suiteUI) window.suiteUI.toast("Cavo eliminato con successo!", "success");
       loadTabDb('cavi', true);
     } catch (e) {
@@ -245,10 +329,60 @@ export function DatabaseManager({ type, setAppMode, projectData }: DatabaseManag
       await saveElectricalItem(db, isDemoMode, newCable);
       setNewCableName('');
       setNewCableDesc('');
+      onDatabaseChange?.();
       if (window.suiteUI) window.suiteUI.toast("Nuovo cavo aggiunto!", "success");
       loadTabDb('cavi', true);
     } catch (e) {
       if (window.suiteUI) window.suiteUI.toast("Errore nella creazione", "error");
+    }
+  };
+
+  const handleAddNewContainerFamily = async () => {
+    if (!newContainerFamilyName.trim()) {
+      if (window.suiteUI) window.suiteUI.alert("Inserisci un nome valido per la famiglia.");
+      return;
+    }
+    const id = newContainerFamilyName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    if (containersCatalog.some(f => f.id === id)) {
+      if (window.suiteUI) window.suiteUI.toast("Questa famiglia esiste già!", "warning");
+      return;
+    }
+    const newFamily: ContainerFamily = {
+      id,
+      name: newContainerFamilyName.trim(),
+      description: '',
+      type: 'contenitore',
+      sectionType: newContainerSectionType,
+      installationType: newContainerInstallationType,
+      sizes: [
+        newContainerSectionType === 'rettangolare'
+          ? { code: '100x75', label: '100x75 mm', weight: 0.5, width: 100, height: 75, coverWeight: 0.2 }
+          : { code: 'D50', label: 'DN 50', weight: 0.4, outerDiameter: 50, innerDiameter: 46 }
+      ]
+    };
+    try {
+      await saveElectricalItem(db, isDemoMode, newFamily);
+      setNewContainerFamilyName('');
+      onDatabaseChange?.();
+      if (window.suiteUI) window.suiteUI.toast("Nuova famiglia aggiunta con successo!", "success");
+      await loadTabDb('contenitori', true);
+      setSelectedContainerId(id);
+    } catch (e) {
+      if (window.suiteUI) window.suiteUI.toast("Errore nella creazione della famiglia", "error");
+    }
+  };
+
+  const handleDeleteContainerFamily = async (id: string) => {
+    const confirmed = await window.suiteUI?.confirm("Vuoi eliminare definitivamente questa famiglia di condotti dal database?");
+    if (!confirmed) return;
+    try {
+      await deleteElectricalItem(db, isDemoMode, id, 'contenitore');
+      onDatabaseChange?.();
+      if (window.suiteUI) window.suiteUI.toast("Famiglia eliminata con successo!", "success");
+      await loadTabDb('contenitori', true);
+      setSelectedContainerId(prev => prev === id ? '' : prev);
+    } catch (e) {
+      if (window.suiteUI) window.suiteUI.toast("Errore nell'eliminazione", "error");
     }
   };
 
@@ -472,370 +606,532 @@ export function DatabaseManager({ type, setAppMode, projectData }: DatabaseManag
         </div>
       ) : (
         <div className="space-y-6">
-          
           {/* TAB: CAVI ELETRICI */}
           {activeTab === 'cavi' && (
-            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row items-end gap-3 text-xs">
-                <div className="flex-1 w-full font-bold">
-                  <label className="block text-[9px] text-slate-400 uppercase mb-1">Nome Nuovo Cavo</label>
+            <div className="flex flex-col lg:flex-row gap-6 items-start text-xs">
+              {/* Menu laterale cavi */}
+              <div className="w-full lg:w-64 bg-white rounded-3xl p-4 border border-slate-200 shadow-sm shrink-0 space-y-4">
+                <span className="text-[10px] font-black text-slate-400 uppercase block mb-1">Famiglie Cavo</span>
+                <div className="flex flex-col gap-1.5 max-h-[300px] overflow-y-auto pr-1">
+                  {cablesCatalog.map(c => (
+                    <div key={c.id} className="flex items-center gap-1">
+                      <button 
+                        onClick={() => setSelectedCableId(c.id)}
+                        className={`flex-1 text-left p-3 rounded-2xl border text-xs font-bold transition-all cursor-pointer truncate ${
+                          selectedCableId === c.id 
+                            ? 'bg-slate-800 text-white border-slate-800' 
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {c.name}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCableFromDb(c.id)}
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer font-bold text-xs"
+                        title="Elimina famiglia cavo"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Form Nuovo Cavo */}
+                <div className="pt-3 border-t border-slate-100 space-y-2">
+                  <span className="text-[10px] font-black text-slate-400 uppercase block">Nuova Famiglia</span>
                   <input 
                     type="text"
-                    placeholder="Es: FG16OR16 0.6/1kV"
+                    placeholder="Nome cavo (es: FG16OR16)"
                     value={newCableName}
                     onChange={e => setNewCableName(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-slate-800"
                   />
-                </div>
-                <div className="flex-2 w-full font-bold">
-                  <label className="block text-[9px] text-slate-400 uppercase mb-1">Descrizione</label>
                   <input 
                     type="text"
-                    placeholder="Es: Cavo multipolare per energia..."
+                    placeholder="Descrizione breve"
                     value={newCableDesc}
                     onChange={e => setNewCableDesc(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-slate-800"
                   />
+                  <button 
+                    onClick={handleAddNewCableToDb}
+                    className="w-full py-2 bg-slate-800 hover:bg-slate-750 text-white font-bold text-xs rounded-xl transition-all active:scale-95 cursor-pointer shadow-sm border border-slate-800"
+                  >
+                    + Aggiungi Cavo
+                  </button>
                 </div>
-                <button 
-                  onClick={handleAddNewCableToDb}
-                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-lg transition-colors cursor-pointer w-full md:w-auto"
-                >
-                  Aggiungi
-                </button>
               </div>
 
-              <div className="grid grid-cols-1 gap-4">
-                {cablesCatalog.map(c => {
-                  const isEditing = editCableId === c.id;
-                  return (
-                    <div key={c.id} className="border border-slate-150 rounded-2xl p-4 bg-slate-50/30 text-xs font-semibold">
-                      <div className="flex justify-between items-center mb-3">
-                        <div>
-                          <span className="font-bold text-sm text-slate-850">{c.name}</span>
-                          <span className="text-[10px] text-slate-400 ml-2">({c.id})</span>
-                          <p className="text-[11px] text-slate-500 font-medium mt-0.5">{c.description}</p>
-                        </div>
-                        <div className="flex gap-1">
-                          {isEditing ? (
-                            <button 
-                              onClick={() => handleSaveCableToDb(c)}
-                              className="px-2 py-1 bg-amber-500 text-white rounded-md flex items-center gap-1 cursor-pointer"
-                            >
-                              <Save className="w-3.5 h-3.5" /> Salva
-                            </button>
-                          ) : (
-                            <button 
-                              onClick={() => setEditCableId(c.id)}
-                              className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md cursor-pointer"
-                            >
-                              Edita Formazioni
-                            </button>
-                          )}
-                          <button 
-                            onClick={() => handleDeleteCableFromDb(c.id)}
-                            className="px-2.5 py-1 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-md cursor-pointer"
-                          >
-                            Elimina
-                          </button>
-                        </div>
+              {/* Dettagli cavo selezionato */}
+              {selectedCableId && cablesCatalog.find(c => c.id === selectedCableId) ? (() => {
+                const currentCable = cablesCatalog.find(c => c.id === selectedCableId)!;
+                return (
+                  <div className="flex-1 w-full bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+                    <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="p-1.5 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center"><Zap className="w-4 h-4" /></span>
+                        <h3 className="text-sm font-black text-slate-805">Modifica {currentCable.name}</h3>
                       </div>
+                      <button 
+                        onClick={() => handleSaveCableToDb(currentCable)}
+                        className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-750 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow border border-slate-800"
+                      >
+                        <Save className="w-3.5 h-3.5" /> Salva Modifiche
+                      </button>
+                    </div>
 
-                      {isEditing && (
-                        <div className="bg-white rounded-xl p-3 border border-slate-150 space-y-3">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                            {c.formations.map((f, fIdx) => (
-                              <div key={fIdx} className="bg-slate-50 border border-slate-150 rounded-lg p-2.5 flex items-center gap-2">
-                                <div className="flex-1">
-                                  <label className="block text-[8px] text-slate-400 font-bold uppercase">Form.</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">Nome Visualizzato</label>
+                        <input 
+                          type="text"
+                          value={currentCable.name}
+                          onChange={e => {
+                            const updatedName = e.target.value;
+                            setCablesCatalog(prev => prev.map(item => item.id === currentCable.id ? { ...item, name: updatedName } : item));
+                          }}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:border-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">Descrizione Cavo</label>
+                        <input 
+                          type="text"
+                          value={currentCable.description}
+                          onChange={e => {
+                            const updatedDesc = e.target.value;
+                            setCablesCatalog(prev => prev.map(item => item.id === currentCable.id ? { ...item, description: updatedDesc } : item));
+                          }}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:border-slate-800"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Tabella formazioni */}
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wide block">Formazioni & Geometria Cavo</span>
+                      <div className="overflow-x-auto border border-slate-150 rounded-2xl bg-white">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-150 text-[10px] text-slate-400 font-black uppercase">
+                              <th className="p-3">Formazione</th>
+                              <th className="p-3 text-center">Ø Esterno [mm]</th>
+                              <th className="p-3 text-center">Peso Lineare [kg/m]</th>
+                              <th className="p-3 text-center w-16">Azioni</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {currentCable.formations.map((f, fIdx) => (
+                              <tr key={fIdx} className="border-b border-slate-100 hover:bg-slate-50/50">
+                                <td className="p-2.5">
                                   <input 
                                     type="text" 
                                     value={f.formation} 
                                     onChange={e => {
-                                      const updatedForm = [...c.formations];
+                                      const updatedForm = [...currentCable.formations];
                                       updatedForm[fIdx] = { ...f, formation: e.target.value };
-                                      const updatedCable = { ...c, formations: updatedForm };
-                                      setCablesCatalog(prev => prev.map(item => item.id === c.id ? updatedCable : item));
+                                      setCablesCatalog(prev => prev.map(item => item.id === currentCable.id ? { ...item, formations: updatedForm } : item));
                                     }}
-                                    className="w-full bg-white border border-slate-200 rounded px-1.5 py-0.5 text-center font-bold"
+                                    className="w-full bg-transparent border-none font-bold text-slate-800 focus:ring-1 focus:ring-slate-800 rounded px-1 text-xs"
                                   />
-                                </div>
-                                <div className="w-16">
-                                  <label className="block text-[8px] text-slate-400 font-bold uppercase">Ø [mm]</label>
+                                </td>
+                                <td className="p-2.5">
                                   <input 
                                     type="number" 
                                     step="any"
                                     value={f.diameter} 
                                     onChange={e => {
-                                      const updatedForm = [...c.formations];
+                                      const updatedForm = [...currentCable.formations];
                                       updatedForm[fIdx] = { ...f, diameter: parseFloat(e.target.value) || 0 };
-                                      const updatedCable = { ...c, formations: updatedForm };
-                                      setCablesCatalog(prev => prev.map(item => item.id === c.id ? updatedCable : item));
+                                      setCablesCatalog(prev => prev.map(item => item.id === currentCable.id ? { ...item, formations: updatedForm } : item));
                                     }}
-                                    className="w-full bg-white border border-slate-200 rounded px-1.5 py-0.5 text-center font-bold"
+                                    className="w-full bg-transparent border-none font-bold text-slate-700 text-center focus:ring-1 focus:ring-slate-800 rounded px-1 text-xs"
                                   />
-                                </div>
-                                <div className="w-16">
-                                  <label className="block text-[8px] text-slate-400 font-bold uppercase">Peso kg/m</label>
+                                </td>
+                                <td className="p-2.5">
                                   <input 
                                     type="number" 
                                     step="any"
                                     value={f.weight} 
                                     onChange={e => {
-                                      const updatedForm = [...c.formations];
+                                      const updatedForm = [...currentCable.formations];
                                       updatedForm[fIdx] = { ...f, weight: parseFloat(e.target.value) || 0 };
-                                      const updatedCable = { ...c, formations: updatedForm };
-                                      setCablesCatalog(prev => prev.map(item => item.id === c.id ? updatedCable : item));
+                                      setCablesCatalog(prev => prev.map(item => item.id === currentCable.id ? { ...item, formations: updatedForm } : item));
                                     }}
-                                    className="w-full bg-white border border-slate-200 rounded px-1.5 py-0.5 text-center font-bold"
+                                    className="w-full bg-transparent border-none font-bold text-slate-700 text-center focus:ring-1 focus:ring-slate-800 rounded px-1 text-xs"
                                   />
-                                </div>
-                                <button 
-                                  onClick={() => {
-                                    const updatedForm = c.formations.filter((_, idx) => idx !== fIdx);
-                                    const updatedCable = { ...c, formations: updatedForm };
-                                    setCablesCatalog(prev => prev.map(item => item.id === c.id ? updatedCable : item));
-                                  }}
-                                  className="text-slate-400 hover:text-rose-500 mt-3"
-                                >
-                                  ✕
-                                </button>
-                              </div>
+                                </td>
+                                <td className="p-2.5 text-center">
+                                  <button 
+                                    onClick={() => {
+                                      const updatedForm = currentCable.formations.filter((_, idx) => idx !== fIdx);
+                                      setCablesCatalog(prev => prev.map(item => item.id === currentCable.id ? { ...item, formations: updatedForm } : item));
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 cursor-pointer font-bold text-xs"
+                                  >
+                                    ✕
+                                  </button>
+                                </td>
+                              </tr>
                             ))}
-
-                            <button 
-                              onClick={() => {
-                                const updatedForm = [...c.formations, { formation: '1x2.5', diameter: 3.5, weight: 0.03 }];
-                                const updatedCable = { ...c, formations: updatedForm };
-                                setCablesCatalog(prev => prev.map(item => item.id === c.id ? updatedCable : item));
-                              }}
-                              className="border-2 border-dashed border-slate-200 rounded-lg p-3 text-center flex items-center justify-center text-slate-400 hover:border-slate-800 hover:text-slate-700 cursor-pointer font-bold"
-                            >
-                              + Aggiungi Formazione
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                          </tbody>
+                        </table>
+                      </div>
+                      
+                      <button 
+                        onClick={() => {
+                          const updatedForm = [...currentCable.formations, { formation: '1x2.5', diameter: 3.5, weight: 0.03 }];
+                          setCablesCatalog(prev => prev.map(item => item.id === currentCable.id ? { ...item, formations: updatedForm } : item));
+                        }}
+                        className="w-full border-2 border-dashed border-slate-200 rounded-xl py-2.5 text-center flex items-center justify-center text-slate-400 hover:border-slate-800 hover:text-slate-700 cursor-pointer font-bold text-xs transition-colors"
+                      >
+                        + Aggiungi Riga Formazione
+                      </button>
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                );
+              })() : (
+                <div className="flex-1 w-full bg-white rounded-3xl p-8 border border-slate-200 shadow-sm text-center text-slate-400 font-bold">
+                  Nessun cavo selezionato. Seleziona o aggiungi una famiglia di cavi.
+                </div>
+              )}
             </div>
           )}
 
           {/* TAB: TUBI E CANALI (ELETTRICI) */}
           {activeTab === 'contenitori' && (
-            <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
-              {containersCatalog.map(fam => {
-                const isEditing = editContainerId === fam.id;
+            <div className="flex flex-col lg:flex-row gap-6 items-start text-xs">
+              {/* Menu laterale contenitori */}
+              <div className="w-full lg:w-64 bg-white rounded-3xl p-4 border border-slate-200 shadow-sm shrink-0 space-y-4">
+                <span className="text-[10px] font-black text-slate-400 uppercase block mb-1">Famiglie Condotti</span>
+                <div className="flex flex-col gap-1.5 max-h-[250px] overflow-y-auto pr-1">
+                  {containersCatalog.map(fam => (
+                    <div key={fam.id} className="flex items-center gap-1">
+                      <button 
+                        onClick={() => setSelectedContainerId(fam.id)}
+                        className={`flex-1 text-left p-3 rounded-2xl border text-xs font-bold transition-all cursor-pointer truncate ${
+                          selectedContainerId === fam.id 
+                            ? 'bg-slate-800 text-white border-slate-800' 
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {fam.name}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteContainerFamily(fam.id)}
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer font-bold text-xs"
+                        title="Elimina famiglia"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Form Nuova Famiglia Condotti */}
+                <div className="pt-3 border-t border-slate-100 space-y-2 text-xs">
+                  <span className="text-[10px] font-black text-slate-400 uppercase block">Nuova Famiglia</span>
+                  <input 
+                    type="text"
+                    placeholder="Nome (es: Tubo PVC rigido)"
+                    value={newContainerFamilyName}
+                    onChange={e => setNewContainerFamilyName(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-slate-800"
+                  />
+                  <div>
+                    <label className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Sezione</label>
+                    <select
+                      value={newContainerSectionType}
+                      onChange={e => setNewContainerSectionType(e.target.value as any)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-slate-800 cursor-pointer"
+                    >
+                      <option value="rettangolare">Rettangolare</option>
+                      <option value="circolare">Circolare</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[8px] text-slate-400 font-bold uppercase mb-1">Posa Predefinita</label>
+                    <select
+                      value={newContainerInstallationType}
+                      onChange={e => setNewContainerInstallationType(e.target.value as any)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-slate-800 cursor-pointer"
+                    >
+                      <option value="vista">A vista (Tubo / Canale)</option>
+                      <option value="cavidotto">Interrato / In cavidotto</option>
+                      <option value="tazze">Su passerella / supporti</option>
+                    </select>
+                  </div>
+                  <button 
+                    onClick={handleAddNewContainerFamily}
+                    className="w-full py-2 bg-slate-800 hover:bg-slate-750 text-white font-bold text-xs rounded-xl transition-all active:scale-95 cursor-pointer shadow-sm border border-slate-800"
+                  >
+                    + Aggiungi Famiglia
+                  </button>
+                </div>
+              </div>
+
+              {/* Dettagli famiglia condotti selezionata */}
+              {selectedContainerId && containersCatalog.find(f => f.id === selectedContainerId) ? (() => {
+                const currentFamily = containersCatalog.find(f => f.id === selectedContainerId)!;
+                const isRect = currentFamily.sectionType === 'rettangolare';
                 return (
-                  <div key={fam.id} className="border border-slate-150 rounded-2xl p-4 bg-slate-50/30 text-xs font-semibold">
-                    <div className="flex justify-between items-center mb-3">
+                  <div className="flex-1 w-full bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+                    <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="p-1.5 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center"><Layers className="w-4 h-4" /></span>
+                        <h3 className="text-sm font-black text-slate-805">Modifica {currentFamily.name}</h3>
+                      </div>
+                      <button 
+                        onClick={async () => {
+                          try {
+                            setLoading(true);
+                            await saveElectricalItem(db, isDemoMode, currentFamily);
+                            onDatabaseChange?.();
+                            if (window.suiteUI) window.suiteUI.toast("Salvataggio completato!", "success");
+                            loadTabDb('contenitori', true);
+                          } catch (e) {
+                            if (window.suiteUI) window.suiteUI.toast("Errore nel salvataggio", "error");
+                          } finally {
+                            setLoading(false);
+                          }
+                        }}
+                        className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-750 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow border border-slate-800"
+                      >
+                        <Save className="w-3.5 h-3.5" /> Salva Modifiche
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
-                        <span className="font-bold text-sm text-slate-800">{fam.name}</span>
-                        <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                          Codice: {fam.id} | Sezione: {fam.sectionType} | Posa: {fam.installationType}
-                        </p>
+                        <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">Nome Famiglia</label>
+                        <input 
+                          type="text"
+                          value={currentFamily.name}
+                          onChange={e => {
+                            const updatedName = e.target.value;
+                            setContainersCatalog(prev => prev.map(item => item.id === currentFamily.id ? { ...item, name: updatedName } : item));
+                          }}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:border-slate-800"
+                        />
                       </div>
                       <div>
-                        {isEditing ? (
-                          <button 
-                            onClick={async () => {
-                              try {
-                                await saveElectricalItem(db, isDemoMode, fam);
-                                setEditContainerId(null);
-                                if (window.suiteUI) window.suiteUI.toast("Salvataggio completato!", "success");
-                                loadTabDb('contenitori', true);
-                              } catch (e) {
-                                if (window.suiteUI) window.suiteUI.toast("Errore nel salvataggio", "error");
-                              }
-                            }}
-                            className="px-3 py-1 bg-amber-500 text-white rounded-md flex items-center gap-1 cursor-pointer"
-                          >
-                            <Save className="w-3.5 h-3.5" /> Salva
-                          </button>
-                        ) : (
-                          <button 
-                            onClick={() => setEditContainerId(fam.id)}
-                            className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-md cursor-pointer"
-                          >
-                            Edita Dimensioni
-                          </button>
-                        )}
+                        <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">Sezione Geometria</label>
+                        <span className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-500 block">
+                          {currentFamily.sectionType.toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">Tipologia di Posa</label>
+                        <select
+                          value={currentFamily.installationType}
+                          onChange={e => {
+                            const updatedInstall = e.target.value;
+                            setContainersCatalog(prev => prev.map(item => item.id === currentFamily.id ? { ...item, installationType: updatedInstall as any } : item));
+                          }}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:border-slate-800 cursor-pointer"
+                        >
+                          <option value="vista">A vista (Tubo / Canale)</option>
+                          <option value="cavidotto">Interrato / In cavidotto</option>
+                          <option value="tazze">Su passerella / supporti</option>
+                        </select>
                       </div>
                     </div>
 
-                    {isEditing && (
-                      <div className="bg-white rounded-xl p-3 border border-slate-150 space-y-3">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                          {fam.sizes.map((sz, szIdx) => (
-                            <div key={szIdx} className="bg-slate-50 border border-slate-150 rounded-lg p-2.5 flex flex-col gap-2 relative">
-                              <button 
-                                onClick={() => {
-                                  const updatedSizes = fam.sizes.filter((_, idx) => idx !== szIdx);
-                                  const updatedFam = { ...fam, sizes: updatedSizes };
-                                  setContainersCatalog(prev => prev.map(item => item.id === fam.id ? updatedFam : item));
-                                }}
-                                className="absolute top-2 right-2 text-slate-400 hover:text-rose-500"
-                              >
-                                ✕
-                              </button>
-                              <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                  <label className="block text-[8px] text-slate-400 uppercase font-bold">Codice</label>
+                    {/* Tabella Dimensioni commerciali */}
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wide block">Dimensioni Commerciali</span>
+                      <div className="overflow-x-auto border border-slate-150 rounded-2xl bg-white">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-150 text-[10px] text-slate-400 font-black uppercase">
+                              <th className="p-3">Codice</th>
+                              <th className="p-3">Etichetta</th>
+                              {isRect ? (
+                                <>
+                                  <th className="p-3 text-center">Largh. B [mm]</th>
+                                  <th className="p-3 text-center">Alt. H [mm]</th>
+                                  <th className="p-3 text-center">Peso Vuoto [kg/m]</th>
+                                  <th className="p-3 text-center">Peso Cop. [kg/m]</th>
+                                </>
+                              ) : (
+                                <>
+                                  <th className="p-3 text-center">Ø Esterno [mm]</th>
+                                  <th className="p-3 text-center">Ø Interno [mm]</th>
+                                  <th className="p-3 text-center">Peso [kg/m]</th>
+                                </>
+                              )}
+                              <th className="p-3 text-center w-16">Azioni</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {currentFamily.sizes.map((sz, szIdx) => (
+                              <tr key={szIdx} className="border-b border-slate-100 hover:bg-slate-50/50">
+                                <td className="p-2">
                                   <input 
                                     type="text" 
                                     value={sz.code} 
                                     onChange={e => {
-                                      const updatedSizes = [...fam.sizes];
+                                      const updatedSizes = [...currentFamily.sizes];
                                       updatedSizes[szIdx] = { ...sz, code: e.target.value };
-                                      const updatedFam = { ...fam, sizes: updatedSizes };
-                                      setContainersCatalog(prev => prev.map(item => item.id === fam.id ? updatedFam : item));
+                                      setContainersCatalog(prev => prev.map(item => item.id === currentFamily.id ? { ...item, sizes: updatedSizes } : item));
                                     }}
-                                    className="w-full bg-white border border-slate-200 rounded px-1.5 py-0.5 text-center font-bold"
+                                    className="w-full bg-transparent border-none font-bold text-slate-800 focus:ring-1 focus:ring-slate-800 rounded px-1 text-xs"
                                   />
-                                </div>
-                                <div>
-                                  <label className="block text-[8px] text-slate-400 uppercase font-bold">Label</label>
+                                </td>
+                                <td className="p-2">
                                   <input 
                                     type="text" 
                                     value={sz.label} 
                                     onChange={e => {
-                                      const updatedSizes = [...fam.sizes];
+                                      const updatedSizes = [...currentFamily.sizes];
                                       updatedSizes[szIdx] = { ...sz, label: e.target.value };
-                                      const updatedFam = { ...fam, sizes: updatedSizes };
-                                      setContainersCatalog(prev => prev.map(item => item.id === fam.id ? updatedFam : item));
+                                      setContainersCatalog(prev => prev.map(item => item.id === currentFamily.id ? { ...item, sizes: updatedSizes } : item));
                                     }}
-                                    className="w-full bg-white border border-slate-200 rounded px-1.5 py-0.5 text-center font-bold"
+                                    className="w-full bg-transparent border-none font-bold text-slate-800 focus:ring-1 focus:ring-slate-800 rounded px-1 text-xs"
                                   />
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-3 gap-1.5">
-                                {fam.sectionType === 'rettangolare' ? (
+                                </td>
+                                {isRect ? (
                                   <>
-                                    <div>
-                                      <label className="block text-[7px] text-slate-400 uppercase font-bold">Largh.</label>
+                                    <td className="p-2">
                                       <input 
                                         type="number" 
                                         value={sz.width || 0} 
                                         onChange={e => {
-                                          const updatedSizes = [...fam.sizes];
+                                          const updatedSizes = [...currentFamily.sizes];
                                           updatedSizes[szIdx] = { ...sz, width: parseFloat(e.target.value) || 0 };
-                                          const updatedFam = { ...fam, sizes: updatedSizes };
-                                          setContainersCatalog(prev => prev.map(item => item.id === fam.id ? updatedFam : item));
+                                          setContainersCatalog(prev => prev.map(item => item.id === currentFamily.id ? { ...item, sizes: updatedSizes } : item));
                                         }}
-                                        className="w-full bg-white border border-slate-200 rounded px-1 py-0.5 text-center font-bold"
+                                        className="w-full bg-transparent border-none font-bold text-slate-750 text-center focus:ring-1 focus:ring-slate-800 rounded px-1 text-xs"
                                       />
-                                    </div>
-                                    <div>
-                                      <label className="block text-[7px] text-slate-400 uppercase font-bold">Alt.</label>
+                                    </td>
+                                    <td className="p-2">
                                       <input 
                                         type="number" 
                                         value={sz.height || 0} 
                                         onChange={e => {
-                                          const updatedSizes = [...fam.sizes];
+                                          const updatedSizes = [...currentFamily.sizes];
                                           updatedSizes[szIdx] = { ...sz, height: parseFloat(e.target.value) || 0 };
-                                          const updatedFam = { ...fam, sizes: updatedSizes };
-                                          setContainersCatalog(prev => prev.map(item => item.id === fam.id ? updatedFam : item));
+                                          setContainersCatalog(prev => prev.map(item => item.id === currentFamily.id ? { ...item, sizes: updatedSizes } : item));
                                         }}
-                                        className="w-full bg-white border border-slate-200 rounded px-1 py-0.5 text-center font-bold"
+                                        className="w-full bg-transparent border-none font-bold text-slate-750 text-center focus:ring-1 focus:ring-slate-800 rounded px-1 text-xs"
                                       />
-                                    </div>
-                                    <div>
-                                      <label className="block text-[7px] text-slate-400 uppercase font-bold">Coperc.</label>
+                                    </td>
+                                    <td className="p-2">
+                                      <input 
+                                        type="number" 
+                                        step="any"
+                                        value={sz.weight || 0} 
+                                        onChange={e => {
+                                          const updatedSizes = [...currentFamily.sizes];
+                                          updatedSizes[szIdx] = { ...sz, weight: parseFloat(e.target.value) || 0 };
+                                          setContainersCatalog(prev => prev.map(item => item.id === currentFamily.id ? { ...item, sizes: updatedSizes } : item));
+                                        }}
+                                        className="w-full bg-transparent border-none font-bold text-slate-750 text-center focus:ring-1 focus:ring-slate-800 rounded px-1 text-xs"
+                                      />
+                                    </td>
+                                    <td className="p-2">
                                       <input 
                                         type="number" 
                                         step="any"
                                         value={sz.coverWeight || 0} 
                                         onChange={e => {
-                                          const updatedSizes = [...fam.sizes];
+                                          const updatedSizes = [...currentFamily.sizes];
                                           updatedSizes[szIdx] = { ...sz, coverWeight: parseFloat(e.target.value) || 0 };
-                                          const updatedFam = { ...fam, sizes: updatedSizes };
-                                          setContainersCatalog(prev => prev.map(item => item.id === fam.id ? updatedFam : item));
+                                          setContainersCatalog(prev => prev.map(item => item.id === currentFamily.id ? { ...item, sizes: updatedSizes } : item));
                                         }}
-                                        className="w-full bg-white border border-slate-200 rounded px-1 py-0.5 text-center font-bold"
+                                        className="w-full bg-transparent border-none font-bold text-slate-750 text-center focus:ring-1 focus:ring-slate-800 rounded px-1 text-xs"
                                       />
-                                    </div>
+                                    </td>
                                   </>
                                 ) : (
                                   <>
-                                    <div>
-                                      <label className="block text-[7px] text-slate-400 uppercase font-bold">Ø Est.</label>
+                                    <td className="p-2">
                                       <input 
                                         type="number" 
                                         value={sz.outerDiameter || 0} 
                                         onChange={e => {
-                                          const updatedSizes = [...fam.sizes];
+                                          const updatedSizes = [...currentFamily.sizes];
                                           updatedSizes[szIdx] = { ...sz, outerDiameter: parseFloat(e.target.value) || 0 };
-                                          const updatedFam = { ...fam, sizes: updatedSizes };
-                                          setContainersCatalog(prev => prev.map(item => item.id === fam.id ? updatedFam : item));
+                                          setContainersCatalog(prev => prev.map(item => item.id === currentFamily.id ? { ...item, sizes: updatedSizes } : item));
                                         }}
-                                        className="w-full bg-white border border-slate-200 rounded px-1 py-0.5 text-center font-bold"
+                                        className="w-full bg-transparent border-none font-bold text-slate-750 text-center focus:ring-1 focus:ring-slate-800 rounded px-1 text-xs"
                                       />
-                                    </div>
-                                    <div>
-                                      <label className="block text-[7px] text-slate-400 uppercase font-bold">Ø Int.</label>
+                                    </td>
+                                    <td className="p-2">
                                       <input 
                                         type="number" 
                                         value={sz.innerDiameter || 0} 
                                         onChange={e => {
-                                          const updatedSizes = [...fam.sizes];
+                                          const updatedSizes = [...currentFamily.sizes];
                                           updatedSizes[szIdx] = { ...sz, innerDiameter: parseFloat(e.target.value) || 0 };
-                                          const updatedFam = { ...fam, sizes: updatedSizes };
-                                          setContainersCatalog(prev => prev.map(item => item.id === fam.id ? updatedFam : item));
+                                          setContainersCatalog(prev => prev.map(item => item.id === currentFamily.id ? { ...item, sizes: updatedSizes } : item));
                                         }}
-                                        className="w-full bg-white border border-slate-200 rounded px-1 py-0.5 text-center font-bold"
+                                        className="w-full bg-transparent border-none font-bold text-slate-750 text-center focus:ring-1 focus:ring-slate-800 rounded px-1 text-xs"
                                       />
-                                    </div>
+                                    </td>
+                                    <td className="p-2">
+                                      <input 
+                                        type="number" 
+                                        step="any"
+                                        value={sz.weight || 0} 
+                                        onChange={e => {
+                                          const updatedSizes = [...currentFamily.sizes];
+                                          updatedSizes[szIdx] = { ...sz, weight: parseFloat(e.target.value) || 0 };
+                                          setContainersCatalog(prev => prev.map(item => item.id === currentFamily.id ? { ...item, sizes: updatedSizes } : item));
+                                        }}
+                                        className="w-full bg-transparent border-none font-bold text-slate-750 text-center focus:ring-1 focus:ring-slate-800 rounded px-1 text-xs"
+                                      />
+                                    </td>
                                   </>
                                 )}
-                              </div>
-                              
-                              <div>
-                                <label className="block text-[8px] text-slate-400 uppercase font-bold">Peso Vuoto (kg/m)</label>
-                                <input 
-                                  type="number" 
-                                  step="any"
-                                  value={sz.weight} 
-                                  onChange={e => {
-                                    const updatedSizes = [...fam.sizes];
-                                    updatedSizes[szIdx] = { ...sz, weight: parseFloat(e.target.value) || 0 };
-                                    const updatedFam = { ...fam, sizes: updatedSizes };
-                                    setContainersCatalog(prev => prev.map(item => item.id === fam.id ? updatedFam : item));
-                                  }}
-                                  className="w-full bg-white border border-slate-200 rounded px-1.5 py-0.5 font-bold text-slate-700"
-                                />
-                              </div>
-                            </div>
-                          ))}
-                          
-                          <button 
-                            onClick={() => {
-                              const updatedSizes = [...fam.sizes, { code: 'NEW_CODE', label: 'Nuova Misura', weight: 0.5, width: 100, height: 75 }];
-                              const updatedFam = { ...fam, sizes: updatedSizes };
-                              setContainersCatalog(prev => prev.map(item => item.id === fam.id ? updatedFam : item));
-                            }}
-                            className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center flex items-center justify-center text-slate-400 hover:border-slate-800 hover:text-slate-700 cursor-pointer font-bold"
-                          >
-                            + Aggiungi Misura
-                          </button>
-                        </div>
+                                <td className="p-2 text-center">
+                                  <button 
+                                    onClick={() => {
+                                      const updatedSizes = currentFamily.sizes.filter((_, idx) => idx !== szIdx);
+                                      setContainersCatalog(prev => prev.map(item => item.id === currentFamily.id ? { ...item, sizes: updatedSizes } : item));
+                                    }}
+                                    className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 cursor-pointer font-bold text-xs"
+                                  >
+                                    ✕
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                    )}
+                      
+                      <button 
+                        onClick={() => {
+                          const updatedSizes = [...currentFamily.sizes, 
+                            isRect 
+                              ? { code: 'NEW_RECT', label: 'Nuova Misura', weight: 0.5, width: 100, height: 75, coverWeight: 0.2 }
+                              : { code: 'NEW_CIRC', label: 'Nuova Misura', weight: 0.4, outerDiameter: 50, innerDiameter: 46 }
+                          ];
+                          setContainersCatalog(prev => prev.map(item => item.id === currentFamily.id ? { ...item, sizes: updatedSizes } : item));
+                        }}
+                        className="w-full border-2 border-dashed border-slate-200 rounded-xl py-2.5 text-center flex items-center justify-center text-slate-400 hover:border-slate-800 hover:text-slate-700 cursor-pointer font-bold text-xs transition-colors"
+                      >
+                        + Aggiungi Riga Misura
+                      </button>
+                    </div>
                   </div>
                 );
-              })}
+              })() : (
+                <div className="flex-1 w-full bg-white rounded-3xl p-8 border border-slate-200 shadow-sm text-center text-slate-400 font-bold">
+                  Nessun condotto selezionato. Seleziona o aggiungi una famiglia di condotti.
+                </div>
+              )}
             </div>
           )}
 
           {/* TAB: TUBI & SCABREZZE (TERMOIDRAULICA) */}
           {activeTab === 'tubi' && (
-            <div className="flex flex-col lg:flex-row gap-6 items-start">
+            <div className="flex flex-col lg:flex-row gap-6 items-start text-xs">
               {/* Menu laterale materiali */}
               <div className="w-full lg:w-64 bg-white rounded-3xl p-4 border border-slate-200 shadow-sm shrink-0">
                 <span className="text-[10px] font-black text-slate-400 uppercase block mb-3">Materiali Tubazione</span>
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1.5 font-bold">
                   {Object.keys(pipeCatalog).map(matName => (
                     <button 
                       key={matName}
@@ -853,108 +1149,290 @@ export function DatabaseManager({ type, setAppMode, projectData }: DatabaseManag
               </div>
 
               {/* Dettagli materiale selezionato */}
-              {selectedMaterial && pipeCatalog[selectedMaterial] && (
-                <div className="flex-1 w-full bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
-                  <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                    <h3 className="text-base font-black text-slate-850">{selectedMaterial}</h3>
-                    <button 
-                      onClick={handleSavePipeCatalog}
-                      className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-750 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Save className="w-3.5 h-3.5" /> Salva Modifiche
-                    </button>
-                  </div>
+              {selectedMaterial && pipeCatalog[selectedMaterial] && (() => {
+                const currentMaterial = pipeCatalog[selectedMaterial];
+                const allPNs = Array.from(new Set(
+                  Object.values(currentMaterial.specs).flatMap(spec => Object.keys(spec))
+                )).sort();
+                
+                const dns = Object.keys(currentMaterial.specs).sort((a, b) => {
+                  const numA = parseFloat(a.replace(/[^0-9.]/g, '')) || 0;
+                  const numB = parseFloat(b.replace(/[^0-9.]/g, '')) || 0;
+                  return numA - numB;
+                });
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">Scabrezza (mm)</label>
-                      <input 
-                        type="number"
-                        step="any"
-                        value={pipeCatalog[selectedMaterial].roughness}
-                        onChange={e => {
-                          const updated = { ...pipeCatalog };
-                          updated[selectedMaterial].roughness = parseFloat(e.target.value) || 0;
-                          setPipeCatalog(updated);
-                        }}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">Conducibilità Lambda (W/mK)</label>
-                      <input 
-                        type="number"
-                        step="any"
-                        value={pipeCatalog[selectedMaterial].lambda}
-                        onChange={e => {
-                          const updated = { ...pipeCatalog };
-                          updated[selectedMaterial].lambda = parseFloat(e.target.value) || 0;
-                          setPipeCatalog(updated);
-                        }}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wide block">Tabella Dimensioni (DN e Diametro Interno in mm)</span>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                      {Object.keys(pipeCatalog[selectedMaterial].specs).map(dn => {
-                        const spec = pipeCatalog[selectedMaterial].specs[dn];
-                        return (
-                          <div key={dn} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2 relative">
-                            <button 
-                              onClick={async () => {
-                                const confirmed = await window.suiteUI?.confirm(`Vuoi rimuovere il DN ${dn} per questo materiale?`);
-                                if (!confirmed) return;
-                                const updated = { ...pipeCatalog };
-                                delete updated[selectedMaterial].specs[dn];
-                                setPipeCatalog(updated);
-                              }}
-                              className="absolute top-2 right-2 text-slate-450 hover:text-rose-600 font-bold"
-                            >
-                              ✕
-                            </button>
-                            <span className="text-xs font-bold text-slate-800 block">Diametro Nominale DN {dn}</span>
-                            
-                            <div className="space-y-1.5">
-                              {Object.keys(spec).map(pn => (
-                                <div key={pn} className="flex items-center justify-between text-[11px] gap-2">
-                                  <span className="text-slate-500 font-bold shrink-0">{pn}:</span>
-                                  <input 
-                                    type="number"
-                                    step="any"
-                                    value={spec[pn]}
-                                    onChange={e => {
-                                      const updated = { ...pipeCatalog };
-                                      updated[selectedMaterial].specs[dn][pn] = parseFloat(e.target.value) || 0;
-                                      setPipeCatalog(updated);
-                                    }}
-                                    className="w-20 bg-white border border-slate-200 rounded px-1.5 py-0.5 text-center font-bold text-slate-700"
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-
+                return (
+                  <div className="flex-1 w-full bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+                    <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="p-1.5 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center">
+                          <Layers className="w-4 h-4" />
+                        </span>
+                        <h3 className="text-sm font-black text-slate-805">{selectedMaterial}</h3>
+                      </div>
                       <button 
-                        onClick={() => {
-                          const updated = { ...pipeCatalog };
-                          const newDN = String(Math.max(...Object.keys(updated[selectedMaterial].specs).map(Number)) + 5);
-                          updated[selectedMaterial].specs[newDN] = { "NORM": 50 };
-                          setPipeCatalog(updated);
-                        }}
-                        className="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center flex items-center justify-center text-slate-400 hover:border-slate-800 hover:text-slate-700 cursor-pointer font-bold text-xs"
+                        onClick={handleSavePipeCatalog}
+                        className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-750 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow border border-slate-800"
                       >
-                        + Aggiungi Nuovo DN
+                        <Save className="w-3.5 h-3.5" /> Salva Modifiche
                       </button>
                     </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">Scabrezza Equivalente (mm)</label>
+                        <input 
+                          type="number"
+                          step="any"
+                          value={currentMaterial.roughness}
+                          onChange={e => {
+                            const val = parseFloat(e.target.value) || 0;
+                            setPipeCatalog(prev => ({
+                              ...prev,
+                              [selectedMaterial]: { ...prev[selectedMaterial], roughness: val }
+                            }));
+                          }}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-750 focus:outline-none focus:border-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-slate-400 font-bold uppercase mb-1">Conducibilità Lambda (W/mK)</label>
+                        <input 
+                          type="number"
+                          step="any"
+                          value={currentMaterial.lambda}
+                          onChange={e => {
+                            const val = parseFloat(e.target.value) || 0;
+                            setPipeCatalog(prev => ({
+                              ...prev,
+                              [selectedMaterial]: { ...prev[selectedMaterial], lambda: val }
+                            }));
+                          }}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-750 focus:outline-none focus:border-slate-800"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Tabella bidimensionale */}
+                    <div className="space-y-3 pt-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wide block">
+                          Tabella Diametri Interni (mm)
+                        </span>
+                        
+                        {/* Gestione colonne e righe */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1">
+                            <input 
+                              type="text" 
+                              placeholder="Nuova Spec. (es: PN16, Sch40)" 
+                              value={newColName} 
+                              onChange={e => setNewColName(e.target.value)}
+                              className="bg-transparent border-none text-[11px] font-semibold outline-none w-36"
+                            />
+                            <button 
+                              onClick={() => {
+                                if (!newColName.trim()) return;
+                                const col = newColName.trim();
+                                setPipeCatalog(prev => {
+                                  const updated = { ...prev };
+                                  const specs = updated[selectedMaterial].specs;
+                                  Object.keys(specs).forEach(dn => {
+                                    if (specs[dn][col] === undefined) {
+                                      specs[dn][col] = 0;
+                                    }
+                                  });
+                                  return updated;
+                                });
+                                setNewColName('');
+                                if (window.suiteUI) window.suiteUI.toast(`Colonna "${col}" aggiunta. Ricorda di salvare!`, "info");
+                              }}
+                              className="text-slate-500 hover:text-slate-800 font-bold text-xs px-1 cursor-pointer"
+                            >
+                              + Colonna
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1">
+                            <input 
+                              type="text" 
+                              placeholder="Nuovo DN (es: 65, 80)" 
+                              value={newRowDN} 
+                              onChange={e => setNewRowDN(e.target.value)}
+                              className="bg-transparent border-none text-[11px] font-semibold outline-none w-28"
+                            />
+                            <button 
+                              onClick={() => {
+                                if (!newRowDN.trim()) return;
+                                const dn = newRowDN.trim();
+                                if (currentMaterial.specs[dn]) {
+                                  if (window.suiteUI) window.suiteUI.toast("Questo DN esiste già!", "warning");
+                                  return;
+                                }
+                                setPipeCatalog(prev => {
+                                  const updated = { ...prev };
+                                  const newSpec: Record<string, number> = {};
+                                  allPNs.forEach(col => {
+                                    newSpec[col] = 0;
+                                  });
+                                  if (allPNs.length === 0) {
+                                    newSpec["NORM"] = 0;
+                                  }
+                                  updated[selectedMaterial].specs[dn] = newSpec;
+                                  return updated;
+                                });
+                                setNewRowDN('');
+                              }}
+                              className="text-slate-500 hover:text-slate-800 font-bold text-xs px-1 cursor-pointer"
+                            >
+                              + DN
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="overflow-x-auto border border-slate-150 rounded-2xl bg-white">
+                        <table className="w-full text-left border-collapse text-[11px]">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-150 text-[10px] text-slate-400 font-black uppercase">
+                              <th className="p-3 text-center border-r border-slate-150 w-24">DN (Riga)</th>
+                              {allPNs.map(pn => (
+                                <th key={pn} className="p-3 text-center border-r border-slate-150 group min-w-[100px]">
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <input 
+                                      type="text" 
+                                      defaultValue={pn}
+                                      onBlur={e => {
+                                        const newPn = e.target.value.trim();
+                                        if (newPn && newPn !== pn) {
+                                          setPipeCatalog(prev => {
+                                            const updated = { ...prev };
+                                            const specs = updated[selectedMaterial].specs;
+                                            Object.keys(specs).forEach(dn => {
+                                              if (specs[dn][pn] !== undefined) {
+                                                specs[dn][newPn] = specs[dn][pn];
+                                                delete specs[dn][pn];
+                                              }
+                                            });
+                                            return updated;
+                                          });
+                                        }
+                                      }}
+                                      className="bg-transparent border-none text-center font-black w-14 focus:ring-1 focus:ring-slate-800 rounded text-[10px] text-slate-650"
+                                      title="Modifica nome specifica"
+                                    />
+                                    <button 
+                                      onClick={async () => {
+                                        const confirmed = await window.suiteUI?.confirm(`Vuoi eliminare la colonna di specifica "${pn}" e tutti i diametri correlati?`);
+                                        if (!confirmed) return;
+                                        setPipeCatalog(prev => {
+                                          const updated = { ...prev };
+                                          Object.keys(updated[selectedMaterial].specs).forEach(dn => {
+                                            delete updated[selectedMaterial].specs[dn][pn];
+                                          });
+                                          return updated;
+                                        });
+                                      }}
+                                      className="text-slate-350 hover:text-rose-500 text-[9px] font-bold cursor-pointer"
+                                      title="Elimina specifica"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                </th>
+                              ))}
+                              <th className="p-3 text-center w-16">Azioni</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {dns.map(dn => {
+                              const spec = currentMaterial.specs[dn];
+                              return (
+                                <tr key={dn} className="border-b border-slate-100 hover:bg-slate-50/50">
+                                  <td className="p-2 border-r border-slate-150 text-center font-bold">
+                                    <input 
+                                      type="text" 
+                                      defaultValue={dn}
+                                      onBlur={e => {
+                                        const newDN = e.target.value.trim();
+                                        if (newDN && newDN !== dn) {
+                                          if (currentMaterial.specs[newDN]) {
+                                            if (window.suiteUI) window.suiteUI.toast("DN duplicato!", "warning");
+                                            e.target.value = dn;
+                                            return;
+                                          }
+                                          setPipeCatalog(prev => {
+                                            const updated = { ...prev };
+                                            updated[selectedMaterial].specs[newDN] = updated[selectedMaterial].specs[dn];
+                                            delete updated[selectedMaterial].specs[dn];
+                                            return updated;
+                                          });
+                                        }
+                                      }}
+                                      className="bg-transparent border-none text-center font-bold w-12 text-slate-800 focus:ring-1 focus:ring-slate-800 rounded"
+                                    />
+                                  </td>
+
+                                  {allPNs.map(pn => (
+                                    <td key={pn} className="p-1 border-r border-slate-150 text-center">
+                                      {spec[pn] !== undefined ? (
+                                        <input 
+                                          type="number"
+                                          step="any"
+                                          value={spec[pn]}
+                                          onChange={e => {
+                                            const val = parseFloat(e.target.value) || 0;
+                                            setPipeCatalog(prev => {
+                                              const updated = { ...prev };
+                                              updated[selectedMaterial].specs[dn][pn] = val;
+                                              return updated;
+                                            });
+                                          }}
+                                          className="w-16 bg-transparent border-none text-center font-bold text-slate-700 focus:ring-1 focus:ring-slate-800 rounded"
+                                        />
+                                      ) : (
+                                        <button
+                                          onClick={() => {
+                                            setPipeCatalog(prev => {
+                                              const updated = { ...prev };
+                                              updated[selectedMaterial].specs[dn][pn] = 0;
+                                              return updated;
+                                            });
+                                          }}
+                                          className="text-slate-350 hover:text-slate-700 italic font-medium cursor-pointer"
+                                        >
+                                          + Aggiungi
+                                        </button>
+                                      )}
+                                    </td>
+                                  ))}
+
+                                  <td className="p-2 text-center">
+                                    <button 
+                                      onClick={async () => {
+                                        const confirmed = await window.suiteUI?.confirm(`Vuoi rimuovere interamente la riga DN ${dn} per questo materiale?`);
+                                        if (!confirmed) return;
+                                        setPipeCatalog(prev => {
+                                          const updated = { ...prev };
+                                          delete updated[selectedMaterial].specs[dn];
+                                          return updated;
+                                        });
+                                      }}
+                                      className="p-1 text-slate-400 hover:text-rose-600 rounded hover:bg-rose-50 cursor-pointer font-bold text-xs"
+                                    >
+                                      ✕
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           )}
 
