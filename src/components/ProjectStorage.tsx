@@ -27,6 +27,7 @@ interface Project {
   notes: string;
   data: any;
   updatedAt: string;
+  isShared?: boolean;
 }
 
 interface ProjectStorageProps {
@@ -203,7 +204,7 @@ export default function ProjectStorage({
           );
           const sharedSnapshot = await getDocs(qShared);
           sharedSnapshot.forEach((docSnapshot) => {
-            list.push({ id: docSnapshot.id, ...docSnapshot.data(), isShared: true } as Project);
+            list.push({ id: docSnapshot.id, ...docSnapshot.data(), isShared: true } as unknown as Project);
           });
           sharedSuccess = true;
         } catch (e) {
@@ -219,7 +220,7 @@ export default function ProjectStorage({
           );
           const personalSnapshot = await getDocs(qPersonal);
           personalSnapshot.forEach((docSnapshot) => {
-            const p = { id: docSnapshot.id, ...docSnapshot.data(), isShared: false } as Project;
+            const p = { id: docSnapshot.id, ...docSnapshot.data(), isShared: false } as unknown as Project;
             personalProjects.push(p);
             if (!list.some(oldP => oldP.id === docSnapshot.id)) {
               list.push(p);
@@ -275,7 +276,7 @@ export default function ProjectStorage({
               const sharedSnapshot = await getDocs(qShared);
               const updatedList: Project[] = [];
               sharedSnapshot.forEach((docSnapshot) => {
-                updatedList.push({ id: docSnapshot.id, ...docSnapshot.data(), isShared: true } as Project);
+                updatedList.push({ id: docSnapshot.id, ...docSnapshot.data(), isShared: true } as unknown as Project);
               });
               // Aggiungi eventuali rimanenti personali non migrati
               personalProjects.forEach((p) => {
@@ -315,7 +316,7 @@ export default function ProjectStorage({
         author: projectInfo.author || '',
         date: projectInfo.date || new Date().toISOString().split('T')[0],
         notes: projectInfo.notes || '',
-        data: currentData,
+        data: JSON.parse(JSON.stringify(currentData)),
         updatedAt: new Date().toISOString()
       };
 
@@ -397,7 +398,7 @@ export default function ProjectStorage({
             author: projectInfo.author || '',
             date: projectInfo.date || new Date().toISOString().split('T')[0],
             notes: projectInfo.notes || '',
-            data: currentData,
+            data: JSON.parse(JSON.stringify(currentData)),
             updatedAt: new Date().toISOString()
           });
           await fetchProjects(user);
@@ -411,7 +412,7 @@ export default function ProjectStorage({
               author: projectInfo.author || '',
               date: projectInfo.date || new Date().toISOString().split('T')[0],
               notes: projectInfo.notes || '',
-              data: currentData,
+              data: JSON.parse(JSON.stringify(currentData)),
               updatedAt: new Date().toISOString()
             });
             await fetchProjects(user);

@@ -780,7 +780,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                         fontSize="7.5"
                         fontWeight="600"
                       >
-                        {mode === 'electric' ? `${formatNumber(l.pressioneNodo, 1)}%` : `${formatNumber(l.pressioneNodo, 2)} barg`}
+                        {`${formatNumber(l.pressioneNodo, 2)} barg`}
                       </text>
                       <text
                         x={labelX}
@@ -790,7 +790,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                         fontSize="7.5"
                         fontWeight="600"
                       >
-                        {mode === 'electric' ? `${formatNumber(l.pressioneNodo, 1)}%` : `${formatNumber(l.pressioneNodo, 2)} barg`}
+                        {`${formatNumber(l.pressioneNodo, 2)} barg`}
                       </text>
                     </g>
                   );

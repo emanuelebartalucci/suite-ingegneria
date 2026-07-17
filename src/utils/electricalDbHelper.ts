@@ -63,8 +63,9 @@ export async function seedElectricalCatalog(db: Firestore): Promise<void> {
     const isCablesOutdated = !fg16om16Doc || !fg16om16Doc.data().formations || fg16om16Doc.data().formations.length < 50;
     const hasNewCables = querySnapshot.docs.some(d => d.id === 'fg16r16');
     const hasPasserellaFilo = querySnapshot.docs.some(d => d.id === 'passerella_filo');
+    const hasOlflex = querySnapshot.docs.some(d => d.id === 'olflex_classic_110_ch');
 
-    if (isCablesOutdated || !hasNewCables || !hasPasserellaFilo) {
+    if (isCablesOutdated || !hasNewCables || !hasPasserellaFilo || !hasOlflex) {
       console.log("Rilevata versione precedente o parziale su Firestore. Avvio allineamento complessivo (cavi e condotti)...");
       // Allineamento cavi
       for (const cavo of INITIAL_CABLES) {
@@ -89,7 +90,8 @@ export async function fetchElectricalCables(db: Firestore, isDemo: boolean): Pro
     const catalog = getLocalCatalog();
     const fg16om16 = catalog.cables.find(c => c.id === 'fg16om16');
     const isOutdated = !fg16om16 || !fg16om16.formations || fg16om16.formations.length < 50;
-    if (isOutdated || !catalog.cables.some(c => c.id === 'fg16r16') || !catalog.containers.some(c => c.id === 'passerella_filo')) {
+    const hasOlflex = catalog.cables.some(c => c.id === 'olflex_classic_110_ch');
+    if (isOutdated || !catalog.cables.some(c => c.id === 'fg16r16') || !catalog.containers.some(c => c.id === 'passerella_filo') || !hasOlflex) {
       saveLocalCatalog(INITIAL_CABLES, INITIAL_CONTAINERS);
       return INITIAL_CABLES;
     }
@@ -119,8 +121,9 @@ export async function fetchElectricalCables(db: Firestore, isDemo: boolean): Pro
     // Se mancano i nuovi cavi o le formazioni su Firestore, allineiamo
     const fg16om16 = results.find(c => c.id === 'fg16om16');
     const isOutdated = !fg16om16 || fg16om16.formations.length < 50;
+    const hasOlflex = results.some(c => c.id === 'olflex_classic_110_ch');
 
-    if (isOutdated || !results.some(c => c.id === 'fg16r16')) {
+    if (isOutdated || !results.some(c => c.id === 'fg16r16') || !hasOlflex) {
       console.log("Rilevata assenza o versione parziale su Firestore, eseguo allineamento...");
       await seedElectricalCatalog(db);
       const updatedSnap = await getDocs(q);

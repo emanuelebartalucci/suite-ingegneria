@@ -1,0 +1,49 @@
+Created At: 2026-07-17T10:14:50Z
+Completed At: 2026-07-17T10:14:50Z
+File Path: `file:///c:/Users/e.bartalucci.INGEGNO.001/Documents/Antigravity/suite-ingegneria/src/data/electricalDatabase.ts`
+Total Lines: 710
+Total Bytes: 37665
+Showing lines 520 to 560
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+520:       { formation: '1x70', diameter: 16.5, weight: 0.755 },
+521:       { formation: '1x95', diameter: 18.4, weight: 0.975 },
+522:       { formation: '1x120', diameter: 20.5, weight: 1.237 },
+523:       { formation: '1x150', diameter: 22.4, weight: 1.533 },
+524:       { formation: '1x185', diameter: 25.0, weight: 1.875 },
+525:       { formation: '1x240', diameter: 28.4, weight: 2.420 },
+526:       { formation: '1x300', diameter: 31.6, weight: 3.008 },
+527:       { formation: '1x400', diameter: 34.2, weight: 3.865 },
+528:       { formation: '1x500', diameter: 41.2, weight: 5.080 },
+529:       { formation: '1x630', diameter: 46.2, weight: 6.560 }
+530:     ]
+531:   }
+532: ];
+533: 
+534: export const INITIAL_CONTAINERS: ContainerFamily[] = [
+535:   {
+536:     id: 'canala_met_chiusa',
+537:     name: 'Canale metallico chiuso',
+538:     description: 'Passerella blindata zincata in continuo (Sendzimir) per installazione a vista.',
+539:     type: 'contenitore',
+540:     sectionType: 'rettangolare',
+541:     installationType: 'vista',
+542:     sizes: [
+543:       // H75
+544:       { code: 'R3075Z', label: '75x75', width: 75, height: 75, weight: 1.22, coverWeight: 0.46 },
+545:       { code: 'R3100Z', label: '75x100', width: 100, height: 75, weight: 1.33, coverWeight: 0.55 },
+546:       { code: 'R3150Z', label: '75x150', width: 150, height: 75, weight: 1.60, coverWeight: 0.75 },
+547:       { code: 'R3200Z', label: '75x200', width: 200, height: 75, weight: 2.26, coverWeight: 0.94 },
+548:       { code: 'R3300Z', label: '75x300', width: 300, height: 75, weight: 2.90, coverWeight: 1.60 },
+549:       { code: 'R3400Z', label: '75x400', width: 400, height: 75, weight: 4.10, coverWeight: 2.59 },
+550:       { code: 'R3500Z', label: '75x500', width: 500, height: 75, weight: 4.80, coverWeight: 3.18 },
+551:       { code: 'R3600Z', label: '75x600', width: 600, height: 75, weight: 5.50, coverWeight: 3.77 },
+552:       // H100
+553:       { code: 'R10100Z', label: '100x100', width: 100, height: 100, weight: 1.55, coverWeight: 0.55 },
+554:       { code: 'R10150Z', label: '100x150', width: 150, height: 100, weight: 1.79, coverWeight: 0.75 },
+555:       { code: 'R10200Z', label: '100x200', width: 200, height: 100, weight: 3.03, coverWeight: 0.94 },
+556:       { code: 'R10300Z', label: '100x300', width: 300, height: 100, weight: 3.74, coverWeight: 1.60 },
+557:       { code: 'R10400Z', label: '100x400', width: 400, height: 100, weight: 4.44, coverWeight: 2.59 },
+558:       { code: 'R10500Z', label: '100x500', width: 500, height: 100, weight: 5.15, coverWeight: 3.18 },
+559:       { code: 'R10600Z', label: '100x600', width: 600, height: 100, weight: 5.40, coverWeight: 3.77 }
+560:     ]
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.
