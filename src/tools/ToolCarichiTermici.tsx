@@ -373,15 +373,17 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode, pi
 
     return (
         <div className="max-w-6xl mx-auto animate-fade-in">
-            <ProjectHeader pData={projectData} setPData={setProjectData} title="Calcolo Carichi Termici & Reti" setAppMode={setAppMode} iconColor="orange" />
+            <div className="mb-6">
+                <ProjectStorage 
+                    toolType="termico"
+                    currentData={getCloudSaveData()}
+                    onLoadProject={handleLoadCloudProject}
+                    projectInfo={projectData}
+                    setProjectInfo={setProjectData}
+                />
+            </div>
             
-            <ProjectStorage 
-                toolType="termico"
-                currentData={getCloudSaveData()}
-                onLoadProject={handleLoadCloudProject}
-                projectInfo={projectData}
-                setProjectInfo={setProjectData}
-            />
+            <ProjectHeader pData={projectData} setPData={setProjectData} title="Calcolo Carichi Termici & Reti" setAppMode={setAppMode} iconColor="orange" />
 
             {/* Spiegazione & Formula */}
             <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">

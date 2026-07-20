@@ -35,7 +35,7 @@ import {
 import * as XLSX from 'xlsx';
 import TopologicalTree, { TrattoNode } from '../components/TopologicalTree';
 
-interface ToolDimensionamentoCanaliProps {
+interface ToolVerificaRiempimentoCanalizzazioniProps {
   projectData: ProjectData;
   setProjectData: (data: any) => void;
   setAppMode: (mode: string) => void;
@@ -45,6 +45,7 @@ interface ToolDimensionamentoCanaliProps {
 
 interface CavoSelezionato {
   cableId: string;        // ID del tipo cavo o 'personalizzato'
+  sigla?: string;         // Riferimento progressivo del cavo (es. '01')
   formation: string;      // Formazione scelta, es. '3x50' o nome personalizzato
   diameter: number;       // Diametro esterno in mm
   weight: number;         // Peso in kg/m
@@ -158,7 +159,7 @@ const formatContainerSizeLabel = (
     if (isRect) {
       const h = tratta.customHeight || 0;
       const l = tratta.customWidth || 0;
-      return `Personalizzato: ${h}x${l} mm (H x L)`;
+      return `Personalizzato: ${l}x${h} mm (L x H)`;
     } else {
       const ext = tratta.customOuterDiameter || 0;
       const int = tratta.customInnerDiameter || 0;
@@ -167,7 +168,7 @@ const formatContainerSizeLabel = (
   }
   if (!size) return 'Personalizzato';
   if (family && family.sectionType === 'rettangolare') {
-    return `${size.height}x${size.width} mm (H x L)`;
+    return `${size.width}x${size.height} mm (L x H)`;
   } else {
     const ext = size.outerDiameter || size.width || 0;
     const int = size.innerDiameter || size.height || 0;
@@ -642,17 +643,20 @@ const SezioneCanvas: React.FC<{
         const pipeCablesTooMany = flatCables.length > MAX_PIPE_CABLES;
 
         // Algoritmo di Rilassamento Fisico (Verlet Physics) per adagiare i cavi sul fondo del tubo per gravità
-        const iterations = 180;
-        const gravity = 2.0;
+        const iterations = 220;
+        const gravity = 0.8; // Gravità moderata per convergenza fluida
 
         const placedCables = pipeCablesForCanvas.map((c, idx) => {
           const r = (c.diameter / 2) * scale * 0.88;
-          // Sfalsa le posizioni iniziali orizzontalmente per evitare sovrapposizioni perfette
-          const offsetFrac = pipeCablesForCanvas.length > 1
-            ? (idx / (pipeCablesForCanvas.length - 1) - 0.5)
-            : 0;
-          const startX = px + offsetFrac * (innerScaled * 0.6);
-          const startY = py; // Parte dal centro per facilitare l'adagiamento sul fondo
+          // Distribuiamo i cavi in una griglia iniziale ben spaziata intorno al centro per evitare forti sovrapposizioni iniziali
+          const colsCount = Math.ceil(Math.sqrt(pipeCablesForCanvas.length));
+          const col = idx % colsCount;
+          const row = Math.floor(idx / colsCount);
+          const gridSpacing = r * 2.2;
+          
+          const startX = px + (col - (colsCount - 1) / 2) * gridSpacing;
+          const startY = py + (row - Math.ceil(pipeCablesForCanvas.length / colsCount) / 2) * gridSpacing - (innerScaled * 0.2);
+          
           return {
             x: startX,
             y: startY,
@@ -664,13 +668,13 @@ const SezioneCanvas: React.FC<{
 
         // Risoluzione iterativa dei vincoli di gravità, collisione e contenimento circolare
         for (let step = 0; step < iterations; step++) {
-          // 1. Gravità
+          // 1. Gravità graduale
           placedCables.forEach(c => {
             c.y += gravity;
           });
 
-          // Esegue la risoluzione dei vincoli per 3 volte di fila per far convergere perfettamente la fisica
-          for (let sub = 0; sub < 3; sub++) {
+          // Esegue la risoluzione dei vincoli per 8 volte di fila per far convergere perfettamente la fisica ed evitare sovrapposizioni
+          for (let sub = 0; sub < 8; sub++) {
             // 2. Repulsione mutua tra cavi per evitare sovrapposizioni (con 1px di spazio di tolleranza)
             for (let i = 0; i < placedCables.length; i++) {
               for (let j = i + 1; j < placedCables.length; j++) {
@@ -1100,7 +1104,7 @@ export function regenerateTratteTags(
 }
 
 
-export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppMode, cablesCatalog: propCablesCatalog, containersCatalog: propContainersCatalog }: ToolDimensionamentoCanaliProps) {
+export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectData, setAppMode, cablesCatalog: propCablesCatalog, containersCatalog: propContainersCatalog }: ToolVerificaRiempimentoCanalizzazioniProps) {
   // Stati principali dello strumento
   const [state, setState] = useState<ToolState>(defaultState);
   const [activeTab, setActiveTab] = useState<'calcoli' | 'topologia' | 'database'>('calcoli');
@@ -1416,8 +1420,19 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
     const defaultDiameter = defaultCable.formations?.[0]?.diameter || 10;
     const defaultWeight = defaultCable.formations?.[0]?.weight || 0.15;
 
+    // Calcola sigla progressiva (01, 02, 03, ...)
+    let nextNum = 1;
+    const existingNums = activeTratta.cables
+      .map(c => parseInt(c.sigla || '') || 0)
+      .filter(n => n > 0);
+    if (existingNums.length > 0) {
+      nextNum = Math.max(...existingNums) + 1;
+    }
+    const progressiveSigla = String(nextNum).padStart(2, '0');
+
     const newCavo: CavoSelezionato = {
       cableId: defaultCable.id,
+      sigla: progressiveSigla,
       formation: defaultFormation,
       diameter: defaultDiameter,
       weight: defaultWeight,
@@ -1566,9 +1581,6 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
 
   return (
     <div className="bg-slate-100 rounded-3xl p-6 md:p-8 animate-in fade-in duration-300">
-      {/* Intestazione del progetto standard */}
-      <ProjectHeader pData={projectData} setPData={setProjectData} title="Dimensionamento Canale e Tubazioni" setAppMode={setAppMode} iconColor="orange" />
-
       {/* Gestione Progetti Condivisi (Full-width) */}
       <div className="print:hidden mb-6">
         <ProjectStorage 
@@ -1579,6 +1591,9 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
           setProjectInfo={setProjectData} 
         />
       </div>
+
+      {/* Intestazione del progetto standard */}
+      <ProjectHeader pData={projectData} setPData={setProjectData} title="Verifica Riempimento Canalizzazioni Elettriche" setAppMode={setAppMode} iconColor="orange" />
 
       {/* Contenuto principale interattivo (nascosto in stampa) */}
       <div className="print:hidden space-y-6">
@@ -2012,6 +2027,7 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
                     <thead>
                       <tr className="text-slate-400 uppercase font-black tracking-wide text-[10px]">
                         <th className="py-2.5 px-2">Tipo Cavo</th>
+                        <th className="py-2.5 px-2">Sigla</th>
                         <th className="py-2.5 px-2">Formazione</th>
                         <th className="py-2.5 px-2">Q.tà</th>
                         <th className="py-2.5 px-2">Diametro [mm]</th>
@@ -2038,6 +2054,16 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
                                 ))}
                                 <option value="personalizzato">Personalizzato</option>
                               </select>
+                            </td>
+
+                            <td className="py-2.5 px-2">
+                              <input 
+                                type="text"
+                                value={cavo.sigla || ''}
+                                onChange={e => handleUpdateCableInTratta(idx, 'sigla', e.target.value)}
+                                className="bg-slate-50 border border-slate-200 rounded-lg p-1 text-[11px] w-12 text-center font-bold"
+                                placeholder="es. 01"
+                              />
                             </td>
 
                             <td className="py-2.5 px-2">
@@ -2216,182 +2242,210 @@ export function ToolDimensionamentoCanali({ projectData, setProjectData, setAppM
 
       {/* Report di Stampa Clean & Premium (visibile solo in stampa) */}
       <div className="hidden print:block space-y-6 mt-6">
-        <div>
-          <h3 className="text-base font-black text-slate-800 border-b-2 border-slate-800 pb-1 uppercase tracking-wider">
-            Riepilogo e Dimensionamento Condutture Elettriche
-          </h3>
-        </div>
-
-        {/* Certificato di Conformità Ufficiale (CEI 64-8) */}
-        <div className="bg-slate-50 border-l-4 border-slate-700 p-4 rounded-r-xl my-4 print:bg-slate-50">
-          <div className="flex justify-between items-center gap-4">
-            <div className="space-y-1">
-              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Attestato di Conformità Tecnica</span>
-              <p className="text-xs text-slate-700 font-semibold leading-relaxed">
-                Si attesta che il dimensionamento delle condutture elettriche, la scelta dei canali/tubazioni e il calcolo dei relativi tassi di riempimento riportati nel presente report sono stati eseguiti in piena conformità ai requisiti di sicurezza e alle prescrizioni della **Normativa CEI 64-8**.
-              </p>
-            </div>
-            <div className="shrink-0 flex items-center gap-2 border border-slate-300 bg-white px-3 py-1.5 rounded-lg text-slate-800 font-bold">
-              <span className="text-xs">📜</span>
-              <span className="text-[10px] font-black uppercase tracking-wider">CEI 64-8</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabella di Riepilogo delle Tratte */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-300 bg-slate-50 font-bold text-slate-700">
-                <th className="py-2 px-3">Tratta</th>
-                <th className="py-2 px-2 text-center">Lungh. (m)</th>
-                <th className="py-2 px-2">Tipo Posa & Condotto</th>
-                <th className="py-2 px-2">Cavi Installati</th>
-                <th className="py-2 px-2 text-right">Peso (kg/m)</th>
-                <th className="py-2 px-2 text-right">Peso Totale (kg)</th>
-                <th className="py-2 px-3 text-center">Esito CEI 64-8</th>
-              </tr>
-            </thead>
-            <tbody>
-              {state.tratte.map(t => {
-                const fam = containersCatalog.find(f => f.id === t.selectedFamilyId);
-                const sz = fam?.sizes.find(s => s.code === t.selectedSizeCode);
-                const comp = tratteCompliance.find(c => c.tag === t.tag);
-                
-                // Calcola pesi della tratta
-                const isRect = fam ? fam.sectionType === 'rettangolare' : (t.selectedFamilyId === 'personalizzato' && t.customWidth !== undefined);
-                let pesoCavi = 0;
-                t.cables.forEach(c => { pesoCavi += c.weight * (Number(c.qty) || 0); });
-                const N_lines = t.lineQty || (t.doubleLine ? 2 : 1);
-                let pesoCondotto = (sz?.weight || t.customWeight || 0.5) * N_lines;
-                let pesoCoperchio = 0;
-                if (isRect && t.hasCover) {
-                  pesoCoperchio = (sz?.coverWeight || t.customCoverWeight || 0.3) * N_lines;
-                }
-                let pesoSetto = 0;
-                if (t.hasSeparator) {
-                  pesoSetto = (isRect ? (sz?.coverWeight || t.customCoverWeight || 0.3) : 0.2) * N_lines;
-                }
-                const pesoLineare = pesoCavi + pesoCondotto + pesoCoperchio + pesoSetto;
-                const pesoTot = pesoLineare * (Number(t.length) || 0);
-
-                return (
-                  <tr key={t.tag} className="border-b border-slate-200 hover:bg-slate-50/50">
-                    <td className="py-2.5 px-3 font-bold text-slate-800">
-                      {t.name}
-                    </td>
-                    <td className="py-2.5 px-2 text-center font-mono">{formatNumber(t.length, 0)}</td>
-                    <td className="py-2.5 px-2">
-                      <div className="font-semibold text-slate-700">
-                        {t.containmentType === 'vista' ? 'A vista' : t.containmentType === 'cavidotto' ? 'Interrato' : 'Tubo "tazza"'}
-                      </div>
-                      <div className="text-[10px] text-slate-500">
-                        {fam?.name} ({formatContainerSizeLabel(fam, sz, t)}) {N_lines > 1 ? `x ${N_lines} linee` : ''}
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-2">
-                      {t.cables.length === 0 ? (
-                        <span className="text-slate-400 italic text-[10px]">Nessun cavo</span>
-                      ) : (
-                        <ul className="list-disc pl-3 text-[10px] text-slate-650 space-y-0.5">
-                          {t.cables.map((c, idx) => (
-                            <li key={idx}>
-                              {c.formation} (Ø {formatNumber(c.diameter, 1)}mm) x {formatNumber(c.qty, 0)} pz
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-2 text-right font-mono font-semibold">{formatNumber(pesoLineare, 2)}</td>
-                    <td className="py-2.5 px-2 text-right font-mono font-bold">{formatNumber(pesoTot, 1)}</td>
-                    <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                      <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
-                        comp?.verificato ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'
-                      }`}>
-                        {comp?.verificato ? 'Conforme' : 'Non Conforme'} • {formatNumber(comp?.fillRate, 1)}%
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Rappresentazione Grafica in Stampa */}
-        <div className="print:break-inside-avoid page-break-before-auto">
-          <h4 className="text-xs font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">
-            Sezioni e Riempimento dei Condotti
-          </h4>
-          <div className="grid grid-cols-2 gap-4">
-            {state.tratte.map(t => {
-              const fam = containersCatalog.find(f => f.id === t.selectedFamilyId);
-              const sz = fam?.sizes.find(s => s.code === t.selectedSizeCode);
-              const comp = tratteCompliance.find(c => c.tag === t.tag);
-              return (
-                <div key={t.tag} className="border border-slate-200 rounded-2xl p-4 bg-white flex flex-col items-center print:break-inside-avoid shadow-xs">
-                  <span className="text-xs font-bold text-slate-800 mb-2">{t.name}</span>
-                  <div className="scale-90 origin-top">
-                    <SezioneCanvas
-                      tratta={t}
-                      family={fam}
-                      size={sz}
-                      fillRate={comp?.fillRate || 0}
-                    />
-                  </div>
-                  <div className="text-[10px] font-bold text-slate-500 mt-2">
-                    Riempimento: {formatNumber(comp?.fillRate, 1)}% | Stato: {comp?.verificato ? 'CONFORME' : 'NON CONFORME'}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Schema Topologico in Stampa */}
-        <div className="print:break-inside-avoid">
-          <h4 className="text-xs font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">
-            Schema Topologico e Percorsi della Rete
-          </h4>
-          <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50 flex flex-col items-center justify-center min-h-[250px] mb-4">
-            <TopologicalTree 
-              tratti={trattiNodesForTree} 
-              activeTag={state.activeTrattaTag}
-              mode="electric"
-            />
+        
+        {/* PAGINA 1 REPORT */}
+        <div className="w-full">
+          <div>
+            <h3 className="text-base font-black text-slate-800 border-b-2 border-slate-800 pb-1 uppercase tracking-wider">
+              Riepilogo e Dimensionamento Condutture Elettriche
+            </h3>
           </div>
 
-          <div className="mt-4">
-            <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-              Tabella dei Collegamenti (DA ➔ A)
-            </h5>
-            <table className="w-full text-[10px] border-collapse">
+          {/* Tabella di Riepilogo delle Tratte */}
+          <div className="overflow-x-auto mt-6">
+            <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-350 text-slate-500 text-left font-bold">
-                  <th className="pb-1.5">Tratto</th>
-                  <th className="pb-1.5">Partenza (DA)</th>
-                  <th className="pb-1.5">Arrivo (A)</th>
-                  <th className="pb-1.5 text-center">Stato</th>
-                  <th className="pb-1.5 text-right">Riempimento</th>
+                <tr className="border-b border-slate-300 bg-slate-50 font-bold text-slate-700">
+                  <th className="py-2 px-3">Tratta</th>
+                  <th className="py-2 px-2 text-center">Lungh. (m)</th>
+                  <th className="py-2 px-2">Tipo Posa & Condotto</th>
+                  <th className="py-2 px-2">Cavi Posati</th>
+                  <th className="py-2 px-2 text-right">Peso (kg/m)</th>
+                  <th className="py-2 px-2 text-right">Peso Totale (kg)</th>
+                  <th className="py-2 px-3 text-center">Esito CEI 64-8</th>
                 </tr>
               </thead>
               <tbody>
                 {state.tratte.map(t => {
+                  const fam = containersCatalog.find(f => f.id === t.selectedFamilyId);
+                  const sz = fam?.sizes.find(s => s.code === t.selectedSizeCode);
                   const comp = tratteCompliance.find(c => c.tag === t.tag);
+                  
+                  // Calcola pesi della tratta
+                  const isRect = fam ? fam.sectionType === 'rettangolare' : (t.selectedFamilyId === 'personalizzato' && t.customWidth !== undefined);
+                  let pesoCavi = 0;
+                  t.cables.forEach(c => { pesoCavi += c.weight * (Number(c.qty) || 0); });
+                  const N_lines = t.lineQty || (t.doubleLine ? 2 : 1);
+                  let pesoCondotto = (sz?.weight || t.customWeight || 0.5) * N_lines;
+                  let pesoCoperchio = 0;
+                  if (isRect && t.hasCover) {
+                    pesoCoperchio = (sz?.coverWeight || t.customCoverWeight || 0.3) * N_lines;
+                  }
+                  let pesoSetto = 0;
+                  if (t.hasSeparator) {
+                    pesoSetto = (isRect ? (sz?.coverWeight || t.customCoverWeight || 0.3) : 0.2) * N_lines;
+                  }
+                  const pesoLineare = pesoCavi + pesoCondotto + pesoCoperchio + pesoSetto;
+                  const pesoTot = pesoLineare * (Number(t.length) || 0);
+
                   return (
-                    <tr key={t.tag} className="border-b border-slate-200">
-                      <td className="py-1.5 font-bold text-slate-800">Tratto {t.tag}</td>
-                      <td className="py-1.5 text-slate-650">{t.da || 'Partenza generica'}</td>
-                      <td className="py-1.5 text-slate-650">{t.a || 'Destinazione generica'}</td>
-                      <td className={`py-1.5 text-center font-bold ${comp?.verificato ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {comp?.verificato ? 'Conforme' : 'Non Conforme'}
+                    <tr key={t.tag} className="border-b border-slate-200 hover:bg-slate-50/50">
+                      <td className="py-2.5 px-3 font-bold text-slate-800">
+                        {t.name}
                       </td>
-                      <td className="py-1.5 text-right font-mono font-semibold">{formatNumber(comp?.fillRate, 1)}%</td>
+                      <td className="py-2.5 px-2 text-center font-mono">{formatNumber(t.length, 0)}</td>
+                      <td className="py-2.5 px-2">
+                        <div className="font-semibold text-slate-700">
+                          {t.containmentType === 'vista' ? 'A vista' : t.containmentType === 'cavidotto' ? 'Interrato' : 'Tubo "tazza"'}
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          {fam?.name} ({formatContainerSizeLabel(fam, sz, t)}) {N_lines > 1 ? `x ${N_lines} linee` : ''}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-2">
+                        {t.cables.length === 0 ? (
+                          <span className="text-slate-400 italic text-[10px]">Nessun cavo</span>
+                        ) : (
+                          <div className="space-y-1.5 py-0.5">
+                            {t.cables.map((c, idx) => {
+                              const product = cablesCatalog.find(cat => cat.id === c.cableId);
+                              const cableName = c.cableId === 'personalizzato' ? 'Cavo Personalizzato' : (product?.name || c.cableId);
+                              return (
+                                <div key={idx} className="border-b border-slate-100 last:border-0 pb-1.5 last:pb-0">
+                                  <div className="flex items-center gap-1.5 text-[11px] leading-tight">
+                                    {c.sigla && (
+                                      <span className="inline-block bg-slate-800 text-white font-mono text-[9px] px-1.5 py-0.2 rounded font-bold tracking-wider">
+                                        [{c.sigla}]
+                                      </span>
+                                    )}
+                                    <span className="font-bold text-slate-800">{cableName}</span>
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 font-medium mt-0.5 flex flex-wrap items-center gap-x-2">
+                                    <span>Formazione: <strong className="text-slate-700 font-semibold">{c.formation}</strong></span>
+                                    <span>&bull;</span>
+                                    <span>Ø <strong className="text-slate-700 font-semibold">{formatNumber(c.diameter, 1)} mm</strong></span>
+                                    <span>&bull;</span>
+                                    <span>Q.tà: <strong className="text-slate-700 font-semibold">{formatNumber(c.qty, 0)} pz</strong></span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-mono font-semibold">{formatNumber(pesoLineare, 2)}</td>
+                      <td className="py-2.5 px-2 text-right font-mono font-bold">{formatNumber(pesoTot, 1)}</td>
+                      <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                        <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                          comp?.verificato ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'
+                        }`}>
+                          {comp?.verificato ? 'Conforme' : 'Non Conforme'} • {formatNumber(comp?.fillRate, 1)}%
+                        </span>
+                      </td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        {/* PAGINA 2 REPORT */}
+        <div className="print:break-before-page w-full">
+          {/* Rappresentazione Grafica in Stampa */}
+          <div className="print:break-inside-avoid">
+            <h4 className="text-xs font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">
+              Sezioni e Riempimento dei Condotti
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              {state.tratte.map(t => {
+                const fam = containersCatalog.find(f => f.id === t.selectedFamilyId);
+                const sz = fam?.sizes.find(s => s.code === t.selectedSizeCode);
+                const comp = tratteCompliance.find(c => c.tag === t.tag);
+                return (
+                  <div key={t.tag} className="border border-slate-200 rounded-2xl p-4 bg-white flex flex-col items-center print:break-inside-avoid shadow-xs">
+                    <span className="text-xs font-bold text-slate-800 mb-2">{t.name}</span>
+                    <div className="scale-90 origin-top">
+                      <SezioneCanvas
+                        tratta={t}
+                        family={fam}
+                        size={sz}
+                        fillRate={comp?.fillRate || 0}
+                      />
+                    </div>
+                    <div className="text-[10px] font-bold text-slate-500 mt-2">
+                      Riempimento: {formatNumber(comp?.fillRate, 1)}% | Stato: {comp?.verificato ? 'CONFORME' : 'NON CONFORME'}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* PAGINA 3 REPORT */}
+        <div className="print:break-before-page print:relative print:min-h-[255mm] w-full">
+          {/* Schema Topologico in Stampa */}
+          <div className="print:break-inside-avoid">
+            <h4 className="text-xs font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">
+              Schema Topologico e Percorsi della Rete
+            </h4>
+            <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50 flex flex-col items-center justify-center min-h-[250px] mb-4">
+              <TopologicalTree 
+                tratti={trattiNodesForTree} 
+                activeTag={state.activeTrattaTag}
+                mode="electric"
+              />
+            </div>
+
+            <div className="mt-4">
+              <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                Tabella dei Collegamenti (DA ➔ A)
+              </h5>
+              <table className="w-full text-[10px] border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-350 text-slate-500 text-left font-bold">
+                    <th className="pb-1.5">Tratto</th>
+                    <th className="pb-1.5">Partenza (DA)</th>
+                    <th className="pb-1.5">Arrivo (A)</th>
+                    <th className="pb-1.5 text-center">Stato</th>
+                    <th className="pb-1.5 text-right">Riempimento</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {state.tratte.map(t => {
+                    const comp = tratteCompliance.find(c => c.tag === t.tag);
+                    return (
+                      <tr key={t.tag} className="border-b border-slate-200">
+                        <td className="py-1.5 font-bold text-slate-800">Tratto {t.tag}</td>
+                        <td className="py-1.5 text-slate-650">{t.da || 'Partenza generica'}</td>
+                        <td className="py-1.5 text-slate-650">{t.a || 'Destinazione generica'}</td>
+                        <td className={`py-1.5 text-center font-bold ${comp?.verificato ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {comp?.verificato ? 'Conforme' : 'Non Conforme'}
+                        </td>
+                        <td className="py-1.5 text-right font-mono font-semibold">{formatNumber(comp?.fillRate, 1)}%</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Attestato di Conformità Tecnica (CEI 64-8) - Piè di Pagina Stampa */}
+          <div className="pt-4 border-t-2 border-slate-300 print:break-inside-avoid print:absolute print:bottom-0 print:left-0 print:right-0 bg-white">
+            <div className="flex justify-between items-start gap-4">
+              <div className="space-y-1 flex-1">
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Attestato di Conformità Tecnica</span>
+                <p className="text-[10px] text-slate-600 font-medium leading-relaxed italic">
+                  Si attesta che il dimensionamento delle condutture elettriche, la scelta dei canali/tubazioni e il calcolo dei relativi tassi di riempimento riportati nel presente report sono stati eseguiti in piena conformità ai requisiti di sicurezza e alle prescrizioni della <strong className="font-bold text-slate-800">Normativa CEI 64-8</strong>.
+                </p>
+              </div>
+              <div className="shrink-0 flex items-center gap-2 border border-slate-300 bg-slate-50 px-3 py-1.5 rounded-lg text-slate-800 font-bold">
+                <span className="text-xs">📜</span>
+                <span className="text-[10px] font-black uppercase tracking-wider">Normativa CEI 64-8</span>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -189,6 +189,13 @@ body {
 
   @page {
     margin: 0.6cm 0.8cm;
+    @bottom-center {
+      content: "Pagina " counter(page);
+      font-size: 8.5px;
+      color: #94a3b8;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      font-weight: bold;
+    }
   }
   
   * {

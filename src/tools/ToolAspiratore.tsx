@@ -353,6 +353,16 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
 
   return (
     <>
+    <div className="print:hidden mb-6">
+      <ProjectStorage
+        toolType="aspiratore"
+        currentData={getCloudSaveData()}
+        onLoadProject={handleLoadCloudProject}
+        projectInfo={projectData}
+        setProjectInfo={setProjectData}
+      />
+    </div>
+
     {/* ProjectHeader — sempre visibile in stampa: gestisce logo, titolo, autore, data */}
     <ProjectHeader
       pData={projectData}
@@ -362,13 +372,6 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
     />
 
     <div className="print:hidden space-y-6 pb-12">
-      <ProjectStorage
-        toolType="aspiratore"
-        currentData={getCloudSaveData()}
-        onLoadProject={handleLoadCloudProject}
-        projectInfo={projectData}
-        setProjectInfo={setProjectData}
-      />
 
       {/* Box formule */}
       <div className="bg-cyan-50 border border-cyan-200 rounded-2xl p-4 print:hidden">

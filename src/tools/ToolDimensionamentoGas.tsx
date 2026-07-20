@@ -690,15 +690,17 @@ export function ToolDimensionamentoGas({
 
   return (
     <div className="max-w-7xl mx-auto animate-fade-in text-slate-800 pb-12">
-      <ProjectHeader pData={projectData} setPData={setProjectData} title="Dimensionamento e Verifica Rete Gas" setAppMode={setAppMode} iconColor="purple" />
+      <div className="mb-6">
+        <ProjectStorage 
+          toolType="gas"
+          currentData={getCloudSaveData()}
+          onLoadProject={handleLoadCloudProject}
+          projectInfo={projectData}
+          setProjectInfo={setProjectData}
+        />
+      </div>
 
-      <ProjectStorage 
-        toolType="gas"
-        currentData={getCloudSaveData()}
-        onLoadProject={handleLoadCloudProject}
-        projectInfo={projectData}
-        setProjectInfo={setProjectData}
-      />
+      <ProjectHeader pData={projectData} setPData={setProjectData} title="Dimensionamento e Verifica Rete Gas" setAppMode={setAppMode} iconColor="purple" />
 
       {/* Spiegazione & Formula */}
       <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">

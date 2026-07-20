@@ -25,6 +25,8 @@ interface Project {
   author: string;
   date: string;
   notes: string;
+  descriptionVerifica?: string;
+  revision?: string;
   data: any;
   updatedAt: string;
   isShared?: boolean;
@@ -245,6 +247,8 @@ export default function ProjectStorage({
                   author: p.author || '',
                   date: p.date || new Date().toISOString().split('T')[0],
                   notes: p.notes || '',
+                  descriptionVerifica: p.descriptionVerifica || '',
+                  revision: p.revision || '',
                   data: p.data,
                   updatedAt: p.updatedAt || new Date().toISOString()
                 });
@@ -316,6 +320,8 @@ export default function ProjectStorage({
         author: projectInfo.author || '',
         date: projectInfo.date || new Date().toISOString().split('T')[0],
         notes: projectInfo.notes || '',
+        descriptionVerifica: projectInfo.descriptionVerifica || '',
+        revision: projectInfo.revision || '',
         data: JSON.parse(JSON.stringify(currentData)),
         updatedAt: new Date().toISOString()
       };
@@ -380,6 +386,8 @@ export default function ProjectStorage({
               author: projectInfo.author || '',
               date: projectInfo.date || new Date().toISOString().split('T')[0],
               notes: projectInfo.notes || '',
+              descriptionVerifica: projectInfo.descriptionVerifica || '',
+              revision: projectInfo.revision || '',
               data: currentData,
               updatedAt: new Date().toISOString()
             };
@@ -398,6 +406,8 @@ export default function ProjectStorage({
             author: projectInfo.author || '',
             date: projectInfo.date || new Date().toISOString().split('T')[0],
             notes: projectInfo.notes || '',
+            descriptionVerifica: projectInfo.descriptionVerifica || '',
+            revision: projectInfo.revision || '',
             data: JSON.parse(JSON.stringify(currentData)),
             updatedAt: new Date().toISOString()
           });
@@ -412,6 +422,8 @@ export default function ProjectStorage({
               author: projectInfo.author || '',
               date: projectInfo.date || new Date().toISOString().split('T')[0],
               notes: projectInfo.notes || '',
+              descriptionVerifica: projectInfo.descriptionVerifica || '',
+              revision: projectInfo.revision || '',
               data: JSON.parse(JSON.stringify(currentData)),
               updatedAt: new Date().toISOString()
             });
@@ -443,7 +455,9 @@ export default function ProjectStorage({
       client: p.client,
       author: p.author,
       date: p.date,
-      notes: p.notes
+      notes: p.notes,
+      descriptionVerifica: p.descriptionVerifica || '',
+      revision: p.revision || ''
     });
     
     setShowModal(false);
@@ -506,7 +520,9 @@ export default function ProjectStorage({
       client: p.client + " (Copia)",
       author: user?.name || p.author,
       date: new Date().toISOString().split('T')[0],
-      notes: p.notes
+      notes: p.notes,
+      descriptionVerifica: p.descriptionVerifica || '',
+      revision: p.revision || ''
     });
     
     setShowModal(false);
@@ -519,6 +535,8 @@ export default function ProjectStorage({
     return (p.name || '').toLowerCase().includes(term) ||
            (p.client || '').toLowerCase().includes(term) ||
            (p.author || '').toLowerCase().includes(term) ||
+           (p.descriptionVerifica || '').toLowerCase().includes(term) ||
+           (p.revision || '').toLowerCase().includes(term) ||
            (p.notes || '').toLowerCase().includes(term);
   });
 
@@ -589,7 +607,7 @@ export default function ProjectStorage({
                 {toolType === 'dispersione' && 'Archivio condiviso: Dispersioni'}
                 {toolType === 'verifica_linee' && 'Archivio condiviso: Verifica linee'}
                 {toolType === 'gas' && 'Archivio condiviso: Dimensionamento Gas'}
-                {toolType === 'dimensionamento_canali' && 'Archivio condiviso: Dimensionamento Canale/Tubi'}
+                {toolType === 'dimensionamento_canali' && 'Archivio condiviso: Verifica riempimento canalizzazioni'}
                 {!['idraulico', 'termico', 'dispersione', 'verifica_linee', 'gas', 'dimensionamento_canali'].includes(toolType) && 'Archivio Condiviso Calcoli'}
               </h3>
               <button 

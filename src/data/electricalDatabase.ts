@@ -593,8 +593,59 @@ export const INITIAL_CABLES: CableProduct[] = [
       { formation: '4g25.0', diameter: 27, weight: 1.1239 },
       { formation: '4g35.0', diameter: 30.4, weight: 1.5292 }
     ]
+  },
+  {
+    id: '6undhpn',
+    name: '6UNDHPN - Reti LAN CAT.6 UTP',
+    description: 'Cavo per reti LAN 4x2xAWG23 UTP CAT.6 LSZH con doppia guaina per esterno/interramento.',
+    type: 'cavo',
+    formations: [
+      { formation: '4x2xAWG23', diameter: 7.4, weight: 0.057 }
+    ]
+  },
+  {
+    id: 'rg26h1m16_12_20kv',
+    name: 'SLIMPOWER PLUS HT 105 RG26H1M16 12/20 kV',
+    description: 'Cavo unipolare isolato in gomma HEPR di qualità G26, a spessore ridotto, 105°C (12/20 kV).',
+    type: 'cavo',
+    formations: [
+      { formation: '1x25', diameter: 24.3, weight: 0.815 },
+      { formation: '1x35', diameter: 25.4, weight: 0.935 },
+      { formation: '1x50', diameter: 26.1, weight: 1.060 },
+      { formation: '1x70', diameter: 27.3, weight: 1.285 },
+      { formation: '1x95', diameter: 28.8, weight: 1.565 },
+      { formation: '1x120', diameter: 30.4, weight: 1.840 },
+      { formation: '1x150', diameter: 31.9, weight: 2.155 },
+      { formation: '1x185', diameter: 33.8, weight: 2.535 },
+      { formation: '1x240', diameter: 36.1, weight: 3.150 },
+      { formation: '1x300', diameter: 39.0, weight: 3.870 },
+      { formation: '1x400', diameter: 42.0, weight: 4.735 },
+      { formation: '1x500', diameter: 45.2, weight: 5.855 },
+      { formation: '1x630', diameter: 48.8, weight: 7.340 }
+    ]
+  },
+  {
+    id: 'rg26h1m16_18_30kv',
+    name: 'SLIMPOWER PLUS HT 105 RG26H1M16 18/30 kV',
+    description: 'Cavo unipolare isolato in gomma HEPR di qualità G26, a spessore ridotto, 105°C (18/30 kV).',
+    type: 'cavo',
+    formations: [
+      { formation: '1x35', diameter: 31.8, weight: 0.940 },
+      { formation: '1x50', diameter: 32.9, weight: 1.450 },
+      { formation: '1x70', diameter: 33.3, weight: 1.640 },
+      { formation: '1x95', diameter: 34.2, weight: 1.900 },
+      { formation: '1x120', diameter: 35.2, weight: 2.150 },
+      { formation: '1x150', diameter: 36.1, weight: 2.440 },
+      { formation: '1x185', diameter: 37.4, weight: 2.825 },
+      { formation: '1x240', diameter: 39.7, weight: 3.420 },
+      { formation: '1x300', diameter: 42.6, weight: 4.140 },
+      { formation: '1x400', diameter: 45.6, weight: 5.165 },
+      { formation: '1x500', diameter: 49.0, weight: 6.240 },
+      { formation: '1x630', diameter: 52.7, weight: 7.665 }
+    ]
   }
 ];
+
 
 export const INITIAL_CONTAINERS: ContainerFamily[] = [
   {
@@ -607,21 +658,21 @@ export const INITIAL_CONTAINERS: ContainerFamily[] = [
     sizes: [
       // H75
       { code: 'R3075Z', label: '75x75', width: 75, height: 75, weight: 1.22, coverWeight: 0.46 },
-      { code: 'R3100Z', label: '75x100', width: 100, height: 75, weight: 1.33, coverWeight: 0.55 },
-      { code: 'R3150Z', label: '75x150', width: 150, height: 75, weight: 1.60, coverWeight: 0.75 },
-      { code: 'R3200Z', label: '75x200', width: 200, height: 75, weight: 2.26, coverWeight: 0.94 },
-      { code: 'R3300Z', label: '75x300', width: 300, height: 75, weight: 2.90, coverWeight: 1.60 },
-      { code: 'R3400Z', label: '75x400', width: 400, height: 75, weight: 4.10, coverWeight: 2.59 },
-      { code: 'R3500Z', label: '75x500', width: 500, height: 75, weight: 4.80, coverWeight: 3.18 },
-      { code: 'R3600Z', label: '75x600', width: 600, height: 75, weight: 5.50, coverWeight: 3.77 },
+      { code: 'R3100Z', label: '100x75', width: 100, height: 75, weight: 1.33, coverWeight: 0.55 },
+      { code: 'R3150Z', label: '150x75', width: 150, height: 75, weight: 1.60, coverWeight: 0.75 },
+      { code: 'R3200Z', label: '200x75', width: 200, height: 75, weight: 2.26, coverWeight: 0.94 },
+      { code: 'R3300Z', label: '300x75', width: 300, height: 75, weight: 2.90, coverWeight: 1.60 },
+      { code: 'R3400Z', label: '400x75', width: 400, height: 75, weight: 4.10, coverWeight: 2.59 },
+      { code: 'R3500Z', label: '500x75', width: 500, height: 75, weight: 4.80, coverWeight: 3.18 },
+      { code: 'R3600Z', label: '600x75', width: 600, height: 75, weight: 5.50, coverWeight: 3.77 },
       // H100
       { code: 'R10100Z', label: '100x100', width: 100, height: 100, weight: 1.55, coverWeight: 0.55 },
-      { code: 'R10150Z', label: '100x150', width: 150, height: 100, weight: 1.79, coverWeight: 0.75 },
-      { code: 'R10200Z', label: '100x200', width: 200, height: 100, weight: 3.03, coverWeight: 0.94 },
-      { code: 'R10300Z', label: '100x300', width: 300, height: 100, weight: 3.74, coverWeight: 1.60 },
-      { code: 'R10400Z', label: '100x400', width: 400, height: 100, weight: 4.44, coverWeight: 2.59 },
-      { code: 'R10500Z', label: '100x500', width: 500, height: 100, weight: 5.15, coverWeight: 3.18 },
-      { code: 'R10600Z', label: '100x600', width: 600, height: 100, weight: 5.40, coverWeight: 3.77 }
+      { code: 'R10150Z', label: '150x100', width: 150, height: 100, weight: 1.79, coverWeight: 0.75 },
+      { code: 'R10200Z', label: '200x100', width: 200, height: 100, weight: 3.03, coverWeight: 0.94 },
+      { code: 'R10300Z', label: '300x100', width: 300, height: 100, weight: 3.74, coverWeight: 1.60 },
+      { code: 'R10400Z', label: '400x100', width: 400, height: 100, weight: 4.44, coverWeight: 2.59 },
+      { code: 'R10500Z', label: '500x100', width: 500, height: 100, weight: 5.15, coverWeight: 3.18 },
+      { code: 'R10600Z', label: '600x100', width: 600, height: 100, weight: 5.40, coverWeight: 3.77 }
     ]
   },
   {
@@ -634,21 +685,21 @@ export const INITIAL_CONTAINERS: ContainerFamily[] = [
     sizes: [
       // H75
       { code: 'S3075Z', label: '75x75', width: 75, height: 75, weight: 1.08, coverWeight: 0.46 },
-      { code: 'S3100Z', label: '75x100', width: 100, height: 75, weight: 1.19, coverWeight: 0.55 },
-      { code: 'S3150Z', label: '75x150', width: 150, height: 75, weight: 1.45, coverWeight: 0.75 },
-      { code: 'S3200Z', label: '75x200', width: 200, height: 75, weight: 2.05, coverWeight: 0.94 },
-      { code: 'S3300Z', label: '75x300', width: 300, height: 75, weight: 2.70, coverWeight: 1.60 },
-      { code: 'S3400Z', label: '75x400', width: 400, height: 75, weight: 3.75, coverWeight: 2.59 },
-      { code: 'S3500Z', label: '75x500', width: 500, height: 75, weight: 4.30, coverWeight: 3.18 },
-      { code: 'S3600Z', label: '75x600', width: 600, height: 75, weight: 4.90, coverWeight: 3.77 },
+      { code: 'S3100Z', label: '100x75', width: 100, height: 75, weight: 1.19, coverWeight: 0.55 },
+      { code: 'S3150Z', label: '150x75', width: 150, height: 75, weight: 1.45, coverWeight: 0.75 },
+      { code: 'S3200Z', label: '200x75', width: 200, height: 75, weight: 2.05, coverWeight: 0.94 },
+      { code: 'S3300Z', label: '300x75', width: 300, height: 75, weight: 2.70, coverWeight: 1.60 },
+      { code: 'S3400Z', label: '400x75', width: 400, height: 75, weight: 3.75, coverWeight: 2.59 },
+      { code: 'S3500Z', label: '500x75', width: 500, height: 75, weight: 4.30, coverWeight: 3.18 },
+      { code: 'S3600Z', label: '600x75', width: 600, height: 75, weight: 4.90, coverWeight: 3.77 },
       // H100
       { code: 'S10100Z', label: '100x100', width: 100, height: 100, weight: 1.40, coverWeight: 0.55 },
-      { code: 'S10150Z', label: '100x150', width: 150, height: 100, weight: 1.60, coverWeight: 0.75 },
-      { code: 'S10200Z', label: '100x200', width: 200, height: 100, weight: 1.87, coverWeight: 0.94 },
-      { code: 'S10300Z', label: '100x300', width: 300, height: 100, weight: 2.67, coverWeight: 1.60 },
-      { code: 'S10400Z', label: '100x400', width: 400, height: 100, weight: 4.07, coverWeight: 2.59 },
-      { code: 'S10500Z', label: '100x500', width: 500, height: 100, weight: 5.15, coverWeight: 3.18 },
-      { code: 'S10600Z', label: '100x600', width: 600, height: 100, weight: 5.40, coverWeight: 3.77 }
+      { code: 'S10150Z', label: '150x100', width: 150, height: 100, weight: 1.60, coverWeight: 0.75 },
+      { code: 'S10200Z', label: '200x100', width: 200, height: 100, weight: 1.87, coverWeight: 0.94 },
+      { code: 'S10300Z', label: '300x100', width: 300, height: 100, weight: 2.67, coverWeight: 1.60 },
+      { code: 'S10400Z', label: '400x100', width: 400, height: 100, weight: 4.07, coverWeight: 2.59 },
+      { code: 'S10500Z', label: '500x100', width: 500, height: 100, weight: 5.15, coverWeight: 3.18 },
+      { code: 'S10600Z', label: '600x100', width: 600, height: 100, weight: 5.40, coverWeight: 3.77 }
     ]
   },
   {
@@ -660,33 +711,33 @@ export const INITIAL_CONTAINERS: ContainerFamily[] = [
     installationType: 'vista',
     sizes: [
       // H54
-      { code: 'CF54/50', label: '54x50', width: 50, height: 54, weight: 0.64 },
-      { code: 'CF54/100', label: '54x100', width: 100, height: 54, weight: 0.79 },
-      { code: 'CF54/150', label: '54x150', width: 150, height: 54, weight: 1.06 },
-      { code: 'CF54/200', label: '54x200', width: 200, height: 54, weight: 1.35 },
-      { code: 'CF54/300', label: '54x300', width: 300, height: 54, weight: 2.07 },
-      { code: 'CF54/400', label: '54x400', width: 400, height: 54, weight: 3.08 },
-      { code: 'CF54/450', label: '54x450', width: 450, height: 54, weight: 3.48 },
-      { code: 'CF54/500', label: '54x500', width: 500, height: 54, weight: 3.50 },
-      { code: 'CF54/600', label: '54x600', width: 600, height: 54, weight: 3.93 },
+      { code: 'CF54/50', label: '50x54', width: 50, height: 54, weight: 0.64 },
+      { code: 'CF54/100', label: '100x54', width: 100, height: 54, weight: 0.79 },
+      { code: 'CF54/150', label: '150x54', width: 150, height: 54, weight: 1.06 },
+      { code: 'CF54/200', label: '200x54', width: 200, height: 54, weight: 1.35 },
+      { code: 'CF54/300', label: '300x54', width: 300, height: 54, weight: 2.07 },
+      { code: 'CF54/400', label: '400x54', width: 400, height: 54, weight: 3.08 },
+      { code: 'CF54/450', label: '450x54', width: 450, height: 54, weight: 3.48 },
+      { code: 'CF54/500', label: '500x54', width: 500, height: 54, weight: 3.50 },
+      { code: 'CF54/600', label: '600x54', width: 600, height: 54, weight: 3.93 },
       // H105
-      { code: 'CF105/100', label: '105x100', width: 100, height: 105, weight: 1.32 },
-      { code: 'CF105/150', label: '105x150', width: 150, height: 105, weight: 1.69 },
-      { code: 'CF105/200', label: '105x200', width: 200, height: 105, weight: 1.99 },
-      { code: 'CF105/300', label: '105x300', width: 300, height: 105, weight: 2.96 },
-      { code: 'CF105/400', label: '105x400', width: 400, height: 105, weight: 3.37 },
-      { code: 'CF105/450', label: '105x450', width: 450, height: 105, weight: 3.60 },
-      { code: 'CF105/500', label: '105x500', width: 500, height: 105, weight: 3.78 },
-      { code: 'CF105/600', label: '105x600', width: 600, height: 105, weight: 4.19 },
+      { code: 'CF105/100', label: '100x105', width: 100, height: 105, weight: 1.32 },
+      { code: 'CF105/150', label: '150x105', width: 150, height: 105, weight: 1.69 },
+      { code: 'CF105/200', label: '200x105', width: 200, height: 105, weight: 1.99 },
+      { code: 'CF105/300', label: '300x105', width: 300, height: 105, weight: 2.96 },
+      { code: 'CF105/400', label: '400x105', width: 400, height: 105, weight: 3.37 },
+      { code: 'CF105/450', label: '450x105', width: 450, height: 105, weight: 3.60 },
+      { code: 'CF105/500', label: '500x105', width: 500, height: 105, weight: 3.78 },
+      { code: 'CF105/600', label: '600x105', width: 600, height: 105, weight: 4.19 },
       // H150
       { code: 'CF150/150', label: '150x150', width: 150, height: 150, weight: 2.38 },
-      { code: 'CF150/200', label: '150x200', width: 200, height: 150, weight: 3.05 },
-      { code: 'CF150/300', label: '150x300', width: 300, height: 150, weight: 3.50 },
-      { code: 'CF150/400', label: '150x400', width: 400, height: 150, weight: 3.90 },
-      { code: 'CF150/450', label: '150x450', width: 450, height: 150, weight: 4.10 },
-      { code: 'CF150/500', label: '150x500', width: 500, height: 150, weight: 4.40 },
-      { code: 'CF150/600', label: '150x600', width: 600, height: 150, weight: 4.73 },
-      { code: 'CF150/900', label: '150x900', width: 900, height: 150, weight: 7.17 }
+      { code: 'CF150/200', label: '200x150', width: 200, height: 150, weight: 3.05 },
+      { code: 'CF150/300', label: '300x150', width: 300, height: 150, weight: 3.50 },
+      { code: 'CF150/400', label: '400x150', width: 400, height: 150, weight: 3.90 },
+      { code: 'CF150/450', label: '450x150', width: 450, height: 150, weight: 4.10 },
+      { code: 'CF150/500', label: '500x150', width: 500, height: 150, weight: 4.40 },
+      { code: 'CF150/600', label: '600x150', width: 600, height: 150, weight: 4.73 },
+      { code: 'CF150/900', label: '900x150', width: 900, height: 150, weight: 7.17 }
     ]
   },
   {

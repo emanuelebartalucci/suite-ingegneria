@@ -15,7 +15,7 @@ import { ToolCalcoliVari } from './tools/ToolCalcoliVari';
 import { ToolHVAC } from './tools/ToolHVAC';
 import { ToolPompeFognarie } from './tools/ToolPompeFognarie';
 import { ToolAspiratore } from './tools/ToolAspiratore';
-import { ToolDimensionamentoCanali } from './tools/ToolDimensionamentoCanali';
+import { ToolVerificaRiempimentoCanalizzazioni } from './tools/ToolVerificaRiempimentoCanalizzazioni';
 import { DatabaseManager } from './components/DatabaseManager';
 import { 
     seedThermodynamicCatalog,
@@ -39,6 +39,8 @@ export interface ProjectData {
     author: string;
     date: string;
     notes: string;
+    descriptionVerifica?: string;
+    revision?: string;
 }
 
 export interface RegistryMember {
@@ -116,7 +118,9 @@ export default function App() {
         client: '',
         author: '',
         date: new Date().toISOString().split('T')[0],
-        notes: ''
+        notes: '',
+        descriptionVerifica: '',
+        revision: ''
     });
 
     // Stato Gestione Anagrafica (Admin)
@@ -328,7 +332,9 @@ export default function App() {
                 client: '',
                 author: userProfile?.name || '',
                 date: new Date().toISOString().split('T')[0],
-                notes: ''
+                notes: '',
+                descriptionVerifica: '',
+                revision: ''
             });
             setPrevMode(appMode);
         }
@@ -640,7 +646,7 @@ export default function App() {
                         {appMode === 'hvac' && <>🌀 <span className="inline-block pb-1 pr-2 bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">Dimensionamento Impianto di Climatizzazione</span></>}
                         {appMode === 'pompe_fognarie' && <>🔧 <span className="inline-block pb-1 bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent">Pompe di Sollevamento Fognario</span></>}
                         {appMode === 'aspiratore' && <>🌪️ <span className="inline-block pb-1 bg-gradient-to-r from-cyan-600 to-sky-600 bg-clip-text text-transparent">Aspiratore / Ventilatore Industriale</span></>}
-                        {appMode === 'dimensionamento_canali' && <>⚡ <span className="inline-block pb-1 bg-gradient-to-r from-amber-500 to-yellow-600 bg-clip-text text-transparent">Dimensionamento Canale e Tubazioni</span></>}
+                        {appMode === 'dimensionamento_canali' && <>⚡ <span className="inline-block pb-1 bg-gradient-to-r from-amber-500 to-yellow-600 bg-clip-text text-transparent">Verifica Riempimento Canalizzazioni Elettriche</span></>}
                     </h1>
                 </div>
             )}
@@ -808,10 +814,10 @@ export default function App() {
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 text-left">
-                                    {/* 1. Dimensionamento Canale e Tubazioni */}
+                                    {/* 1. Verifica Riempimento Canalizzazioni Elettriche */}
                                     <button onClick={() => setAppMode('dimensionamento_canali')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-amber-500 hover:bg-amber-50 transition-all text-left cursor-pointer w-full">
                                         <div className="w-14 h-14 bg-amber-100 text-amber-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><Layers className="w-7 h-7" /></div>
-                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Dimensionamento Canale e Tubazioni</h2>
+                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Verifica Riempimento Canalizzazioni Elettriche</h2>
                                         <p className="text-[11px] text-slate-500 text-center leading-relaxed">Verifica sfilabilità e tasso di riempimento per cavi elettrici (CEI 64-8).</p>
                                     </button>
 
@@ -837,7 +843,7 @@ export default function App() {
                 {appMode === 'hvac' && <ToolHVAC projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} climateData={climateData || undefined} />}
                 {appMode === 'pompe_fognarie' && <ToolPompeFognarie projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 {appMode === 'aspiratore' && <ToolAspiratore projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
-                {appMode === 'dimensionamento_canali' && <ToolDimensionamentoCanali projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} cablesCatalog={cablesCatalog || undefined} containersCatalog={containersCatalog || undefined} />}
+                {appMode === 'dimensionamento_canali' && <ToolVerificaRiempimentoCanalizzazioni projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} cablesCatalog={cablesCatalog || undefined} containersCatalog={containersCatalog || undefined} />}
                 {appMode === 'database_termo' && <DatabaseManager type="termo" setAppMode={setAppMode} projectData={projectData} pipeCatalog={pipeCatalog || undefined} equivalentLengths={equivalentLengths || undefined} gasEquivalentLengths={gasEquivalentLengths || undefined} climateData={climateData || undefined} onDatabaseChange={() => loadThermodynamicDbs(true)} />}
                 {appMode === 'database_elettrico' && <DatabaseManager type="elettrico" setAppMode={setAppMode} projectData={projectData} cablesCatalog={cablesCatalog || undefined} containersCatalog={containersCatalog || undefined} onDatabaseChange={() => loadElectricalDbs(true)} />}
             </div>

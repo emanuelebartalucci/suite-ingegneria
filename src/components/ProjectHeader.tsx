@@ -7,6 +7,8 @@ export interface ProjectData {
   author: string;
   date: string;
   notes: string;
+  descriptionVerifica?: string;
+  revision?: string;
 }
 
 interface ProjectHeaderProps {
@@ -65,8 +67,8 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
                 </div>
             )}
 
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 print:border-b-2 print:border-slate-800 print:pb-4 print:mb-4">
-                <div className="flex items-center space-x-4 flex-1 w-full">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 print:flex-row print:justify-between print:items-start print:w-full print:border-b-2 print:border-slate-800 print:pb-4 print:mb-4">
+                <div className="flex items-center space-x-4 flex-1 w-full print:w-auto">
                     {!logoError ? (
                         <img src={logoImg} alt="Logo" className="h-12 w-auto object-contain print:h-12" onError={() => setLogoError(true)} />
                     ) : (
@@ -78,7 +80,36 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
                         <p className={`text-xs font-bold uppercase tracking-wider mb-1 print:text-slate-500 ${textBrandClass}`}>{title}</p>
                         <span className="hidden print:block text-2xl md:text-3xl font-bold text-slate-900">{pData.client || 'Progetto Impianto'}</span>
                         <input type="text" value={pData.client} onChange={e => setPData({...pData, client: e.target.value})} className={`text-2xl md:text-3xl font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:outline-none w-full max-w-xl print:hidden ${focusBorderClass}`} placeholder="Inserisci Titolo o Cliente..."/>
+                        
+                        {/* Descrizione Verifica */}
+                        <div className="mt-1">
+                            {pData.descriptionVerifica && (
+                                <span className="hidden print:block text-xs font-medium text-slate-500 italic">
+                                    {pData.descriptionVerifica}
+                                </span>
+                            )}
+                            <input 
+                                type="text" 
+                                value={pData.descriptionVerifica || ''} 
+                                onChange={e => setPData({...pData, descriptionVerifica: e.target.value})} 
+                                className={`text-xs font-medium text-slate-500 bg-transparent border-b border-transparent hover:border-slate-300 focus:outline-none w-full max-w-xl print:hidden ${focusBorderClass}`} 
+                                placeholder="Descrizione Verifica (opzionale)..."
+                            />
+                        </div>
                     </div>
+                </div>
+
+                {/* Revisione */}
+                <div className="flex flex-col items-end w-full md:w-auto print:items-end print:w-auto mt-2 md:mt-0 print:self-start">
+                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 print:hidden">Rev.</label>
+                    <span className="hidden print:block text-base font-bold text-slate-800">{pData.revision || ''}</span>
+                    <input 
+                        type="text" 
+                        value={pData.revision || ''} 
+                        onChange={e => setPData({...pData, revision: e.target.value})} 
+                        className={`text-right text-base font-bold text-slate-800 bg-transparent border-b border-slate-200 focus:outline-none w-20 print:hidden ${focusBorderClass}`} 
+                        placeholder="es. Rev00"
+                    />
                 </div>
             </div>
 

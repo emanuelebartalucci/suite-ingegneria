@@ -65,8 +65,16 @@ export async function seedElectricalCatalog(db: Firestore): Promise<void> {
     const hasPasserellaFilo = querySnapshot.docs.some(d => d.id === 'passerella_filo');
     const hasOlflex = querySnapshot.docs.some(d => d.id === 'olflex_classic_110_ch');
 
-    if (isCablesOutdated || !hasNewCables || !hasPasserellaFilo || !hasOlflex) {
-      console.log("Rilevata versione precedente o parziale su Firestore. Avvio allineamento complessivo (cavi e condotti)...");
+    // Rileva se il DB ha ancora le vecchie etichette nel formato HxL
+    const passerellaFiloDoc = querySnapshot.docs.find(d => d.id === 'passerella_filo');
+    const hasOldLabel = !!passerellaFiloDoc && (passerellaFiloDoc.data().sizes || []).some((sz: any) => sz.label === '54x100');
+
+    // Rileva se mancano i nuovi cavi
+    const has6undhpn = querySnapshot.docs.some(d => d.id === '6undhpn');
+    const hasRg26 = querySnapshot.docs.some(d => d.id === 'rg26h1m16_12_20kv');
+
+    if (isCablesOutdated || !hasNewCables || !hasPasserellaFilo || !hasOlflex || hasOldLabel || !has6undhpn || !hasRg26) {
+      console.log("Rilevata versione precedente, parziale o con formato etichette obsoleto su Firestore. Avvio allineamento complessivo (cavi e condotti)...");
       // Allineamento cavi
       for (const cavo of INITIAL_CABLES) {
         await setDoc(doc(db, COLLECTION_NAME, cavo.id), cavo);
@@ -91,7 +99,10 @@ export async function fetchElectricalCables(db: Firestore, isDemo: boolean): Pro
     const fg16om16 = catalog.cables.find(c => c.id === 'fg16om16');
     const isOutdated = !fg16om16 || !fg16om16.formations || fg16om16.formations.length < 50;
     const hasOlflex = catalog.cables.some(c => c.id === 'olflex_classic_110_ch');
-    if (isOutdated || !catalog.cables.some(c => c.id === 'fg16r16') || !catalog.containers.some(c => c.id === 'passerella_filo') || !hasOlflex) {
+    const hasOldLabel = catalog.containers.some(c => c.id === 'passerella_filo' && (c.sizes || []).some(sz => sz.label === '54x100'));
+    const has6undhpn = catalog.cables.some(c => c.id === '6undhpn');
+    const hasRg26 = catalog.cables.some(c => c.id === 'rg26h1m16_12_20kv');
+    if (isOutdated || !catalog.cables.some(c => c.id === 'fg16r16') || !catalog.containers.some(c => c.id === 'passerella_filo') || !hasOlflex || hasOldLabel || !has6undhpn || !hasRg26) {
       saveLocalCatalog(INITIAL_CABLES, INITIAL_CONTAINERS);
       return INITIAL_CABLES;
     }
@@ -122,8 +133,10 @@ export async function fetchElectricalCables(db: Firestore, isDemo: boolean): Pro
     const fg16om16 = results.find(c => c.id === 'fg16om16');
     const isOutdated = !fg16om16 || fg16om16.formations.length < 50;
     const hasOlflex = results.some(c => c.id === 'olflex_classic_110_ch');
+    const has6undhpn = results.some(c => c.id === '6undhpn');
+    const hasRg26 = results.some(c => c.id === 'rg26h1m16_12_20kv');
 
-    if (isOutdated || !results.some(c => c.id === 'fg16r16') || !hasOlflex) {
+    if (isOutdated || !results.some(c => c.id === 'fg16r16') || !hasOlflex || !has6undhpn || !hasRg26) {
       console.log("Rilevata assenza o versione parziale su Firestore, eseguo allineamento...");
       await seedElectricalCatalog(db);
       const updatedSnap = await getDocs(q);
@@ -147,7 +160,8 @@ export async function fetchElectricalCables(db: Firestore, isDemo: boolean): Pro
 export async function fetchElectricalContainers(db: Firestore, isDemo: boolean): Promise<ContainerFamily[]> {
   if (isDemo) {
     const catalog = getLocalCatalog();
-    if (!catalog.containers.some(c => c.id === 'passerella_filo')) {
+    const hasOldLabel = catalog.containers.some(c => c.id === 'passerella_filo' && (c.sizes || []).some(sz => sz.label === '54x100'));
+    if (!catalog.containers.some(c => c.id === 'passerella_filo') || hasOldLabel) {
       saveLocalCatalog(catalog.cables, INITIAL_CONTAINERS);
       return INITIAL_CONTAINERS;
     }

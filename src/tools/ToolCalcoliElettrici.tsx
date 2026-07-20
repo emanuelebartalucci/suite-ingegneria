@@ -147,9 +147,6 @@ export function ToolCalcoliElettrici({ projectData, setProjectData, setAppMode }
 
   return (
     <div className="bg-slate-100 rounded-3xl p-6 md:p-8 animate-in fade-in duration-300">
-      {/* Intestazione del progetto standard */}
-      <ProjectHeader pData={projectData} setPData={setProjectData} title="Calcoli Elettrici Rapidi" setAppMode={setAppMode} iconColor="orange" />
-
       {/* Gestione Progetti Condivisi (Full-width) */}
       <div className="print:hidden mb-6">
         <ProjectStorage 
@@ -160,6 +157,9 @@ export function ToolCalcoliElettrici({ projectData, setProjectData, setAppMode }
           setProjectInfo={setProjectData} 
         />
       </div>
+
+      {/* Intestazione del progetto standard */}
+      <ProjectHeader pData={projectData} setPData={setProjectData} title="Calcoli Elettrici Rapidi" setAppMode={setAppMode} iconColor="orange" />
 
       {/* Contenitore Principale a due colonne */}
       <div className="flex flex-col md:flex-row gap-6 items-start">

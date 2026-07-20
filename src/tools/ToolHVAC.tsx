@@ -1070,6 +1070,17 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode, climateData 
   return (
     <>
       <div className="max-w-7xl mx-auto animate-fade-in px-4 pb-12">
+      {/* Persistence / Cloud Storage */}
+      <div className="print:hidden mb-6">
+        <ProjectStorage 
+          toolType="hvac"
+          currentData={getCloudSaveData()}
+          onLoadProject={handleLoadCloudProject}
+          projectInfo={projectData}
+          setProjectInfo={setProjectData}
+        />
+      </div>
+
       {/* Title Header */}
       <ProjectHeader 
         pData={projectData} 
@@ -1079,17 +1090,6 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode, climateData 
         iconColor="brand" 
         showPrintButton={activeTab === 'summary' || activeTab === 'hvacFlowSummary' || activeTab === 'freshAirCheck' || activeTab === 'reheat'}
       />
-      
-      {/* Persistence / Cloud Storage */}
-      <div className="print:hidden">
-        <ProjectStorage 
-          toolType="hvac"
-          currentData={getCloudSaveData()}
-          onLoadProject={handleLoadCloudProject}
-          projectInfo={projectData}
-          setProjectInfo={setProjectData}
-        />
-      </div>
 
       {/* Box Informativo con Formule */}
       <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">

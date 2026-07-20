@@ -193,6 +193,16 @@ export function ToolPompeFognarie({ projectData, setProjectData, setAppMode }: T
 
   return (
     <>
+    <div className="print:hidden mb-6">
+      <ProjectStorage
+        toolType="pompe_fognarie"
+        currentData={getCloudSaveData()}
+        onLoadProject={handleLoadCloudProject}
+        projectInfo={projectData}
+        setProjectInfo={setProjectData}
+      />
+    </div>
+
     {/* ProjectHeader — sempre visibile in stampa: gestisce logo, titolo, autore, data */}
     <ProjectHeader
       pData={projectData}
@@ -202,13 +212,6 @@ export function ToolPompeFognarie({ projectData, setProjectData, setAppMode }: T
     />
 
     <div className="print:hidden space-y-6 pb-12">
-      <ProjectStorage
-        toolType="pompe_fognarie"
-        currentData={getCloudSaveData()}
-        onLoadProject={handleLoadCloudProject}
-        projectInfo={projectData}
-        setProjectInfo={setProjectData}
-      />
 
       {/* Box formule */}
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 print:hidden">
