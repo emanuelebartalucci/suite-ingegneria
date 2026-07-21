@@ -10,6 +10,7 @@ export interface CableProduct {
   description: string;
   type: 'cavo';
   formations: CableFormation[];
+  raggioCurvaturaMinFattore?: number;
 }
 
 export interface ContainerSize {
@@ -39,6 +40,7 @@ export const INITIAL_CABLES: CableProduct[] = [
     name: 'FS17 450/750 V',
     description: 'Cavo unipolare energia isolato in PVC di qualità S17, antifiamma CPR Cca-s3,d1,a3.',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 4,
     formations: [
       { formation: '1x1', diameter: 2.7, weight: 0.015 },
       { formation: '1x1.5', diameter: 2.9, weight: 0.020 },
@@ -64,6 +66,7 @@ export const INITIAL_CABLES: CableProduct[] = [
     name: 'FG17 450/750 V',
     description: 'Cavo unipolare flessibile isolato in mescola elastomerica G17 LS0H, antifiamma CPR Cca-s1b,d1,a1.',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 4,
     formations: [
       { formation: '1x1', diameter: 2.7, weight: 0.015 },
       { formation: '1x1.5', diameter: 2.9, weight: 0.020 },
@@ -89,6 +92,7 @@ export const INITIAL_CABLES: CableProduct[] = [
     name: 'H1Z2Z2-K Solar',
     description: 'Cavo unipolare armonizzato per impianti fotovoltaici, isolamento reticolato LS0H, CPR Dca.',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 6,
     formations: [
       { formation: '1x1.5', diameter: 5.4, weight: 0.032 },
       { formation: '1x2.5', diameter: 5.9, weight: 0.043 },
@@ -109,9 +113,10 @@ export const INITIAL_CABLES: CableProduct[] = [
   },
   {
     id: 'sf225rz',
-    name: 'SF225RZ',
+    name: 'FTE32OHAM16',
     description: 'Cavo schermato a spirale per sistemi fissi antincendio, isolato in silicone CPR Cca-s1b,d1,a1.',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 12,
     formations: [
       { formation: '2x2.5', diameter: 8.7, weight: 0.100 }
     ]
@@ -121,24 +126,27 @@ export const INITIAL_CABLES: CableProduct[] = [
     name: '12S1YVI',
     description: 'Cavo di rete schermato S/FTP Profibus DP con conduttori AWG22 solidi in rame, guaina LSZH.',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 10,
     formations: [
       { formation: '1x2xAWG22', diameter: 8.0, weight: 0.066 }
     ]
   },
   {
     id: 'futp_cat6',
-    name: 'F-UTP Cat. 6',
+    name: 'Cat. 6 F-UTP',
     description: 'Cavo di rete dati schermato F/UTP in Categoria 6, conduttori AWG24 solidi, guaina LSZH CPR Dca.',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 8,
     formations: [
       { formation: '4x2xAWG24', diameter: 7.2, weight: 0.048 }
     ]
   },
   {
     id: 'futp_cat6a',
-    name: 'F-UTP Cat. 6A',
+    name: 'Cat. 6A F-UTP',
     description: 'Cavo di rete dati schermato F/UTP in Categoria 6A, conduttori AWG23 solidi, guaina LSZH CPR Dca.',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 8,
     formations: [
       { formation: '4x2xAWG23', diameter: 7.8, weight: 0.058 }
     ]
@@ -148,6 +156,7 @@ export const INITIAL_CABLES: CableProduct[] = [
     name: 'FG16OR16 0.6/1 kV',
     description: 'Cavo multipolare energia isolato in HEPR e guaina in PVC, non propagante CPR Cca-s3,d1,a3.',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 4,
     formations: [
       // 2x...
       { formation: '2x1.5', diameter: 9.4, weight: 0.127 },
@@ -229,6 +238,7 @@ export const INITIAL_CABLES: CableProduct[] = [
     name: 'FG16OM16 0.6/1 kV',
     description: 'Cavo multipolare energia isolato in HEPR e guaina LSZH, antifiamma CPR Cca-s1b,d1,a1.',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 4,
     formations: [
       // 2x...
       { formation: '2x1.5', diameter: 9.9, weight: 0.140 },
@@ -306,6 +316,7 @@ export const INITIAL_CABLES: CableProduct[] = [
   },
   {
     id: 'fg16oh2r16',
+    raggioCurvaturaMinFattore: 8,
     name: 'FG16OH2R16 0.6/1 kV',
     description: 'Cavo multipolare energia armato in piattina d\'acciaio, isolamento HEPR, CPR Cca-s3,d1,a3.',
     type: 'cavo',
@@ -357,6 +368,7 @@ export const INITIAL_CABLES: CableProduct[] = [
     name: 'FS18OR18 300/500 V',
     description: 'Cavo multipolare comando/segnalamento isolato in PVC speciale, CPR Cca-s3,d1,a3.',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 4,
     formations: [
       { formation: '2x0.5', diameter: 4.8, weight: 0.033 },
       { formation: '2x0.75', diameter: 5.2, weight: 0.041 },
@@ -433,6 +445,7 @@ export const INITIAL_CABLES: CableProduct[] = [
     name: 'FTE29OHM16',
     description: 'Cavo antincendio schermato LS0H per sistemi di allarme, CPR Cca-s1b,d1,a1.',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 14,
     formations: [
       { formation: '2x0.50', diameter: 6.6, weight: 0.056 },
       { formation: '2x0.75', diameter: 7.0, weight: 0.065 },
@@ -446,6 +459,7 @@ export const INITIAL_CABLES: CableProduct[] = [
     name: 'FTG18OM16 0.6/1 kV',
     description: 'Cavo per energia e segnalazione resistente al fuoco, isolamento in mica/elastomero LS0H, CPR Cca-s1b,d1,a1.',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 14,
     formations: [
       { formation: '7x1.5', diameter: 18.9, weight: 0.463 },
       { formation: '7x2.5', diameter: 20.3, weight: 0.565 },
@@ -470,6 +484,7 @@ export const INITIAL_CABLES: CableProduct[] = [
     name: 'FTS29OM16 Antincendio Evac',
     description: 'Cavo antincendio ed evacuazione vocale (EVAC) resistente al fuoco LS0H, CPR Cca-s1b,d1,a1.',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 14,
     formations: [
       { formation: '2x1', diameter: 8.0, weight: 0.091 },
       { formation: '2x1.5', diameter: 8.6, weight: 0.115 },
@@ -483,6 +498,7 @@ export const INITIAL_CABLES: CableProduct[] = [
     name: 'FG16R16 0.6/1 kV',
     description: 'Cavo unipolare per energia isolato in gomma G16, sotto guaina di PVC R16, CPR Cca-s3,d1,a3.',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 4,
     formations: [
       { formation: '1x1.5', diameter: 6.6, weight: 0.060 },
       { formation: '1x2.5', diameter: 7.0, weight: 0.072 },
@@ -510,6 +526,7 @@ export const INITIAL_CABLES: CableProduct[] = [
     name: 'FG16M16 0.6/1 kV',
     description: 'Cavo unipolare per energia isolato in gomma G16 sotto guaina termoplastica M16 LS0H, CPR Cca-s1b,d1,a1.',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 4,
     formations: [
       { formation: '1x6', diameter: 8.8, weight: 0.129 },
       { formation: '1x10', diameter: 9.3, weight: 0.167 },
@@ -531,6 +548,7 @@ export const INITIAL_CABLES: CableProduct[] = [
   },
   {
     id: 'olflex_classic_110_ch',
+    raggioCurvaturaMinFattore: 6,
     name: 'ÖLFLEX® CLASSIC 110 CH 300/500 V',
     description: 'Cavo di comando schermato, privo di alogeni e resistente all\'olio, CPR Cca-s1a,d1,a1.',
     type: 'cavo',
@@ -596,18 +614,20 @@ export const INITIAL_CABLES: CableProduct[] = [
   },
   {
     id: '6undhpn',
-    name: '6UNDHPN - Reti LAN CAT.6 UTP',
+    name: 'Cat. 6 UTP Reti LAN Posa Esterno',
     description: 'Cavo per reti LAN 4x2xAWG23 UTP CAT.6 LSZH con doppia guaina per esterno/interramento.',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 10,
     formations: [
       { formation: '4x2xAWG23', diameter: 7.4, weight: 0.057 }
     ]
   },
   {
     id: 'rg26h1m16_12_20kv',
-    name: 'SLIMPOWER PLUS HT 105 RG26H1M16 12/20 kV',
+    name: 'RG26H1M16 12/20 kV',
     description: 'Cavo unipolare isolato in gomma HEPR di qualità G26, a spessore ridotto, 105°C (12/20 kV).',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 14,
     formations: [
       { formation: '1x25', diameter: 24.3, weight: 0.815 },
       { formation: '1x35', diameter: 25.4, weight: 0.935 },
@@ -626,9 +646,10 @@ export const INITIAL_CABLES: CableProduct[] = [
   },
   {
     id: 'rg26h1m16_18_30kv',
-    name: 'SLIMPOWER PLUS HT 105 RG26H1M16 18/30 kV',
+    name: 'RG26H1M16 18/30 kV',
     description: 'Cavo unipolare isolato in gomma HEPR di qualità G26, a spessore ridotto, 105°C (18/30 kV).',
     type: 'cavo',
+    raggioCurvaturaMinFattore: 14,
     formations: [
       { formation: '1x35', diameter: 31.8, weight: 0.940 },
       { formation: '1x50', diameter: 32.9, weight: 1.450 },
@@ -822,4 +843,44 @@ export const INITIAL_CONTAINERS: ContainerFamily[] = [
       { code: 'ECTC1540', label: 'Ø40 (Int. 31.5)', outerDiameter: 40, innerDiameter: 31.5, weight: 0.203 }
     ]
   }
+];
+
+export interface CavidottoDoppiaParete {
+  dn: number;              // DN nominale (es. 50, 63, 90, 110, 125, 160, 200)
+  outerDiameter: number;   // OD (mm)
+  innerDiameter: number;   // ID (mm)
+  bendingFactor: number;   // default 8
+}
+
+export interface PozzettoClsPreset {
+  code: string;            // es. 'POZZET02'
+  label: string;           // es. 'Pozzetto 30x30'
+  baseB: number;           // base esterna (cm)
+  lengthL: number;         // lunghezza esterna (cm)
+  innerBaseB: number;      // base interna (cm)
+  innerLengthL: number;    // lunghezza interna (cm)
+  depthH: number;          // altezza esterna (cm)
+  innerDepthH: number;     // altezza interna (cm)
+  weight: number;          // peso (kg)
+}
+
+export const CAVIDOTTI_DOPPIA_PARETE: CavidottoDoppiaParete[] = [
+  { dn: 50, outerDiameter: 63, innerDiameter: 50, bendingFactor: 8 },
+  { dn: 63, outerDiameter: 75, innerDiameter: 63, bendingFactor: 8 },
+  { dn: 90, outerDiameter: 110, innerDiameter: 92, bendingFactor: 8 },
+  { dn: 110, outerDiameter: 125, innerDiameter: 105, bendingFactor: 8 },
+  { dn: 125, outerDiameter: 140, innerDiameter: 125, bendingFactor: 8 },
+  { dn: 160, outerDiameter: 180, innerDiameter: 160, bendingFactor: 8 },
+  { dn: 200, outerDiameter: 200, innerDiameter: 170, bendingFactor: 8 }
+];
+
+export const POZZETTI_CLS_PRESETS: PozzettoClsPreset[] = [
+  { code: 'POZZET02', label: 'Est: 30x30, Int: 25x25 cm, H int: 23 cm', baseB: 30, lengthL: 30, innerBaseB: 25, innerLengthL: 25, depthH: 27, innerDepthH: 23, weight: 32 },
+  { code: 'POZZET03', label: 'Est: 40x40, Int: 34x34 cm, H int: 33 cm', baseB: 40, lengthL: 40, innerBaseB: 34, innerLengthL: 34, depthH: 37, innerDepthH: 33, weight: 55 },
+  { code: 'POZZET04', label: 'Est: 50x50, Int: 40x40 cm, H int: 38 cm', baseB: 50, lengthL: 50, innerBaseB: 40, innerLengthL: 40, depthH: 42, innerDepthH: 38, weight: 67 },
+  { code: 'POZZET05', label: 'Est: 60x60, Int: 50x50 cm, H int: 47 cm', baseB: 60, lengthL: 60, innerBaseB: 50, innerLengthL: 50, depthH: 51, innerDepthH: 47, weight: 150 },
+  { code: 'POZZET06', label: 'Est: 70x70, Int: 60x60 cm, H int: 55 cm', baseB: 70, lengthL: 70, innerBaseB: 60, innerLengthL: 60, depthH: 59, innerDepthH: 55, weight: 204 },
+  { code: 'POZZET07', label: 'Est: 80x80, Int: 70x70 cm, H int: 71 cm', baseB: 80, lengthL: 80, innerBaseB: 70, innerLengthL: 70, depthH: 76, innerDepthH: 71, weight: 370 },
+  { code: 'POZZET08', label: 'Est: 100x100, Int: 87x87 cm, H int: 92 cm', baseB: 100, lengthL: 100, innerBaseB: 87, innerLengthL: 87, depthH: 99, innerDepthH: 92, weight: 600 },
+  { code: 'POZZET16', label: 'Est: 115x115, Int: 100x100 cm, H int: 90 cm', baseB: 115, lengthL: 115, innerBaseB: 100, innerLengthL: 100, depthH: 99, innerDepthH: 90, weight: 900 }
 ];

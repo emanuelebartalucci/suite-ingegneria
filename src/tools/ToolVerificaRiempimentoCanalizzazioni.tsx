@@ -7,7 +7,8 @@ import {
   fetchElectricalCables, 
   fetchElectricalContainers, 
   saveElectricalItem, 
-  deleteElectricalItem 
+  deleteElectricalItem,
+  getCableColor
 } from '../utils/electricalDbHelper';
 import { 
   CableProduct, 
@@ -41,6 +42,7 @@ interface ToolVerificaRiempimentoCanalizzazioniProps {
   setAppMode: (mode: string) => void;
   cablesCatalog?: CableProduct[];
   containersCatalog?: ContainerFamily[];
+  onVerifyPozzetto?: (payload: any) => void;
 }
 
 interface CavoSelezionato {
@@ -411,13 +413,10 @@ const SezioneCanvas: React.FC<{
             return true;
           });
 
-          const colors = ['#f59e0b', '#3b82f6', '#10b981', '#ec4899', '#8b5cf6', '#06b6d4', '#f43f5e'];
-
           // Prepariamo la lista piatta di tutti i singoli cavi
           const flatCables: { diameter: number; color: string }[] = [];
           compCables.forEach((c) => {
-            const originalIdx = (tratta.cables || []).findIndex(orig => orig.cableId === c.cableId && orig.formation === c.formation);
-            const color = originalIdx !== -1 ? colors[originalIdx % colors.length] : colors[0];
+            const color = getCableColor(c.cableId);
             for (let q = 0; q < c.qty; q++) {
               flatCables.push({ diameter: c.diameter, color });
             }
@@ -431,59 +430,78 @@ const SezioneCanvas: React.FC<{
           const cablesForCanvas = flatCables.slice(0, MAX_CANVAS_CABLES);
           const cablesTooMany = flatCables.length > MAX_CANVAS_CABLES;
 
-          // Gestione delle righe per l'impacchettamento dal basso senza buchi
-          interface RowData {
-            yFloor: number;
-            currentWidth: number;
-            maxHeight: number;
-            cables: { x: number; y: number; r: number; color: string }[];
-          }
+          // Algoritmo Skyline 2D adattivo con allineamento in file ordinate
+          // Consente di riempire gli scomparti vuoti ad altezza ridotta a fianco dei cavi grandi,
+          // mantenendo ciascuna tipologia ordinata in file e separate per quanto possibile.
+          const width = Math.ceil(xMax - xMin);
+          const heights = new Float32Array(width);
+          // Inizializza il profilo sul fondo della canalizzazione
+          heights.fill(yStart + hScaled - 2.5);
 
-          const rows: RowData[] = [
-            {
-              yFloor: yStart + hScaled - 4,
-              currentWidth: 0,
-              maxHeight: 0,
-              cables: []
-            }
-          ];
-
-          const maxRowWidth = xMax - xMin - 8; // Margine sinistro/destro di 4px
+          const placedCables: { x: number; y: number; r: number; color: string }[] = [];
 
           cablesForCanvas.forEach(c => {
-            const rScaled = (c.diameter / 2) * scale * 0.88;
-            const dScaled = rScaled * 2;
-            let placed = false;
+            const r = (c.diameter / 2) * scale * 0.88;
+            
+            let bestX = 0;
+            let bestY = -9999; // Vogliamo la Y maggiore possibile (più in basso/fondo possibile)
 
-            // Cerca la prima riga dal basso in cui c'è spazio sufficiente
-            for (let i = 0; i < rows.length; i++) {
-              const rData = rows[i];
-              if (rData.currentWidth + dScaled <= maxRowWidth) {
-                // Il cavo ci sta in questa riga
-                const xCenter = xMin + 4 + rData.currentWidth + rScaled;
-                const yCenter = rData.yFloor - rScaled;
-                rData.cables.push({ x: xCenter, y: yCenter, r: rScaled, color: c.color });
-                rData.currentWidth += dScaled + 2; // 2px di spazio tra cavi vicini
-                rData.maxHeight = Math.max(rData.maxHeight, dScaled);
-                placed = true;
-                break;
+            const startX = xMin + 4 + r;
+            const endX = xMax - 4 - r;
+
+            // Cerchiamo la X migliore effettuando una scansione orizzontale
+            for (let x = startX; x <= endX; x += 1.0) {
+              // Calcola la quota di appoggio basata sull'altezza massima (Y minima) del profilo sottostante
+              let profileY = yStart + hScaled - 2.5;
+              const xLeftIdx = Math.floor(x - r - xMin);
+              const xRightIdx = Math.ceil(x + r - xMin);
+
+              for (let xi = xLeftIdx; xi <= xRightIdx; xi++) {
+                if (xi >= 0 && xi < width) {
+                  if (heights[xi] < profileY) {
+                    profileY = heights[xi]; // quota y minore = punto più alto nel canale
+                  }
+                }
+              }
+
+              const candidateY = profileY - r;
+
+              // Verifica se in questa coordinata (x, candidateY) il cavo si sovrappone a quelli già posati
+              let hasOverlap = false;
+              for (const p of placedCables) {
+                const dist = Math.hypot(x - p.x, candidateY - p.y);
+                // Tolleranza di 0.8px per evitare adiacenza estrema
+                if (dist < r + p.r + 0.8) {
+                  hasOverlap = true;
+                  break;
+                }
+              }
+
+              if (!hasOverlap) {
+                // Scegliamo la posizione che fa adagiare il cavo più in basso (candidateY maggiore)
+                // In caso di Y equivalenti, la scansione da sinistra a destra favorisce il riempimento compatto a sinistra
+                if (candidateY > bestY + 0.1) {
+                  bestY = candidateY;
+                  bestX = x;
+                }
               }
             }
 
-            // Se non ci sta in nessuna riga esistente, creiamo una nuova riga superiore
-            if (!placed) {
-              const prevRow = rows[rows.length - 1];
-              const newYFloor = prevRow.yFloor - prevRow.maxHeight - 2; // 2px di distanza verticale
-              const xCenter = xMin + 4 + rScaled;
-              const yCenter = newYFloor - rScaled;
-              
-              const newRow: RowData = {
-                yFloor: newYFloor,
-                currentWidth: dScaled + 2,
-                maxHeight: dScaled,
-                cables: [{ x: xCenter, y: yCenter, r: rScaled, color: c.color }]
-              };
-              rows.push(newRow);
+            // Se abbiamo trovato un posizionamento valido, registriamo il cavo e aggiorniamo il profilo delle altezze
+            if (bestY > -9999) {
+              placedCables.push({ x: bestX, y: bestY, r, color: c.color });
+
+              const xLeftIdx = Math.floor(bestX - r - xMin);
+              const xRightIdx = Math.ceil(bestX + r - xMin);
+              for (let xi = xLeftIdx; xi <= xRightIdx; xi++) {
+                if (xi >= 0 && xi < width) {
+                  // Il nuovo profilo superiore in quel punto corrisponde al bordo superiore del cavo appena posato
+                  const cableTop = bestY - r - 1.5;
+                  if (cableTop < heights[xi]) {
+                    heights[xi] = cableTop;
+                  }
+                }
+              }
             }
           });
 
@@ -497,11 +515,9 @@ const SezioneCanvas: React.FC<{
             ctx.restore();
           }
 
-          // Disegniamo tutti i cavi inseriti nelle righe
-          rows.forEach(rData => {
-            rData.cables.forEach(cable => {
-              drawCableCircle(ctx, cable.x, cable.y, cable.r, cable.color);
-            });
+          // Disegnamo tutti i cavi
+          placedCables.forEach(cable => {
+            drawCableCircle(ctx, cable.x, cable.y, cable.r, cable.color);
           });
         };
 
@@ -624,11 +640,9 @@ const SezioneCanvas: React.FC<{
         }
 
         // Disegno dei cavi in righe orizzontali partendo dal basso e adagiati sulla parete interna
-        const colors = ['#f59e0b', '#3b82f6', '#10b981', '#ec4899', '#8b5cf6', '#06b6d4', '#f43f5e'];
         const flatCables: { diameter: number, color: string, compartment?: string }[] = [];
         pipeCables.forEach((c) => {
-          const originalIdx = (tratta.cables || []).findIndex(orig => orig.cableId === c.cableId && orig.formation === c.formation);
-          const color = originalIdx !== -1 ? colors[originalIdx % colors.length] : colors[0];
+          const color = getCableColor(c.cableId);
           for (let q = 0; q < c.qty; q++) {
             flatCables.push({ diameter: c.diameter, color, compartment: c.compartment });
           }
@@ -771,14 +785,14 @@ const SezioneCanvas: React.FC<{
   }, [tratta, family, size, fillRate]);
 
   return (
-    <div className="bg-slate-50 rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col items-center relative w-full h-full min-h-[380px] justify-between">
-      <div className="absolute top-5 right-5 bg-slate-900/95 text-white text-[10px] font-black px-3 py-1.5 rounded-lg shadow-sm uppercase tracking-wide">
+    <div className="bg-slate-50 rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col items-center relative w-full h-full min-h-[380px] justify-between print:border-none print:bg-transparent print:shadow-none print:p-0 print:min-h-0">
+      <div className="absolute top-5 right-5 bg-slate-900/95 text-white text-[10px] font-black px-3 py-1.5 rounded-lg shadow-sm uppercase tracking-wide print:hidden">
         Riempimento: {formatNumber(fillRate, 1)}%
       </div>
-      <div className="w-full flex-1 flex items-center justify-center mt-6">
-        <canvas ref={canvasRef} width={480 * dpr} height={320 * dpr} className="w-full max-w-[480px] aspect-[3/2] rounded-2xl bg-white border border-slate-100 shadow-xs" />
+      <div className="w-full flex-1 flex items-center justify-center mt-6 print:mt-2">
+        <canvas ref={canvasRef} width={480 * dpr} height={320 * dpr} className="w-full max-w-[480px] aspect-[3/2] rounded-2xl bg-white border border-slate-100 shadow-xs print:border-none print:shadow-none" />
       </div>
-      <div className="text-[10px] text-slate-500 mt-4 text-center italic leading-relaxed px-2">
+      <div className="text-[10px] text-slate-500 mt-4 text-center italic leading-relaxed px-2 print:mt-2">
         {isRect ? "Simulazione riempimento dal basso" : "Simulazione riempimento dal basso per tubazioni"}
       </div>
     </div>
@@ -1017,8 +1031,8 @@ export function regenerateTratteTags(
     if (newParentId) {
       const parentNode = updatedTratte.find(ut => ut.tag === newParentId);
       if (parentNode) {
-        const parentA = parentNode.a || 'Destinazione generica';
-        childDa = parentA === 'Destinazione generica' ? 'Partenza generica' : parentA;
+        const parentA = parentNode.a || 'Utenza generica';
+        childDa = parentA === 'Utenza generica' ? 'Partenza generica' : parentA;
       }
     } else {
       childDa = node.da || 'Cabina elettrica';
@@ -1104,7 +1118,7 @@ export function regenerateTratteTags(
 }
 
 
-export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectData, setAppMode, cablesCatalog: propCablesCatalog, containersCatalog: propContainersCatalog }: ToolVerificaRiempimentoCanalizzazioniProps) {
+export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectData, setAppMode, cablesCatalog: propCablesCatalog, containersCatalog: propContainersCatalog, onVerifyPozzetto }: ToolVerificaRiempimentoCanalizzazioniProps) {
   // Stati principali dello strumento
   const [state, setState] = useState<ToolState>(defaultState);
   const [activeTab, setActiveTab] = useState<'calcoli' | 'topologia' | 'database'>('calcoli');
@@ -1224,7 +1238,7 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
           customCoverWeight: t.customCoverWeight,
           customBaseWeight: t.customBaseWeight,
           da: typeof t.da === 'string' && t.da ? t.da : (t.parentId === null ? 'Cabina elettrica' : 'Partenza generica'),
-          a: typeof t.a === 'string' && t.a ? t.a : 'Destinazione generica',
+          a: typeof t.a === 'string' && t.a ? t.a : 'Utenza generica',
           dislivelloGeodetico: t.dislivelloGeodetico !== undefined ? t.dislivelloGeodetico : 0
         }));
 
@@ -1315,7 +1329,7 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
       hasCover: false,
       cables: [],
       da: activeTratta.a || 'Quadro elettrico',
-      a: 'Destinazione generica',
+      a: 'Utenza generica',
       dislivelloGeodetico: 0
     };
     setState(prev => {
@@ -1380,7 +1394,7 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
       // Prima applica il cambio di valore
       let tempTratte = prev.tratte.map(t => {
         if (field === 'a' && t.parentId === tag) {
-          const newDa = value === 'Destinazione generica' ? 'Partenza generica' : value;
+          const newDa = value === 'Utenza generica' ? 'Partenza generica' : value;
           return { ...t, da: newDa };
         }
         if (t.tag === tag) {
@@ -1820,7 +1834,7 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
                 <div>
                   <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Arrivo (A)</label>
                   <select 
-                    value={activeTratta.a || 'Destinazione generica'}
+                    value={activeTratta.a || 'Utenza generica'}
                     onChange={e => updateTrattaField(activeTratta.tag, 'a', e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400"
                   >
@@ -1829,7 +1843,7 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
                     <option value="Punto di derivazione">Punto di derivazione</option>
                     <option value="Strumento elettronico">Strumento elettronico</option>
                     <option value="Scatola di derivazione">Scatola di derivazione</option>
-                    <option value="Destinazione generica">Destinazione generica</option>
+                    <option value="Utenza generica">Utenza generica</option>
                   </select>
                 </div>
               </div>
@@ -2008,13 +2022,52 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
                 <h3 className="text-base font-black text-slate-800">
                   Cavi Posati nella Tratta
                 </h3>
-                <button 
-                  onClick={handleAddCableToTratta}
-                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Aggiungi Cavo
-                </button>
+                <div className="flex gap-2">
+                  {onVerifyPozzetto && (
+                    <button
+                      onClick={() => {
+                        if (activeTratta.cables.length === 0) {
+                          if (window.suiteUI) window.suiteUI.toast("Nessun cavo presente da verificare nel pozzetto!", "warning");
+                          return;
+                        }
+                        const fam = containersCatalog?.find(f => f.id === activeTratta.selectedFamilyId);
+                        const sz = fam?.sizes.find(s => s.code === activeTratta.selectedSizeCode);
+                        let conduitPayload = undefined;
+                        if (fam && sz) {
+                          conduitPayload = {
+                            familyId: fam.id,
+                            familyName: fam.name,
+                            sizeCode: sz.code,
+                            outerDiameter: sz.outerDiameter || sz.width || 90,
+                            innerDiameter: sz.innerDiameter || sz.height || 77
+                          };
+                        }
+                        onVerifyPozzetto({
+                          cables: activeTratta.cables.map(c => ({
+                            cableId: c.cableId,
+                            sigla: c.sigla,
+                            formation: c.formation,
+                            diameter: c.diameter,
+                            weight: c.weight,
+                            qty: c.qty
+                          })),
+                          conduit: conduitPayload
+                        });
+                      }}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                      title="Esporta i cavi di questa tratta verso il tool Pozzetti"
+                    >
+                      <span>🕳️</span> Verifica Pozzetto
+                    </button>
+                  )}
+                  <button 
+                    onClick={handleAddCableToTratta}
+                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Aggiungi Cavo
+                  </button>
+                </div>
               </div>
 
               {activeTratta.cables.length === 0 ? (
@@ -2026,8 +2079,8 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
                   <table className="w-full text-left text-xs divide-y divide-slate-100">
                     <thead>
                       <tr className="text-slate-400 uppercase font-black tracking-wide text-[10px]">
-                        <th className="py-2.5 px-2">Tipo Cavo</th>
                         <th className="py-2.5 px-2">Sigla</th>
+                        <th className="py-2.5 px-2">Tipo Cavo</th>
                         <th className="py-2.5 px-2">Formazione</th>
                         <th className="py-2.5 px-2">Q.tà</th>
                         <th className="py-2.5 px-2">Diametro [mm]</th>
@@ -2044,19 +2097,6 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
                         return (
                           <tr key={idx} className="hover:bg-slate-50/50">
                             <td className="py-2.5 px-2">
-                              <select 
-                                value={cavo.cableId}
-                                onChange={e => handleUpdateCableInTratta(idx, 'cableId', e.target.value)}
-                                className="bg-slate-50 border border-slate-200 rounded-lg p-1 text-[11px]"
-                              >
-                                {cablesCatalog.map(c => (
-                                  <option key={c.id} value={c.id}>{c.name}</option>
-                                ))}
-                                <option value="personalizzato">Personalizzato</option>
-                              </select>
-                            </td>
-
-                            <td className="py-2.5 px-2">
                               <input 
                                 type="text"
                                 value={cavo.sigla || ''}
@@ -2064,6 +2104,22 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
                                 className="bg-slate-50 border border-slate-200 rounded-lg p-1 text-[11px] w-12 text-center font-bold"
                                 placeholder="es. 01"
                               />
+                            </td>
+
+                            <td className="py-2.5 px-2">
+                              <div className="flex items-center gap-2">
+                                <span className="w-2.5 h-2.5 rounded-full shrink-0 border border-slate-900/10" style={{ backgroundColor: getCableColor(cavo.cableId) }} />
+                                <select 
+                                  value={cavo.cableId}
+                                  onChange={e => handleUpdateCableInTratta(idx, 'cableId', e.target.value)}
+                                  className="bg-slate-50 border border-slate-200 rounded-lg p-1 text-[11px] max-w-[180px] truncate"
+                                >
+                                  {cablesCatalog.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                  ))}
+                                  <option value="personalizzato">Personalizzato</option>
+                                </select>
+                              </div>
                             </td>
 
                             <td className="py-2.5 px-2">
@@ -2247,7 +2303,7 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
         <div className="w-full">
           <div>
             <h3 className="text-base font-black text-slate-800 border-b-2 border-slate-800 pb-1 uppercase tracking-wider">
-              Riepilogo e Dimensionamento Condutture Elettriche
+              Riepilogo Verifiche Canalizzazioni Elettriche
             </h3>
           </div>
 
@@ -2295,11 +2351,11 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
                       </td>
                       <td className="py-2.5 px-2 text-center font-mono">{formatNumber(t.length, 0)}</td>
                       <td className="py-2.5 px-2">
-                        <div className="font-semibold text-slate-700">
-                          {t.containmentType === 'vista' ? 'A vista' : t.containmentType === 'cavidotto' ? 'Interrato' : 'Tubo "tazza"'}
+                        <div className="font-bold text-slate-800">
+                          {fam?.name || (t.selectedFamilyId === 'personalizzato' ? 'Condotto Personalizzato' : 'Personalizzato')}
                         </div>
-                        <div className="text-[10px] text-slate-500">
-                          {fam?.name} ({formatContainerSizeLabel(fam, sz, t)}) {N_lines > 1 ? `x ${N_lines} linee` : ''}
+                        <div className="text-[10px] text-slate-500 font-medium mt-0.5">
+                          {formatContainerSizeLabel(fam, sz, t)} {N_lines > 1 ? `x ${N_lines} linee` : ''}
                         </div>
                       </td>
                       <td className="py-2.5 px-2">
@@ -2419,7 +2475,7 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
                       <tr key={t.tag} className="border-b border-slate-200">
                         <td className="py-1.5 font-bold text-slate-800">Tratto {t.tag}</td>
                         <td className="py-1.5 text-slate-650">{t.da || 'Partenza generica'}</td>
-                        <td className="py-1.5 text-slate-650">{t.a || 'Destinazione generica'}</td>
+                        <td className="py-1.5 text-slate-650">{t.a || 'Utenza generica'}</td>
                         <td className={`py-1.5 text-center font-bold ${comp?.verificato ? 'text-emerald-600' : 'text-rose-600'}`}>
                           {comp?.verificato ? 'Conforme' : 'Non Conforme'}
                         </td>
@@ -2438,7 +2494,9 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
               <div className="space-y-1 flex-1">
                 <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Attestato di Conformità Tecnica</span>
                 <p className="text-[10px] text-slate-600 font-medium leading-relaxed italic">
-                  Si attesta che il dimensionamento delle condutture elettriche, la scelta dei canali/tubazioni e il calcolo dei relativi tassi di riempimento riportati nel presente report sono stati eseguiti in piena conformità ai requisiti di sicurezza e alle prescrizioni della <strong className="font-bold text-slate-800">Normativa CEI 64-8</strong>.
+                  Si attesta che la selezione delle canalizzazioni elettriche (tubazioni/canalette) è stata eseguita in piena conformità ai requisiti di sicurezza ed alle prescrizioni della Normativa CEI 64-8 vigente, come evidenziato dai calcoli dei tassi di riempimento presenti nel report in oggetto.
+                  <br />
+                  È onere dell'appaltatore la verifica ed il rispetto del riempimento delle canalizzazioni di progetto; eventuali difformità riscontrate prima dell'esecuzione dei lavori dovranno essere comunicate alla D.L.
                 </p>
               </div>
               <div className="shrink-0 flex items-center gap-2 border border-slate-300 bg-slate-50 px-3 py-1.5 rounded-lg text-slate-800 font-bold">

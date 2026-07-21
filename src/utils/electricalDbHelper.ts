@@ -57,8 +57,7 @@ export async function seedElectricalCatalog(db: Firestore): Promise<void> {
       console.log("Seeding completato con successo!");
       return;
     }
-
-    // Verifichiamo se mancano i nuovi cavi, le formazioni o le nuove famiglie di condotti
+    // Verifichiamo se mancano i nuovi cavi, le formazioni o le nuove famiglie di condotti
     const fg16om16Doc = querySnapshot.docs.find(d => d.id === 'fg16om16');
     const isCablesOutdated = !fg16om16Doc || !fg16om16Doc.data().formations || fg16om16Doc.data().formations.length < 50;
     const hasNewCables = querySnapshot.docs.some(d => d.id === 'fg16r16');
@@ -73,8 +72,17 @@ export async function seedElectricalCatalog(db: Firestore): Promise<void> {
     const has6undhpn = querySnapshot.docs.some(d => d.id === '6undhpn');
     const hasRg26 = querySnapshot.docs.some(d => d.id === 'rg26h1m16_12_20kv');
 
-    if (isCablesOutdated || !hasNewCables || !hasPasserellaFilo || !hasOlflex || hasOldLabel || !has6undhpn || !hasRg26) {
-      console.log("Rilevata versione precedente, parziale o con formato etichette obsoleto su Firestore. Avvio allineamento complessivo (cavi e condotti)...");
+    // Rileva se manca la proprietà raggioCurvaturaMinFattore
+    const hasBending = fg16om16Doc && fg16om16Doc.data().raggioCurvaturaMinFattore !== undefined;
+
+    // Rileva se i cavi hanno ancora i vecchi nomi
+    const doc6undhpn = querySnapshot.docs.find(d => d.id === '6undhpn');
+    const docSf225rz = querySnapshot.docs.find(d => d.id === 'sf225rz');
+    const hasNewNames = doc6undhpn && doc6undhpn.data().name === 'Cat. 6 UTP Reti LAN Posa Esterno' &&
+                        docSf225rz && docSf225rz.data().name === 'FTE32OHAM16';
+
+    if (isCablesOutdated || !hasNewCables || !hasPasserellaFilo || !hasOlflex || hasOldLabel || !has6undhpn || !hasRg26 || !hasBending || !hasNewNames) {
+      console.log("Rilevata versione precedente, parziale, con formato etichette, raggio curvatura o nomi obsoleti su Firestore. Avvio allineamento complessivo (cavi e condotti)...");
       // Allineamento cavi
       for (const cavo of INITIAL_CABLES) {
         await setDoc(doc(db, COLLECTION_NAME, cavo.id), cavo);
@@ -94,6 +102,7 @@ export async function seedElectricalCatalog(db: Firestore): Promise<void> {
  * Recupera i cavi da Firestore (o localStorage per modalità demo).
  */
 export async function fetchElectricalCables(db: Firestore, isDemo: boolean): Promise<CableProduct[]> {
+  let list: CableProduct[] = [];
   if (isDemo) {
     const catalog = getLocalCatalog();
     const fg16om16 = catalog.cables.find(c => c.id === 'fg16om16');
@@ -102,56 +111,67 @@ export async function fetchElectricalCables(db: Firestore, isDemo: boolean): Pro
     const hasOldLabel = catalog.containers.some(c => c.id === 'passerella_filo' && (c.sizes || []).some(sz => sz.label === '54x100'));
     const has6undhpn = catalog.cables.some(c => c.id === '6undhpn');
     const hasRg26 = catalog.cables.some(c => c.id === 'rg26h1m16_12_20kv');
-    if (isOutdated || !catalog.cables.some(c => c.id === 'fg16r16') || !catalog.containers.some(c => c.id === 'passerella_filo') || !hasOlflex || hasOldLabel || !has6undhpn || !hasRg26) {
+    const hasBending = fg16om16 && fg16om16.raggioCurvaturaMinFattore !== undefined;
+    const hasNewNames = catalog.cables.some(c => c.id === '6undhpn' && c.name === 'Cat. 6 UTP Reti LAN Posa Esterno') &&
+                        catalog.cables.some(c => c.id === 'sf225rz' && c.name === 'FTE32OHAM16');
+
+    if (isOutdated || !catalog.cables.some(c => c.id === 'fg16r16') || !catalog.containers.some(c => c.id === 'passerella_filo') || !hasOlflex || hasOldLabel || !has6undhpn || !hasRg26 || !hasBending || !hasNewNames) {
       saveLocalCatalog(INITIAL_CABLES, INITIAL_CONTAINERS);
-      return INITIAL_CABLES;
+      list = INITIAL_CABLES;
+    } else {
+      list = catalog.cables;
     }
-    return catalog.cables;
-  }
-  
-  try {
-    const q = query(collection(db, COLLECTION_NAME), where("type", "==", "cavo"));
-    const querySnapshot = await getDocs(q);
-    
-    // Se per qualche motivo il DB è vuoto, usa i dati iniziali
-    if (querySnapshot.empty) {
-      await seedElectricalCatalog(db);
-      const secondSnap = await getDocs(q);
-      const results: CableProduct[] = [];
-      secondSnap.forEach(d => {
-        results.push(d.data() as CableProduct);
-      });
-      return results;
-    }
-    
-    const results: CableProduct[] = [];
-    querySnapshot.forEach(d => {
-      results.push(d.data() as CableProduct);
-    });
+  } else {
+    try {
+      const q = query(collection(db, COLLECTION_NAME), where("type", "==", "cavo"));
+      const querySnapshot = await getDocs(q);
+      
+      // Se per qualche motivo il DB è vuoto, usa i dati iniziali
+      if (querySnapshot.empty) {
+        await seedElectricalCatalog(db);
+        const secondSnap = await getDocs(q);
+        const results: CableProduct[] = [];
+        secondSnap.forEach(d => {
+          results.push(d.data() as CableProduct);
+        });
+        list = results;
+      } else {
+        const results: CableProduct[] = [];
+        querySnapshot.forEach(d => {
+          results.push(d.data() as CableProduct);
+        });
 
-    // Se mancano i nuovi cavi o le formazioni su Firestore, allineiamo
-    const fg16om16 = results.find(c => c.id === 'fg16om16');
-    const isOutdated = !fg16om16 || fg16om16.formations.length < 50;
-    const hasOlflex = results.some(c => c.id === 'olflex_classic_110_ch');
-    const has6undhpn = results.some(c => c.id === '6undhpn');
-    const hasRg26 = results.some(c => c.id === 'rg26h1m16_12_20kv');
+        // Se mancano i nuovi cavi o le formazioni su Firestore, allineiamo
+        const fg16om16 = results.find(c => c.id === 'fg16om16');
+        const isOutdated = !fg16om16 || fg16om16.formations.length < 50;
+        const hasOlflex = results.some(c => c.id === 'olflex_classic_110_ch');
+        const has6undhpn = results.some(c => c.id === '6undhpn');
+        const hasRg26 = results.some(c => c.id === 'rg26h1m16_12_20kv');
+        const hasBending = fg16om16 && fg16om16.raggioCurvaturaMinFattore !== undefined;
+        const hasNewNames = results.some(c => c.id === '6undhpn' && c.name === 'Cat. 6 UTP Reti LAN Posa Esterno') &&
+                            results.some(c => c.id === 'sf225rz' && c.name === 'FTE32OHAM16');
 
-    if (isOutdated || !results.some(c => c.id === 'fg16r16') || !hasOlflex || !has6undhpn || !hasRg26) {
-      console.log("Rilevata assenza o versione parziale su Firestore, eseguo allineamento...");
-      await seedElectricalCatalog(db);
-      const updatedSnap = await getDocs(q);
-      const updatedResults: CableProduct[] = [];
-      updatedSnap.forEach(d => {
-        updatedResults.push(d.data() as CableProduct);
-      });
-      return updatedResults;
+        if (isOutdated || !results.some(c => c.id === 'fg16r16') || !hasOlflex || !has6undhpn || !hasRg26 || !hasBending || !hasNewNames) {
+          console.log("Rilevata assenza, versione parziale o vecchi nomi su Firestore, eseguo allineamento...");
+          await seedElectricalCatalog(db);
+          const updatedSnap = await getDocs(q);
+          const updatedResults: CableProduct[] = [];
+          updatedSnap.forEach(d => {
+            updatedResults.push(d.data() as CableProduct);
+          });
+          list = updatedResults;
+        } else {
+          list = results;
+        }
+      }
+    } catch (e) {
+      console.error("Errore recupero cavi da Firestore, uso fallback locale:", e);
+      list = INITIAL_CABLES;
     }
-    
-    return results;
-  } catch (e) {
-    console.error("Errore recupero cavi da Firestore, uso fallback locale:", e);
-    return INITIAL_CABLES;
   }
+
+  // Ordina alfabeticamente in modo naturale e case-insensitive
+  return [...list].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 }
 
 /**
@@ -262,4 +282,69 @@ export async function deleteElectricalItem(
     console.error("Errore nella cancellazione da Firestore:", e);
     throw e;
   }
+}
+
+/**
+ * Hash deterministico DJB2 della stringa ID del cavo.
+ * Restituisce un numero intero unsigned a 32 bit usato come seme per la generazione del colore.
+ */
+function hashCableId(id: string): number {
+  let hash = 5381;
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) + hash) ^ id.charCodeAt(i);
+    hash = hash >>> 0; // Forza conversione a Uint32 per evitare overflow negativi
+  }
+  return hash;
+}
+
+/**
+ * Ritorna un colore standard per il cavo basato sulla sua categoria/sigla per uniformità tra i vari tool.
+ *
+ * CODIFICA CROMATICA PER MACRO-CATEGORIA:
+ *  - Media Tensione (MT) → palette rossa  (hue 0–20)
+ *  - Resistenti al Fuoco → palette arancione (hue 24–40)
+ *  - Dati / Segnale      → palette blu   (hue 210–240)
+ *  - Bassa Tensione (BT) → palette verde  (hue 100–165)
+ *  - Personalizzato      → grigio neutro  #64748b
+ *
+ * All'interno di ogni macro-categoria la sfumatura è DETERMINISTICA sull'ID del cavo
+ * tramite un hash DJB2, così lo stesso cavo mantiene identico colore in tutte le schermate.
+ */
+export function getCableColor(cableId: string): string {
+  // Personalizzato – grigio fisso
+  if (cableId === 'personalizzato') return '#64748b';
+
+  const seed = hashCableId(cableId);
+  // Valore normalizzato [0, 1) per variare la sfumatura
+  const t = (seed % 1000) / 1000;
+
+  // Media Tensione (MT) → hue 0–18, sat 70–85%, lit 40–50%
+  if (cableId.startsWith('rg26')) {
+    const h = Math.round(0  + t * 18);
+    const s = Math.round(70 + t * 15);
+    const l = Math.round(40 + t * 10);
+    return `hsl(${h}, ${s}%, ${l}%)`;
+  }
+
+  // Resistenti al Fuoco → hue 24–40, sat 85–95%, lit 45–55%
+  if (['fte29ohm16', 'ftg18om16', 'fts29om16', 'sf225rz'].includes(cableId)) {
+    const h = Math.round(24 + t * 16);
+    const s = Math.round(85 + t * 10);
+    const l = Math.round(45 + t * 10);
+    return `hsl(${h}, ${s}%, ${l}%)`;
+  }
+
+  // Dati / Segnale → hue 210–240, sat 65–80%, lit 44–54%
+  if (['futp_cat6', 'futp_cat6a', '6undhpn', '12s1yvi'].includes(cableId)) {
+    const h = Math.round(210 + t * 30);
+    const s = Math.round(65  + t * 15);
+    const l = Math.round(44  + t * 10);
+    return `hsl(${h}, ${s}%, ${l}%)`;
+  }
+
+  // Bassa Tensione (BT) – fallback → hue 100–162, sat 45–65%, lit 36–50%
+  const h = Math.round(100 + t * 62);
+  const s = Math.round(45  + t * 20);
+  const l = Math.round(36  + t * 14);
+  return `hsl(${h}, ${s}%, ${l}%)`;
 }

@@ -429,7 +429,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
         y: textY,
         text: `${node.tag} (${formatNumber(node.length, 2).replace(',00', '')}m)`,
         title: mode === 'electric' 
-          ? `${node.name} (${node.tag})\nPercorso: ${node.da || 'Partenza generica'} ➔ ${node.a || 'Destinazione generica'}\nLunghezza: ${formatNumber(node.length, 1)} m\nRiempimento: ${pNodo !== undefined ? formatNumber(pNodo, 1) : '—'}%`
+          ? `${node.name} (${node.tag})\nPercorso: ${node.da || 'Partenza generica'} ➔ ${node.a || 'Utenza generica'}\nLunghezza: ${formatNumber(node.length, 1)} m\nRiempimento: ${pNodo !== undefined ? formatNumber(pNodo, 1) : '—'}%`
           : `${node.name}\nv = ${formatNumber(node.velocity, 2)} m/s\n∆P = ${formatNumber(node.loss_tot_mbar, 1)} mbar\n∆z = ${dz >= 0 ? '+' : ''}${formatNumber(dz, 1)} m\nP_nodo = ${pNodo !== undefined ? formatNumber(pNodo, 3) : '—'} barg`,
         dir,
         anchor: textAnchor
@@ -617,7 +617,7 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
               >
                 <title>
                   {mode === 'electric' 
-                    ? `${l.name} (${l.tag})\nPercorso: ${l.da || 'Partenza generica'} ➔ ${l.a || 'Destinazione generica'}\nLunghezza: ${formatNumber(l.length, 1)} m\nDislivello: ${dz >= 0 ? '+' : ''}${formatNumber(dz, 1)} m\nRiempimento: ${l.pressioneNodo !== undefined ? formatNumber(l.pressioneNodo, 1) : '—'}%` 
+                    ? `${l.name} (${l.tag})\nPercorso: ${l.da || 'Partenza generica'} ➔ ${l.a || 'Utenza generica'}\nLunghezza: ${formatNumber(l.length, 1)} m\nDislivello: ${dz >= 0 ? '+' : ''}${formatNumber(dz, 1)} m\nRiempimento: ${l.pressioneNodo !== undefined ? formatNumber(l.pressioneNodo, 1) : '—'}%` 
                     : `${l.name}\nLunghezza: ${formatNumber(l.length, 1)} m\nVelocità: ${formatNumber(l.velocity, 2)} m/s\nPerdita: ${formatNumber(l.loss, 1)} mbar\n∆z: ${dz >= 0 ? '+' : ''}${formatNumber(dz, 1)} m\nP_nodo: ${l.pressioneNodo !== undefined ? formatNumber(l.pressioneNodo, 3) : '—'} barg`}
                 </title>
                 {/* Linea di hover/attiva */}
