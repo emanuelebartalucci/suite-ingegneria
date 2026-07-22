@@ -379,6 +379,122 @@ export function calcolaCompliancePozzetto(p: PozzettoProgetto, cablesCatalog: Ca
   };
 }
 
+function getPackedCablePositions(
+  cables: { color: string; diameter: number }[],
+  cx: number,
+  cy: number,
+  rIntScaled: number,
+  scale: number
+) {
+  const count = cables.length;
+  if (count === 0) return [];
+
+  const wallInset = 1.2; // Margine interno dal tubo
+  const maxR = Math.max(0.8, (rIntScaled - wallInset) * 0.45);
+
+  // Ordina i cavi dal diametro più grande al più piccolo (i grandi sotto, i piccoli sopra)
+  const sortedCables = [...cables].sort((a, b) => b.diameter - a.diameter);
+
+  const items = sortedCables.map(c => {
+    const rawR = ((c.diameter / 10) / 2) * scale;
+    const r = Math.max(0.8, Math.min(maxR, rawR));
+    return { color: c.color, r };
+  });
+
+  const positions: { color: string; ccx: number; ccy: number; r: number }[] = [];
+
+  if (count === 1) {
+    const item = items[0];
+    positions.push({
+      color: item.color,
+      ccx: cx,
+      ccy: cy + rIntScaled - item.r - wallInset,
+      r: item.r
+    });
+    return positions;
+  }
+
+  if (count === 2) {
+    const r1 = items[0].r;
+    const r2 = items[1].r;
+    const rAvg = (r1 + r2) / 2;
+    const dx = rAvg + 0.4;
+    const maxD = Math.max(0, rIntScaled - rAvg - wallInset);
+    const dy = Math.sqrt(Math.max(0, maxD * maxD - dx * dx));
+
+    positions.push({
+      color: items[0].color,
+      ccx: cx - dx,
+      ccy: cy + dy,
+      r: r1
+    });
+    positions.push({
+      color: items[1].color,
+      ccx: cx + dx,
+      ccy: cy + dy,
+      r: r2
+    });
+    return positions;
+  }
+
+  if (count === 3) {
+    const r1 = items[0].r;
+    const r2 = items[1].r;
+    const r3 = items[2].r;
+    const rAvg = (r1 + r2 + r3) / 3;
+
+    const dx = rAvg + 0.5;
+    const maxD = Math.max(0, rIntScaled - rAvg - wallInset);
+    const dy = Math.sqrt(Math.max(0, maxD * maxD - dx * dx));
+
+    const ccx1 = cx - dx;
+    const ccy1 = cy + dy;
+    const ccx2 = cx + dx;
+    const ccy2 = cy + dy;
+
+    positions.push({ color: items[0].color, ccx: ccx1, ccy: ccy1, r: r1 });
+    positions.push({ color: items[1].color, ccx: ccx2, ccy: ccy2, r: r2 });
+
+    const distTarget = rAvg * 2 + 0.5;
+    const heightDiff = Math.sqrt(Math.max(0, distTarget * distTarget - dx * dx));
+    const ccy3 = ccy1 - heightDiff;
+
+    positions.push({ color: items[2].color, ccx: cx, ccy: ccy3, r: r3 });
+    return positions;
+  }
+
+  // 4 o più cavi: impaccamento esagonale dinamico a strati dal basso verso l'alto
+  const rAvg = items.reduce((acc, it) => acc + it.r, 0) / count;
+  const R_eff = rIntScaled - wallInset;
+  let idx = 0;
+  let curY = cy + R_eff - items[0].r;
+
+  while (idx < count && curY >= cy - R_eff) {
+    const distY = Math.abs(curY - cy);
+    const halfW = distY < R_eff ? Math.sqrt(Math.max(0, R_eff * R_eff - distY * distY)) : 0;
+    
+    const curR = items[idx].r;
+    const stepX = curR * 2 + 0.4;
+    const maxInRow = Math.max(1, Math.floor((halfW * 2) / stepX));
+    const countInRow = Math.min(maxInRow, count - idx);
+
+    const startX = cx - ((countInRow - 1) * stepX) / 2;
+    for (let i = 0; i < countInRow && idx < count; i++, idx++) {
+      const item = items[idx];
+      positions.push({
+        color: item.color,
+        ccx: startX + i * stepX,
+        ccy: curY,
+        r: item.r
+      });
+    }
+
+    curY -= (items[Math.min(idx, count - 1)].r * 1.73);
+  }
+
+  return positions;
+}
+
 const PozzettoGraficaDettaglio: React.FC<{
   pozzetto: PozzettoProgetto;
   compliance: any;
@@ -697,6 +813,26 @@ const PozzettoGraficaDettaglio: React.FC<{
       });
     });
 
+    // Etichette orientamento pareti collocate senza sovrapposizione nel bordo del pozzetto
+    ctx.save();
+    ctx.font = 'bold 8px sans-serif';
+    ctx.fillStyle = '#475569';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const wallThickX = (xStartInt - xStartExt);
+    const wallThickY = (yStartInt - yStartExt);
+
+    // PARETE ALTO e BASSO centrate negli spessori orizzontali
+    ctx.fillText('PARETE ALTO', cx, yStartExt + wallThickY / 2);
+    ctx.fillText('PARETE BASSO', cx, yStartInt + hIntScaled + wallThickY / 2);
+
+    // PARETE SX e DX inserite nel bordo superiore esterno dove non ci sono tubi
+    ctx.fillText('PARETE SX', Math.max(28, xStartExt + wallThickX / 2), yStartExt + 10);
+    ctx.fillText('PARETE DX', Math.min(332, xStartInt + wIntScaled + wallThickX / 2), yStartExt + 10);
+
+    ctx.restore();
+
     const url = canvas.toDataURL('image/png');
     setImgUrlPianta(url);
   }, [pozzetto, compliance, activeWallSide]);
@@ -754,8 +890,18 @@ const PozzettoGraficaDettaglio: React.FC<{
     const allCavidotti = [...ingressCavidotti, ...egressCavidotti];
 
     if (allCavidotti.length > 0) {
-      // Distribuiamo i cavidotti in file ordinate partendo dal basso
-      let curX = xStart;
+      // Calcola la larghezza totale occupata dai corrugati per centrarli sulla parete come in pianta
+      let totalConduitsWidth = 0;
+      allCavidotti.forEach(cond => {
+        const dExtScaled = ((cond.outerDiameter / 10)) * scale;
+        totalConduitsWidth += (dExtScaled * cond.qty) + ((cond.qty - 1) * 4);
+      });
+
+      const startX = totalConduitsWidth < wScaled 
+        ? xStart + (wScaled - totalConduitsWidth) / 2 
+        : xStart + 5;
+
+      let curX = startX;
       let curY = yStart + hScaled;
       let rowHeight = 0;
 
@@ -766,8 +912,8 @@ const PozzettoGraficaDettaglio: React.FC<{
 
         for (let q = 0; q < cond.qty; q++) {
           // Va accapo se esce dalla parete
-          if (curX + dExtScaled > xStart + wScaled) {
-            curX = xStart;
+          if (curX + dExtScaled > xStart + wScaled - 4) {
+            curX = startX;
             curY -= rowHeight + 3;
             rowHeight = 0;
           }
@@ -795,30 +941,24 @@ const PozzettoGraficaDettaglio: React.FC<{
           ctx.stroke();
           ctx.restore();
 
-          // Disegna i cavi all'interno del corrugato (Concentric ring packing)
+          // Disegna i cavi disposti per gravità al fondo del corrugato
           if (cond.cables.length > 0) {
-            const flatCables: string[] = [];
+            const flatCables: { color: string; diameter: number }[] = [];
             cond.cables.forEach(c => {
               for (let i = 0; i < c.qty; i++) {
-                flatCables.push(getCableColor(c.cableId));
+                flatCables.push({ color: getCableColor(c.cableId), diameter: c.diameter });
               }
             });
 
-            // Disegna i cavi disposti a spirale nel centro del tubo
-            flatCables.forEach((color, idx) => {
-              const cRadius = (1.5 * scale); // raggio cavi ridotto in scala per entrare
-              const angle = idx * 1.4;
-              const radius = Math.min(rIntScaled - cRadius - 1, (idx * 0.9 + 1.2) * scale);
-              const ccx = cx + Math.cos(angle) * radius;
-              const ccy = cy + Math.sin(angle) * radius;
-
+            const cablePositions = getPackedCablePositions(flatCables, cx, cy, rIntScaled, scale);
+            cablePositions.forEach(cp => {
               ctx.save();
               ctx.beginPath();
-              ctx.arc(ccx, ccy, cRadius, 0, 2 * Math.PI);
-              ctx.fillStyle = color;
+              ctx.arc(cp.ccx, cp.ccy, cp.r, 0, 2 * Math.PI);
+              ctx.fillStyle = cp.color;
               ctx.fill();
-              ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-              ctx.lineWidth = 0.5;
+              ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+              ctx.lineWidth = 0.6;
               ctx.stroke();
               ctx.restore();
             });
@@ -872,8 +1012,12 @@ const PozzettoGraficaDettaglio: React.FC<{
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
         
         {/* Vista Pianta */}
-        <div className="flex flex-col justify-between items-center bg-slate-50/50 border border-slate-100 rounded-2xl p-4 relative">
-          <span className="absolute top-3 left-3 text-[9px] font-black text-slate-400 uppercase tracking-widest">VISTA IN PIANTA (Dall'alto)</span>
+        <div className="flex flex-col justify-between items-center bg-slate-50/50 border border-slate-100 rounded-2xl p-4 w-full">
+          <div className="w-full flex justify-between items-center mb-3">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+              VISTA IN PIANTA (Dall'alto)
+            </span>
+          </div>
           <div className="w-full flex-1 flex items-center justify-center min-h-[220px]">
             <canvas
               ref={canvasPiantaRef}
@@ -895,8 +1039,12 @@ const PozzettoGraficaDettaglio: React.FC<{
         </div>
 
         {/* Vista Sezione Parete */}
-        <div className="flex flex-col justify-between items-center bg-slate-50/50 border border-slate-100 rounded-2xl p-4 relative">
-          <span className="absolute top-3 left-3 text-[9px] font-black text-slate-400 uppercase tracking-widest">SEZIONE PARETE {activeWallSide.toUpperCase()}</span>
+        <div className="flex flex-col justify-between items-center bg-slate-50/50 border border-slate-100 rounded-2xl p-4 w-full">
+          <div className="w-full flex justify-between items-center mb-3">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+              SEZIONE PARETE {activeWallSide.toUpperCase()}
+            </span>
+          </div>
           <div className="w-full flex-1 flex items-center justify-center min-h-[220px]">
             <canvas
               ref={canvasSezioneRef}
@@ -1003,11 +1151,14 @@ export function ToolDimensionamentoPozzettiElettrici({
           
           let importedConduits: GruppoCavidotto[] = [];
           if (payloadConduit) {
+            const od = payloadConduit.outerDiameter || 40;
+            const id = payloadConduit.innerDiameter || 31.5;
+            const dnVal = payloadConduit.dn || Math.round(od);
             importedConduits = [{
               id: `cond_${Date.now()}`,
-              dn: payloadConduit.outerDiameter || 90, // Mappiamo DN sul diametro esterno di provenienza
-              outerDiameter: payloadConduit.outerDiameter || 110,
-              innerDiameter: payloadConduit.innerDiameter || 92,
+              dn: dnVal,
+              outerDiameter: od,
+              innerDiameter: id,
               bendingFactor: 8,
               qty: 1,
               destinationSide: 'dx',
@@ -1798,13 +1949,16 @@ export function ToolDimensionamentoPozzettiElettrici({
                                     onChange={e => handleUpdateCavidotto(configWallSide, cond.id, 'dn', parseInt(e.target.value))}
                                     className="bg-white border border-slate-200 rounded-lg p-1 text-[11px] font-bold text-slate-700"
                                   >
-                                    <option value="50">DN 50 (Est: 63, Int: 50 mm)</option>
-                                    <option value="63">DN 63 (Est: 75, Int: 63 mm)</option>
-                                    <option value="90">DN 90 (Est: 110, Int: 92 mm)</option>
-                                    <option value="110">DN 110 (Est: 125, Int: 105 mm)</option>
-                                    <option value="125">DN 125 (Est: 140, Int: 125 mm)</option>
-                                    <option value="160">DN 160 (Est: 180, Int: 160 mm)</option>
-                                    <option value="200">DN 200 (Est: 200, Int: 170 mm)</option>
+                                    {CAVIDOTTI_DOPPIA_PARETE.map(c => (
+                                      <option key={c.dn} value={c.dn}>
+                                        DN {c.dn} (Ø Est. {c.outerDiameter} / Ø Int. {c.innerDiameter} mm)
+                                      </option>
+                                    ))}
+                                    {!CAVIDOTTI_DOPPIA_PARETE.some(c => c.dn === cond.dn) && (
+                                      <option value={cond.dn}>
+                                        DN {cond.dn} (Ø Est. {cond.outerDiameter} / Ø Int. {cond.innerDiameter} mm)
+                                      </option>
+                                    )}
                                   </select>
                                 </div>
 

@@ -801,15 +801,15 @@ export const INITIAL_CONTAINERS: ContainerFamily[] = [
     sectionType: 'circolare',
     installationType: 'cavidotto',
     sizes: [
-      { code: 'CEFD040', label: 'Ø40 (Int. 34)', outerDiameter: 40, innerDiameter: 34, weight: 0.15 },
-      { code: 'CEFD050', label: 'Ø50 (Int. 42)', outerDiameter: 50, innerDiameter: 42, weight: 0.18 },
-      { code: 'CEFD063', label: 'Ø63 (Int. 52)', outerDiameter: 63, innerDiameter: 52, weight: 0.25 },
-      { code: 'CEFD075', label: 'Ø75 (Int. 63)', outerDiameter: 75, innerDiameter: 63, weight: 0.32 },
-      { code: 'CEFD090', label: 'Ø90 (Int. 77)', outerDiameter: 90, innerDiameter: 77, weight: 0.42 },
-      { code: 'CEFD110', label: 'Ø110 (Int. 93)', outerDiameter: 110, innerDiameter: 93, weight: 0.58 },
-      { code: 'CEFD125', label: 'Ø125 (Int. 107)', outerDiameter: 125, innerDiameter: 107, weight: 0.70 },
-      { code: 'CEFD160', label: 'Ø160 (Int. 142)', outerDiameter: 160, innerDiameter: 142, weight: 1.05 },
-      { code: 'CEFD200', label: 'Ø200 (Int. 180)', outerDiameter: 200, innerDiameter: 180, weight: 1.50 }
+      { code: 'CEFD040', label: 'DN 40 (Ø Est. 40 / Ø Int. 34 mm)', outerDiameter: 40, innerDiameter: 34, weight: 0.15 },
+      { code: 'CEFD050', label: 'DN 50 (Ø Est. 50 / Ø Int. 42 mm)', outerDiameter: 50, innerDiameter: 42, weight: 0.18 },
+      { code: 'CEFD063', label: 'DN 63 (Ø Est. 63 / Ø Int. 52 mm)', outerDiameter: 63, innerDiameter: 52, weight: 0.25 },
+      { code: 'CEFD075', label: 'DN 75 (Ø Est. 75 / Ø Int. 63 mm)', outerDiameter: 75, innerDiameter: 63, weight: 0.32 },
+      { code: 'CEFD090', label: 'DN 90 (Ø Est. 90 / Ø Int. 77 mm)', outerDiameter: 90, innerDiameter: 77, weight: 0.42 },
+      { code: 'CEFD110', label: 'DN 110 (Ø Est. 110 / Ø Int. 93 mm)', outerDiameter: 110, innerDiameter: 93, weight: 0.58 },
+      { code: 'CEFD125', label: 'DN 125 (Ø Est. 125 / Ø Int. 107 mm)', outerDiameter: 125, innerDiameter: 107, weight: 0.70 },
+      { code: 'CEFD160', label: 'DN 160 (Ø Est. 160 / Ø Int. 142 mm)', outerDiameter: 160, innerDiameter: 142, weight: 1.05 },
+      { code: 'CEFD200', label: 'DN 200 (Ø Est. 200 / Ø Int. 180 mm)', outerDiameter: 200, innerDiameter: 180, weight: 1.50 }
     ]
   },
   {
@@ -820,13 +820,13 @@ export const INITIAL_CONTAINERS: ContainerFamily[] = [
     sectionType: 'circolare',
     installationType: 'tazze',
     sizes: [
-      { code: 'TAZ-16N', label: 'TAZ 16 (Int. 14)', outerDiameter: 16, innerDiameter: 14, weight: 0.37 },
-      { code: 'TAZ-20', label: 'TAZ 20 (Int. 18)', outerDiameter: 20, innerDiameter: 18, weight: 0.47 },
-      { code: 'TAZ-25', label: 'TAZ 25 (Int. 23)', outerDiameter: 25, innerDiameter: 23, weight: 0.59 },
-      { code: 'TAZ-32N', label: 'TAZ 32 (Int. 29.6)', outerDiameter: 32, innerDiameter: 29.6, weight: 0.91 },
-      { code: 'TAZ-40', label: 'TAZ 40 (Int. 37.6)', outerDiameter: 40, innerDiameter: 37.6, weight: 1.15 },
-      { code: 'TAZ-50', label: 'TAZ 50 (Int. 47.6)', outerDiameter: 50, innerDiameter: 47.6, weight: 1.44 },
-      { code: 'TAZ-63N', label: 'TAZ 63 (Int. 60)', outerDiameter: 63, innerDiameter: 60, weight: 2.28 }
+      { code: 'TAZ-16N', label: 'DN 16 (Ø Est. 16 / Ø Int. 14 mm)', outerDiameter: 16, innerDiameter: 14, weight: 0.37 },
+      { code: 'TAZ-20', label: 'DN 20 (Ø Est. 20 / Ø Int. 18 mm)', outerDiameter: 20, innerDiameter: 18, weight: 0.47 },
+      { code: 'TAZ-25', label: 'DN 25 (Ø Est. 25 / Ø Int. 23 mm)', outerDiameter: 25, innerDiameter: 23, weight: 0.59 },
+      { code: 'TAZ-32N', label: 'DN 32 (Ø Est. 32 / Ø Int. 29.6 mm)', outerDiameter: 32, innerDiameter: 29.6, weight: 0.91 },
+      { code: 'TAZ-40', label: 'DN 40 (Ø Est. 40 / Ø Int. 37.6 mm)', outerDiameter: 40, innerDiameter: 37.6, weight: 1.15 },
+      { code: 'TAZ-50', label: 'DN 50 (Ø Est. 50 / Ø Int. 47.6 mm)', outerDiameter: 50, innerDiameter: 47.6, weight: 1.44 },
+      { code: 'TAZ-63N', label: 'DN 63 (Ø Est. 63 / Ø Int. 60 mm)', outerDiameter: 63, innerDiameter: 60, weight: 2.28 }
     ]
   },
   {
@@ -837,10 +837,11 @@ export const INITIAL_CONTAINERS: ContainerFamily[] = [
     sectionType: 'circolare',
     installationType: 'tazze',
     sizes: [
-      { code: 'ECTC1520', label: 'Ø20 (Int. 14.1)', outerDiameter: 20, innerDiameter: 14.1, weight: 0.08 },
-      { code: 'ECTC1525', label: 'Ø25 (Int. 18.2)', outerDiameter: 25, innerDiameter: 18.2, weight: 0.10 },
-      { code: 'ECTC1532', label: 'Ø32 (Int. 24.2)', outerDiameter: 32, innerDiameter: 24.2, weight: 0.15 },
-      { code: 'ECTC1540', label: 'Ø40 (Int. 31.5)', outerDiameter: 40, innerDiameter: 31.5, weight: 0.203 }
+      { code: 'ECTC1516', label: 'DN 16 (Ø Est. 16 / Ø Int. 10.7 mm)', outerDiameter: 16, innerDiameter: 10.7, weight: 0.06 },
+      { code: 'ECTC1520', label: 'DN 20 (Ø Est. 20 / Ø Int. 14.1 mm)', outerDiameter: 20, innerDiameter: 14.1, weight: 0.08 },
+      { code: 'ECTC1525', label: 'DN 25 (Ø Est. 25 / Ø Int. 18.2 mm)', outerDiameter: 25, innerDiameter: 18.2, weight: 0.10 },
+      { code: 'ECTC1532', label: 'DN 32 (Ø Est. 32 / Ø Int. 24.2 mm)', outerDiameter: 32, innerDiameter: 24.2, weight: 0.15 },
+      { code: 'ECTC1540', label: 'DN 40 (Ø Est. 40 / Ø Int. 31.5 mm)', outerDiameter: 40, innerDiameter: 31.5, weight: 0.203 }
     ]
   }
 ];
@@ -865,8 +866,14 @@ export interface PozzettoClsPreset {
 }
 
 export const CAVIDOTTI_DOPPIA_PARETE: CavidottoDoppiaParete[] = [
-  { dn: 50, outerDiameter: 63, innerDiameter: 50, bendingFactor: 8 },
-  { dn: 63, outerDiameter: 75, innerDiameter: 63, bendingFactor: 8 },
+  { dn: 16, outerDiameter: 16, innerDiameter: 10.7, bendingFactor: 8 },
+  { dn: 20, outerDiameter: 20, innerDiameter: 14.1, bendingFactor: 8 },
+  { dn: 25, outerDiameter: 25, innerDiameter: 18.2, bendingFactor: 8 },
+  { dn: 32, outerDiameter: 32, innerDiameter: 24.2, bendingFactor: 8 },
+  { dn: 40, outerDiameter: 40, innerDiameter: 31.5, bendingFactor: 8 },
+  { dn: 50, outerDiameter: 50, innerDiameter: 39.6, bendingFactor: 8 },
+  { dn: 63, outerDiameter: 63, innerDiameter: 51.9, bendingFactor: 8 },
+  { dn: 75, outerDiameter: 75, innerDiameter: 63, bendingFactor: 8 },
   { dn: 90, outerDiameter: 110, innerDiameter: 92, bendingFactor: 8 },
   { dn: 110, outerDiameter: 125, innerDiameter: 105, bendingFactor: 8 },
   { dn: 125, outerDiameter: 140, innerDiameter: 125, bendingFactor: 8 },

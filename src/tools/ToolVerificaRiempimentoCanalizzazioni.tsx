@@ -165,7 +165,7 @@ const formatContainerSizeLabel = (
     } else {
       const ext = tratta.customOuterDiameter || 0;
       const int = tratta.customInnerDiameter || 0;
-      return `Personalizzato: Ø Est. ${ext} / Ø Int. ${int} mm`;
+      return `Personalizzato: DN ${ext} (Ø Est. ${ext} / Ø Int. ${int} mm)`;
     }
   }
   if (!size) return 'Personalizzato';
@@ -174,7 +174,7 @@ const formatContainerSizeLabel = (
   } else {
     const ext = size.outerDiameter || size.width || 0;
     const int = size.innerDiameter || size.height || 0;
-    return `Ø Est. ${ext} / Ø Int. ${int} mm`;
+    return `DN ${ext} (Ø Est. ${ext} / Ø Int. ${int} mm)`;
   }
 };
 
@@ -2033,13 +2033,21 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
                         const fam = containersCatalog?.find(f => f.id === activeTratta.selectedFamilyId);
                         const sz = fam?.sizes.find(s => s.code === activeTratta.selectedSizeCode);
                         let conduitPayload = undefined;
-                        if (fam && sz) {
+                        
+                        const isConduit = activeTratta.containmentType === 'cavidotto' || 
+                                         (fam?.id && (fam.id.toLowerCase().includes('corrugat') || fam.id.toLowerCase().includes('tubo') || fam.id.toLowerCase().includes('cavidott')));
+
+                        if (sz || activeTratta.customOuterDiameter || isConduit) {
+                          const od = sz?.outerDiameter || activeTratta.customOuterDiameter || sz?.width || 40;
+                          const id = sz?.innerDiameter || activeTratta.customInnerDiameter || sz?.height || 31.5;
+                          const dnVal = Math.round(od);
                           conduitPayload = {
-                            familyId: fam.id,
-                            familyName: fam.name,
-                            sizeCode: sz.code,
-                            outerDiameter: sz.outerDiameter || sz.width || 90,
-                            innerDiameter: sz.innerDiameter || sz.height || 77
+                            familyId: fam?.id || activeTratta.selectedFamilyId || 'custom',
+                            familyName: fam?.name || 'Cavidotto / Tubo',
+                            sizeCode: sz?.code || activeTratta.selectedSizeCode || 'custom',
+                            dn: dnVal,
+                            outerDiameter: od,
+                            innerDiameter: id
                           };
                         }
                         onVerifyPozzetto({

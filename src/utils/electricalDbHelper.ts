@@ -57,7 +57,7 @@ export async function seedElectricalCatalog(db: Firestore): Promise<void> {
       console.log("Seeding completato con successo!");
       return;
     }
-    // Verifichiamo se mancano i nuovi cavi, le formazioni o le nuove famiglie di condotti
+    // Verifichiamo se mancano i nuovi cavi, le formazioni o le nuove famiglie di condotti
     const fg16om16Doc = querySnapshot.docs.find(d => d.id === 'fg16om16');
     const isCablesOutdated = !fg16om16Doc || !fg16om16Doc.data().formations || fg16om16Doc.data().formations.length < 50;
     const hasNewCables = querySnapshot.docs.some(d => d.id === 'fg16r16');
@@ -67,6 +67,10 @@ export async function seedElectricalCatalog(db: Firestore): Promise<void> {
     // Rileva se il DB ha ancora le vecchie etichette nel formato HxL
     const passerellaFiloDoc = querySnapshot.docs.find(d => d.id === 'passerella_filo');
     const hasOldLabel = !!passerellaFiloDoc && (passerellaFiloDoc.data().sizes || []).some((sz: any) => sz.label === '54x100');
+
+    // Rileva se i contenitori hanno le nuove etichette col prefisso DN
+    const tuboFlessibileDoc = querySnapshot.docs.find(d => d.id === 'tubo_flessibile');
+    const hasDnLabels = !!tuboFlessibileDoc && (tuboFlessibileDoc.data().sizes || []).some((sz: any) => sz.label && sz.label.startsWith('DN '));
 
     // Rileva se mancano i nuovi cavi
     const has6undhpn = querySnapshot.docs.some(d => d.id === '6undhpn');
@@ -81,7 +85,7 @@ export async function seedElectricalCatalog(db: Firestore): Promise<void> {
     const hasNewNames = doc6undhpn && doc6undhpn.data().name === 'Cat. 6 UTP Reti LAN Posa Esterno' &&
                         docSf225rz && docSf225rz.data().name === 'FTE32OHAM16';
 
-    if (isCablesOutdated || !hasNewCables || !hasPasserellaFilo || !hasOlflex || hasOldLabel || !has6undhpn || !hasRg26 || !hasBending || !hasNewNames) {
+    if (isCablesOutdated || !hasNewCables || !hasPasserellaFilo || !hasOlflex || hasOldLabel || !has6undhpn || !hasRg26 || !hasBending || !hasNewNames || !hasDnLabels) {
       console.log("Rilevata versione precedente, parziale, con formato etichette, raggio curvatura o nomi obsoleti su Firestore. Avvio allineamento complessivo (cavi e condotti)...");
       // Allineamento cavi
       for (const cavo of INITIAL_CABLES) {
@@ -114,8 +118,9 @@ export async function fetchElectricalCables(db: Firestore, isDemo: boolean): Pro
     const hasBending = fg16om16 && fg16om16.raggioCurvaturaMinFattore !== undefined;
     const hasNewNames = catalog.cables.some(c => c.id === '6undhpn' && c.name === 'Cat. 6 UTP Reti LAN Posa Esterno') &&
                         catalog.cables.some(c => c.id === 'sf225rz' && c.name === 'FTE32OHAM16');
+    const hasDnLabels = catalog.containers.some(c => c.id === 'tubo_flessibile' && (c.sizes || []).some(sz => sz.label && sz.label.startsWith('DN ')));
 
-    if (isOutdated || !catalog.cables.some(c => c.id === 'fg16r16') || !catalog.containers.some(c => c.id === 'passerella_filo') || !hasOlflex || hasOldLabel || !has6undhpn || !hasRg26 || !hasBending || !hasNewNames) {
+    if (isOutdated || !catalog.cables.some(c => c.id === 'fg16r16') || !catalog.containers.some(c => c.id === 'passerella_filo') || !hasOlflex || hasOldLabel || !has6undhpn || !hasRg26 || !hasBending || !hasNewNames || !hasDnLabels) {
       saveLocalCatalog(INITIAL_CABLES, INITIAL_CONTAINERS);
       list = INITIAL_CABLES;
     } else {
