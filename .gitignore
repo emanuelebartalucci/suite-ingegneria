@@ -61,3 +61,8 @@ Desktop.ini
 
 *.xlsx
 /File utili
+
+# Temporary scratch scripts
+*.cjs
+scratch_*
+
