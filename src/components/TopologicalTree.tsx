@@ -37,6 +37,8 @@ interface VisualLine {
   y1: number;
   x2: number;
   y2: number;
+  startX?: number;
+  startY?: number;
   thickness: number;
   color: string;
   tag: string;
@@ -111,223 +113,56 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
     const lines: VisualLine[] = [];
     const labels: VisualLabel[] = [];
 
-    const checkCollision = (
-      x1: number, y1: number, x2: number, y2: number,
-      placedLines: VisualLine[]
-    ): boolean => {
-      const minX1 = Math.min(x1, x2);
-      const maxX1 = Math.max(x1, x2);
-      const minY1 = Math.min(y1, y2);
-      const maxY1 = Math.max(y1, y2);
-      const isH1 = (y1 === y2);
+    // Mappa delle posizioni Y ordinate senza sovrapposizioni
+    const childYMap = new Map<string, number>();
+    let currentY = 60;
+    const rowGap = 72; // Spaziatura ampia (72px) per permettere 3 righe trasparenti di testo senza alcuna sovrapposizione
 
-      // 1. Evitamento allineamento parallelo sulle quote (solo per rami vicini verticalmente)
-      if (isH1) {
-        for (const line of placedLines) {
-          if (Math.abs(y2 - line.y2) > 120) continue;
-          if (Math.abs(x2 - line.x1) < 15 && !(x2 === line.x1 && y2 === line.y1)) {
-            return true;
-          }
-          if (Math.abs(x2 - line.x2) < 15 && !(x2 === line.x2 && y2 === line.y2)) {
-            return true;
-          }
-        }
-      } else {
-        for (const line of placedLines) {
-          if (Math.abs(x2 - line.x2) > 120) continue;
-          if (Math.abs(y2 - line.y1) < 15 && !(x2 === line.x1 && y2 === line.y1)) {
-            return true;
-          }
-          if (Math.abs(y2 - line.y2) < 15 && !(x2 === line.x2 && y2 === line.y2)) {
-            return true;
-          }
-        }
+    const assignYPositions = (node: MapNode): number => {
+      if (!node.children || node.children.length === 0) {
+        const y = currentY;
+        currentY += rowGap;
+        childYMap.set(node.tag, y);
+        return y;
       }
-
-      // 2. Controllo intersezioni o contatti lungo i segmenti
-      for (const line of placedLines) {
-        const minX2 = Math.min(line.x1, line.x2);
-        const maxX2 = Math.max(line.x1, line.x2);
-        const minY2 = Math.min(line.y1, line.y2);
-        const maxY2 = Math.max(line.y1, line.y2);
-        const isH2 = (line.y1 === line.y2);
-
-        let intersectsOrTouches = false;
-        let touchX = -1;
-        let touchY = -1;
-
-        if (isH1 && isH2) {
-          if (y1 === line.y1) {
-            const overlapStart = Math.max(minX1, minX2);
-            const overlapEnd = Math.min(maxX1, maxX2);
-            if (overlapStart <= overlapEnd) {
-              intersectsOrTouches = true;
-              touchX = overlapStart;
-              touchY = y1;
-            }
-          }
-        } else if (!isH1 && !isH2) {
-          if (x1 === line.x1) {
-            const overlapStart = Math.max(minY1, minY2);
-            const overlapEnd = Math.min(maxY1, maxY2);
-            if (overlapStart <= overlapEnd) {
-              intersectsOrTouches = true;
-              touchX = x1;
-              touchY = overlapStart;
-            }
-          }
-        } else {
-          const hY = isH1 ? y1 : line.y1;
-          const hMinX = isH1 ? minX1 : minX2;
-          const hMaxX = isH1 ? maxX1 : maxX2;
-
-          const vX = isH1 ? line.x1 : x1;
-          const vMinY = isH1 ? minY2 : minY1;
-          const vMaxY = isH1 ? maxY2 : maxY1;
-
-          if (vX >= hMinX && vX <= hMaxX && hY >= vMinY && hY <= vMaxY) {
-            intersectsOrTouches = true;
-            touchX = vX;
-            touchY = hY;
-          }
-        }
-
-        if (intersectsOrTouches) {
-          const isStartTouchOnly = (touchX === x1 && touchY === y1);
-          if (!isStartTouchOnly) {
-            return true;
-          }
-          if (isH1 && isH2 && y1 === line.y1) {
-            const overlapStart = Math.max(minX1, minX2);
-            const overlapEnd = Math.min(maxX1, maxX2);
-            if (overlapEnd - overlapStart > 1) {
-              return true;
-            }
-          }
-          if (!isH1 && !isH2 && x1 === line.x1) {
-            const overlapStart = Math.max(minY1, minY2);
-            const overlapEnd = Math.min(maxY1, maxY2);
-            if (overlapEnd - overlapStart > 1) {
-              return true;
-            }
-          }
-        }
-      }
-
-      // 3. Prossimità degli endpoint dei rami
-      const minDistance = 50;
-      for (const line of placedLines) {
-        if (Math.abs(y2 - line.y2) > 120 && Math.abs(y2 - line.y1) > 120 && Math.abs(y1 - line.y2) > 120) continue;
-        const dStart = Math.hypot(x2 - line.x1, y2 - line.y1);
-        if (dStart < minDistance && !(x2 === line.x1 && y2 === line.y1)) {
-          return true;
-        }
-        const dEnd = Math.hypot(x2 - line.x2, y2 - line.y2);
-        if (dEnd < minDistance && !(x2 === line.x2 && y2 === line.y2)) {
-          return true;
-        }
-      }
-
-      return false;
+      const sortedChildren = [...node.children].sort((a, b) => a.tag.localeCompare(b.tag));
+      const childYs: number[] = [];
+      sortedChildren.forEach(child => {
+        childYs.push(assignYPositions(child));
+      });
+      const minY = childYs[0];
+      const maxY = childYs[childYs.length - 1];
+      const nodeY = (minY + maxY) / 2;
+      childYMap.set(node.tag, nodeY);
+      return nodeY;
     };
+
+    roots.forEach(root => {
+      assignYPositions(root);
+      currentY += 30; // Spazio extra tra radici diverse
+    });
 
     const visited = new Set<string>();
 
-    // Algoritmo ricorsivo per posizionare i nodi in modo ortogonale perpendicolare
-    const layoutNode = (
-      node: MapNode, 
-      parentStartX: number, 
-      parentStartY: number, 
-      parentEndX: number, 
-      parentEndY: number, 
-      parentDir: 'H' | 'V', 
-      childIndex: number,
-      intendedDir: 'H' | 'V'
+    const layoutSubtree = (
+      node: MapNode,
+      originX: number,
+      originY: number,
+      nodeY: number
     ): void => {
-      if (!node || visited.has(node.tag)) {
-        return;
-      }
+      if (!node || visited.has(node.tag)) return;
       visited.add(node.tag);
 
       const visualLen = getVisualLength(node.length);
-      const startX = parentEndX;
-      const startY = parentEndY;
-
-      let dir = intendedDir;
-
-      let endX = startX;
-      let endY = startY;
-
-      let collision = true;
-      let attempts = 0;
-      const offsets = [0, 45, -45, 90, -90, 135, -135, 180, -180];
-
       const dz = Number(node.dislivelloGeodetico) || 0;
-      const deltaY_quota = -dz * 8; // 8px per metro di dislivello reale
 
-      while (collision && attempts < offsets.length) {
-        const candidateLen = visualLen + offsets[attempts];
-        if (candidateLen < 15) {
-          attempts++;
-          continue;
-        }
+      // Pendenza visiva immediatamente riconoscibile per il dislivello: salita (dz > 0) inclinata in alto, discesa (dz < 0) in basso
+      const slopeY = dz !== 0 ? Math.max(-12, Math.min(12, -dz * 4)) : 0;
 
-        let tempEndX = startX;
-        let tempEndY = startY;
-
-        if (dir === 'H') {
-          if (parentDir === 'V') {
-            tempEndX = startX + candidateLen;
-          } else {
-            const sgnX = parentEndX - parentStartX < 0 ? -1 : 1;
-            tempEndX = startX + sgnX * candidateLen;
-          }
-        } else {
-          if (parentDir === 'H') {
-            if (childIndex % 2 === 1) {
-              tempEndY = startY - candidateLen;
-            } else {
-              tempEndY = startY + candidateLen;
-            }
-          } else {
-            const sgnY = parentEndY - parentStartY < 0 ? -1 : 1;
-            tempEndY = startY + sgnY * candidateLen;
-          }
-        }
-
-        tempEndY += deltaY_quota;
-
-        if (!checkCollision(startX, startY, tempEndX, tempEndY, lines)) {
-          collision = false;
-          endX = tempEndX;
-          endY = tempEndY;
-        } else {
-          attempts++;
-        }
-      }
-
-      if (collision) {
-        if (dir === 'H') {
-          if (parentDir === 'V') {
-            endX = startX + visualLen;
-          } else {
-            const sgnX = parentEndX - parentStartX < 0 ? -1 : 1;
-            endX = startX + sgnX * visualLen;
-          }
-        } else {
-          if (parentDir === 'H') {
-            if (childIndex % 2 === 1) {
-              endY = startY - visualLen;
-            } else {
-              endY = startY + visualLen;
-            }
-          } else {
-            const sgnY = parentEndY - parentStartY < 0 ? -1 : 1;
-            endY = startY + sgnY * visualLen;
-          }
-        }
-        endY += deltaY_quota;
-      }
+      const startX = originX;
+      const startY = nodeY;
+      const endX = startX + visualLen;
+      const endY = nodeY + slopeY;
 
       // Spessore e colore del tratto
       let lineThickness = 4;
@@ -359,47 +194,35 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
         ? (pNodo !== undefined && pNodo > (pMin || 50)) 
         : (pNodo !== undefined && pNodo < pMin);
 
-      // Calcolo dell'angolo e dei vettori per il posizionamento ortogonale ed evitamento delle collisioni delle etichette
+      // Calcolo orientamento e vettori perpendicolari alla linea
       const dx_val = endX - startX;
       const dy_val = endY - startY;
-      const angle = Math.atan2(dy_val, dx_val);
+      const lineLen = Math.hypot(dx_val, dy_val) || 1;
+      
+      const nx = -dy_val / lineLen;
+      const ny = dx_val / lineLen;
 
-      // Classifica l'angolo della condotta per distribuire i testi ed evitare sovrapposizioni reciproche
-      // angle è in radianti (da -PI a PI)
-      const labelFraction = 0.5;
-      const dzFraction = 0.5;
+      const midX = (startX + endX) / 2;
+      const midY = (startY + endY) / 2;
 
-      const midX_label = startX + dx_val * labelFraction;
-      const midY_label = startY + dy_val * labelFraction;
+      // Label TAG + lunghezza (Riga 1 - SOPRA il tubo)
+      const textX = midX - nx * 13;
+      const textY = midY - ny * 13;
 
-      const midX_dz = startX + dx_val * dzFraction;
-      const midY_dz = startY + dy_val * dzFraction;
+      // Label Riempimento % (Riga 2 - SOTTO il tubo)
+      const fillX = midX + nx * 13;
+      const fillY = midY + ny * 13;
 
-      // Vettore perpendicolare unitario (punta a sinistra/sopra rispetto alla direzione della linea)
-      const px = -Math.sin(angle);
-      const py = Math.cos(angle);
+      // Label Dislivello (Riga 3 - SOTTO il riempimento)
+      const dzX = midX + nx * 24;
+      const dzY = midY + ny * 24;
 
-      // Shifta l'etichetta del tratto perpendicolarmente per non sovrapporsi al tubo (sopra/destra)
-      const offsetDist = mode === 'electric' ? 20 : 13;
-      const textX = midX_label - px * offsetDist;
-      const textY = midY_label - py * offsetDist;
-
-      // textAnchor intelligente basato sull'orientamento di -px
-      let textAnchor: "end" | "inherit" | "start" | "middle" = 'middle';
-      if (-px < -0.3) textAnchor = 'end';
-      else if (-px > 0.3) textAnchor = 'start';
-
-      // Shifta la quota geodetica nella direzione opposta (sotto/sinistra)
-      const dzX = midX_dz + px * offsetDist;
-      const dzY = midY_dz + py * offsetDist;
-      let dzAnchor: "end" | "inherit" | "start" | "middle" = 'middle';
-      if (px < -0.3) dzAnchor = 'end';
-      else if (px > 0.3) dzAnchor = 'start';
-
-      // Aggiungiamo la linea reale del tratto di tubo
+      // Aggiungiamo la linea reale del tratto
       lines.push({
-        x1: startX,
-        y1: startY,
+        x1: originX,
+        y1: originY,
+        startX,
+        startY,
         x2: endX,
         y2: endY,
         thickness: lineThickness,
@@ -409,76 +232,78 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
         velocity: node.velocity,
         loss: node.loss_tot_mbar,
         length: node.length,
-        dir,
+        dir: slopeY === 0 ? 'H' : 'V',
         dislivello: dz !== 0 ? dz : undefined,
         pressioneNodo: pNodo,
         pressioneMin: pMin,
         hasAlarm,
         tipoCondotto: node.tipoCondotto || 'mandata',
-        dzX: dz !== 0 ? dzX : undefined,
-        dzY: dz !== 0 ? dzY : undefined,
-        dzAnchor: dz !== 0 ? dzAnchor : undefined,
         pressioneInizioTratto: node.pressioneInizioTratto,
         da: node.da,
         a: node.a
       });
 
-      // Label principale: TAG + lunghezza
+      // Label principale (TAG + lunghezza) SOPRA la linea (Riga 1)
       labels.push({
         x: textX,
         y: textY,
         text: `${node.tag} (${formatNumber(node.length, 2).replace(',00', '')}m)`,
         title: mode === 'electric' 
-          ? `${node.name} (${node.tag})\nPercorso: ${node.da || 'Partenza generica'} ➔ ${node.a || 'Utenza generica'}\nLunghezza: ${formatNumber(node.length, 1)} m\nRiempimento: ${pNodo !== undefined ? formatNumber(pNodo, 1) : '—'}%`
+          ? `${node.name} (${node.tag})\nPercorso: ${node.da || 'Partenza generica'} ➔ ${node.a || 'Utenza generica'}\nLunghezza: ${formatNumber(node.length, 1)} m\nRiempimento: ${pNodo !== undefined ? formatNumber(pNodo, 1) : '—'}%\nDislivello: ${dz >= 0 ? '+' : ''}${formatNumber(dz, 1)} m`
           : `${node.name}\nv = ${formatNumber(node.velocity, 2)} m/s\n∆P = ${formatNumber(node.loss_tot_mbar, 1)} mbar\n∆z = ${dz >= 0 ? '+' : ''}${formatNumber(dz, 1)} m\nP_nodo = ${pNodo !== undefined ? formatNumber(pNodo, 3) : '—'} barg`,
-        dir,
-        anchor: textAnchor
+        dir: 'H',
+        anchor: 'middle'
       });
 
-      // Aggiungi la label della percentuale di riempimento sotto (modalità elettrica)
+      // Label di riempimento (%) SOTTO la linea (Riga 2)
       if (mode === 'electric' && pNodo !== undefined) {
         labels.push({
-          x: textX,
-          y: textY + 10,
+          x: fillX,
+          y: fillY,
           text: `Riempimento: ${formatNumber(pNodo, 1)}%`,
           title: `${node.name}\nLunghezza: ${formatNumber(node.length, 1)} m\nRiempimento: ${formatNumber(pNodo, 1)}%`,
-          dir,
-          anchor: textAnchor,
+          dir: 'H',
+          anchor: 'middle',
           isAlarm: hasAlarm
         });
       }
 
-      // Ricorsione sui figli
+      // Label Dislivello (dz) SOTTO la scritta Riempimento (Riga 3)
+      if (dz !== 0) {
+        const dzText = `${dz > 0 ? '↑' : '↓'} Dislivello: ${dz >= 0 ? '+' : ''}${formatNumber(dz, 1)}m`;
+        labels.push({
+          x: dzX,
+          y: dzY,
+          text: dzText,
+          title: `Dislivello geodetico: ${dz >= 0 ? '+' : ''}${formatNumber(dz, 1)} m`,
+          dir: 'H',
+          anchor: 'middle',
+          isAlarm: false,
+          isDz: true,
+          dzValue: dz
+        } as any);
+      }
+
+      // Ricorsione sui figli: allineiamo il centro dei figli all'endpoint EFFETTIVO (endX, endY) del nodo padre!
       const sortedChildren = [...node.children].sort((a, b) => a.tag.localeCompare(b.tag));
-      
-      let hasStraight = false;
-      let vCount = 0;
+      if (sortedChildren.length > 0) {
+        const firstChildBaseY = childYMap.get(sortedChildren[0].tag) ?? endY;
+        const lastChildBaseY = childYMap.get(sortedChildren[sortedChildren.length - 1].tag) ?? endY;
+        const childrenCenterY = (firstChildBaseY + lastChildBaseY) / 2;
+        const yShift = endY - childrenCenterY;
 
-      sortedChildren.forEach((child) => {
-        const desiredDir: 'H' | 'V' = child.hierarchy === node.hierarchy ? dir : (dir === 'H' ? 'V' : 'H');
-        
-        let actualDir = desiredDir;
-        if (desiredDir === dir) {
-          if (!hasStraight) {
-            hasStraight = true;
-          } else {
-            actualDir = dir === 'H' ? 'V' : 'H';
-          }
-        }
-
-        let childIndex = 0;
-        if (actualDir === 'V') {
-          childIndex = vCount;
-          vCount++;
-        }
-
-        layoutNode(child, startX, startY, endX, endY, dir, childIndex, actualDir);
-      });
+        sortedChildren.forEach(child => {
+          const baseChildY = childYMap.get(child.tag) ?? endY;
+          const childY = baseChildY + yShift;
+          layoutSubtree(child, endX, endY, childY);
+        });
+      }
     };
 
     // Inizializziamo le radici
-    roots.forEach((root, idx) => {
-      layoutNode(root, 40, 80 + idx * 200, 40, 80 + idx * 200, 'H', 0, 'H');
+    roots.forEach((root) => {
+      const rootY = childYMap.get(root.tag) ?? 80;
+      layoutSubtree(root, 40, rootY, rootY);
     });
 
     // TROVIAMO I LIMITI ED APPLICHIAMO LO SHIFT
@@ -488,10 +313,12 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
     let maxY = 40;
 
     lines.forEach(l => {
-      minX = Math.min(minX, l.x1, l.x2);
-      maxX = Math.max(maxX, l.x1, l.x2);
-      minY = Math.min(minY, l.y1, l.y2);
-      maxY = Math.max(maxY, l.y1, l.y2);
+      const sx = l.startX ?? l.x1;
+      const sy = l.startY ?? l.y1;
+      minX = Math.min(minX, l.x1, l.x2, sx);
+      maxX = Math.max(maxX, l.x1, l.x2, sx);
+      minY = Math.min(minY, l.y1, l.y2, sy);
+      maxY = Math.max(maxY, l.y1, l.y2, sy);
     });
 
     const padding = 50;
@@ -511,6 +338,10 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
       l.x2 += shiftX;
       l.y1 += shiftY;
       l.y2 += shiftY;
+      if (l.startX !== undefined && l.startY !== undefined) {
+        l.startX += shiftX;
+        l.startY += shiftY;
+      }
       if (l.dzX !== undefined && l.dzY !== undefined) {
         l.dzX += shiftX;
         l.dzY += shiftY;
@@ -601,7 +432,9 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
             const isActive = activeTag === l.tag;
             const dz = Number(l.dislivello) || 0;
             const dzLabel = dz !== 0 ? (dz > 0 ? `↑${dz}m` : `↓${Math.abs(dz)}m`) : null;
- 
+            const hasJunction = l.startX !== undefined && l.startY !== undefined && (l.startX !== l.x1 || l.startY !== l.y1);
+            const pathD = hasJunction ? `M ${l.x1} ${l.y1} L ${l.startX} ${l.startY} L ${l.x2} ${l.y2}` : `M ${l.x1} ${l.y1} L ${l.x2} ${l.y2}`;
+
             return (
               <g 
                 key={l.tag} 
@@ -621,18 +454,23 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
                     : `${l.name}\nLunghezza: ${formatNumber(l.length, 1)} m\nVelocità: ${formatNumber(l.velocity, 2)} m/s\nPerdita: ${formatNumber(l.loss, 1)} mbar\n∆z: ${dz >= 0 ? '+' : ''}${formatNumber(dz, 1)} m\nP_nodo: ${l.pressioneNodo !== undefined ? formatNumber(l.pressioneNodo, 3) : '—'} barg`}
                 </title>
                 {/* Linea di hover/attiva */}
-                <line 
-                  x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
+                <path 
+                  d={pathD}
+                  fill="none"
                   stroke={isActive ? "rgba(34, 197, 94, 0.3)" : "rgba(59, 130, 246, 0.08)"}
                   strokeWidth={l.thickness + 8}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                   className={`topo-highlight-line ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 transition-opacity"}`}
                 />
                 {/* Linea reale */}
-                <line 
-                  x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
+                <path 
+                  d={pathD}
+                  fill="none"
                   stroke={isActive ? "#22c55e" : l.color}
                   strokeWidth={isActive ? l.thickness + 1 : l.thickness}
                   strokeLinecap="round"
+                  strokeLinejoin="round"
                   markerEnd={l.thickness <= 2 ? "url(#arrow)" : undefined}
                   className={`transition-colors group-hover:stroke-green-500 ${
                     mode === 'electric' ? "topo-line-electric" : (
@@ -799,6 +637,50 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
             );
           })}
 
+          {/* Strato Superiore: Tratta Selezionata Attiva (Renderizzata SOPRA a tutte le altre linee) */}
+          {lines.filter(l => activeTag === l.tag).map(l => {
+            const hasJunction = l.startX !== undefined && l.startY !== undefined && (l.startX !== l.x1 || l.startY !== l.y1);
+            const pathD = hasJunction ? `M ${l.x1} ${l.y1} L ${l.startX} ${l.startY} L ${l.x2} ${l.y2}` : `M ${l.x1} ${l.y1} L ${l.x2} ${l.y2}`;
+            return (
+              <g key={`active-layer-${l.tag}`} className="pointer-events-none">
+                {/* Glow verde esterno di selezione */}
+                <path 
+                  d={pathD}
+                  fill="none"
+                  stroke="rgba(34, 197, 94, 0.4)"
+                  strokeWidth={l.thickness + 10}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                {/* Linea verde reale selezionata */}
+                <path 
+                  d={pathD}
+                  fill="none"
+                  stroke="#22c55e"
+                  strokeWidth={l.thickness + 2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                {/* Cerchio del nodo di origine */}
+                <circle 
+                  cx={l.x1} cy={l.y1} 
+                  r="5.5" 
+                  fill="#dcfce7" 
+                  stroke="#22c55e" 
+                  strokeWidth="2"
+                />
+                {/* Cerchio del nodo di arrivo */}
+                <circle 
+                  cx={l.x2} cy={l.y2} 
+                  r="6.5" 
+                  fill="#dcfce7" 
+                  stroke="#22c55e" 
+                  strokeWidth="2.5"
+                />
+              </g>
+            );
+          })}
+
           {/* Simbolo Pompa nei punti di transizione */}
           {pumpLocations.map((p, i) => {
             const childLine = lines.find(l => Math.abs(l.x1 - p.x) < 0.1 && Math.abs(l.y1 - p.y) < 0.1 && l.tipoCondotto === 'mandata');
@@ -859,35 +741,42 @@ export default function TopologicalTree({ tratti, activeTag, onSelectTag, pressi
           })}
 
           {/* Testi informativi */}
-          {labels.map((lbl, index) => (
-            <g key={`lbl-${index}`} className="pointer-events-none">
-              {/* Outline per leggibilità */}
-              <text 
-                x={lbl.x} y={lbl.y} 
-                textAnchor={lbl.anchor || (lbl.dir === 'H' ? "middle" : "start")} 
-                fill="white" 
-                stroke="white"
-                strokeWidth="2.5"
-                strokeLinejoin="round"
-                fontSize="9" 
-                fontWeight="bold" 
-                className="font-semibold"
-              >
-                {lbl.text}
-              </text>
-              {/* Testo reale */}
-              <text 
-                x={lbl.x} y={lbl.y} 
-                textAnchor={lbl.anchor || (lbl.dir === 'H' ? "middle" : "start")} 
-                fill={lbl.isAlarm ? "#ef4444" : "#334155"} 
-                fontSize="9" 
-                fontWeight="bold" 
-                className="font-semibold"
-              >
-                {lbl.text}
-              </text>
-            </g>
-          ))}
+          {labels.map((lbl, index) => {
+            const isDz = (lbl as any).isDz;
+            const dzVal = (lbl as any).dzValue;
+            const textColor = isDz ? (dzVal > 0 ? "#ea580c" : "#0891b2") : (lbl.isAlarm ? "#ef4444" : "#334155");
+            const fontSize = isDz ? "8" : "9";
+
+            return (
+              <g key={`lbl-${index}`} className="pointer-events-none">
+                {/* Outline per leggibilità */}
+                <text 
+                  x={lbl.x} y={lbl.y} 
+                  textAnchor={lbl.anchor || (lbl.dir === 'H' ? "middle" : "start")} 
+                  fill="white" 
+                  stroke="white"
+                  strokeWidth="2.5"
+                  strokeLinejoin="round"
+                  fontSize={fontSize} 
+                  fontWeight="bold" 
+                  className="font-semibold"
+                >
+                  {lbl.text}
+                </text>
+                {/* Testo reale */}
+                <text 
+                  x={lbl.x} y={lbl.y} 
+                  textAnchor={lbl.anchor || (lbl.dir === 'H' ? "middle" : "start")} 
+                  fill={textColor} 
+                  fontSize={fontSize} 
+                  fontWeight="bold" 
+                  className="font-semibold"
+                >
+                  {lbl.text}
+                </text>
+              </g>
+            );
+          })}
         </svg>
       {mode === 'electric' ? (
         <div className="flex flex-wrap gap-4 justify-center mt-3 text-[10px] text-slate-500 font-semibold print:hidden">

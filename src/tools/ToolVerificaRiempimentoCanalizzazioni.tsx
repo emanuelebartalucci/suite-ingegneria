@@ -43,6 +43,7 @@ interface ToolVerificaRiempimentoCanalizzazioniProps {
   cablesCatalog?: CableProduct[];
   containersCatalog?: ContainerFamily[];
   onVerifyPozzetto?: (payload: any) => void;
+  onVerifyStaffaggio?: (payload: any) => void;
 }
 
 interface CavoSelezionato {
@@ -1118,7 +1119,7 @@ export function regenerateTratteTags(
 }
 
 
-export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectData, setAppMode, cablesCatalog: propCablesCatalog, containersCatalog: propContainersCatalog, onVerifyPozzetto }: ToolVerificaRiempimentoCanalizzazioniProps) {
+export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectData, setAppMode, cablesCatalog: propCablesCatalog, containersCatalog: propContainersCatalog, onVerifyPozzetto, onVerifyStaffaggio }: ToolVerificaRiempimentoCanalizzazioniProps) {
   // Stati principali dello strumento
   const [state, setState] = useState<ToolState>(defaultState);
   const [activeTab, setActiveTab] = useState<'calcoli' | 'topologia' | 'database'>('calcoli');
@@ -1673,21 +1674,37 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
               Legenda Collegamenti delle Tratte (DA ➔ A)
             </h4>
             {(() => {
-              // Raggruppa le tratte per albero indipendente
+              // Raggruppa e ordina le tratte in ordine logico di rete (Topologico a Livelli - BFS)
               const allTags = new Set(state.tratte.map(t => t.tag));
-              const roots = state.tratte.filter(t => !t.parentId || !allTags.has(t.parentId));
+              const roots = state.tratte
+                .filter(t => !t.parentId || !allTags.has(t.parentId))
+                .sort((a, b) => a.tag.localeCompare(b.tag));
 
-              const getSubtree = (rootTag: string): string[] => {
-                const result: string[] = [rootTag];
-                state.tratte
-                  .filter(t => t.parentId === rootTag)
-                  .forEach(child => result.push(...getSubtree(child.tag)));
-                return result;
+              const getSubtreeTopological = (rootTag: string): string[] => {
+                const ordered: string[] = [];
+                const queue: string[] = [rootTag];
+                const seen = new Set<string>();
+
+                while (queue.length > 0) {
+                  const current = queue.shift()!;
+                  if (seen.has(current)) continue;
+                  seen.add(current);
+                  ordered.push(current);
+
+                  // Figli ordinati in modo topologico/alfabetico naturale per TAG (es. DE, DF, DM)
+                  const children = state.tratte
+                    .filter(t => t.parentId === current)
+                    .sort((a, b) => a.tag.localeCompare(b.tag));
+
+                  children.forEach(c => queue.push(c.tag));
+                }
+
+                return ordered;
               };
 
               const trees = roots.map(r => ({
                 rootTag: r.tag,
-                tags: getSubtree(r.tag)
+                tags: getSubtreeTopological(r.tag)
               }));
 
               const hasMultipleTrees = trees.length > 1;
@@ -2046,8 +2063,23 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
                             familyName: fam?.name || 'Cavidotto / Tubo',
                             sizeCode: sz?.code || activeTratta.selectedSizeCode || 'custom',
                             dn: dnVal,
-                            outerDiameter: od,
-                            innerDiameter: id
+                            sectionType: fam?.sectionType || (sz?.width ? 'rettangolare' : 'circolare'),
+                            width: sz?.width || activeTratta.customWidth || 100,
+                            height: sz?.height || activeTratta.customHeight || 75,
+                            outerDiameter: sz?.outerDiameter || activeTratta.customOuterDiameter || od,
+                            innerDiameter: sz?.innerDiameter || activeTratta.customInnerDiameter || id
+                          };
+                        } else if (activeTratta.selectedFamilyId === 'personalizzato') {
+                          const isRect = Boolean(activeTratta.customWidth);
+                          conduitPayload = {
+                            familyId: 'personalizzato',
+                            familyName: 'Canalizzazione Personalizzata',
+                            sizeCode: 'custom',
+                            sectionType: isRect ? 'rettangolare' : 'circolare',
+                            width: activeTratta.customWidth || 100,
+                            height: activeTratta.customHeight || 75,
+                            outerDiameter: activeTratta.customOuterDiameter || 90,
+                            innerDiameter: activeTratta.customInnerDiameter || 77
                           };
                         }
                         onVerifyPozzetto({
@@ -2063,9 +2095,63 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
                         });
                       }}
                       className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-                      title="Esporta i cavi di questa tratta verso il tool Pozzetti"
+                      title="Esporta i cavi di questa tratta verso la Verifica Pozzetti"
                     >
                       <span>🕳️</span> Verifica Pozzetto
+                    </button>
+                  )}
+
+                  {onVerifyStaffaggio && (
+                    <button
+                      onClick={() => {
+                        const fam = containersCatalog?.find(f => f.id === activeTratta.selectedFamilyId);
+                        const sz = fam?.sizes.find(s => s.code === activeTratta.selectedSizeCode);
+                        const h = sz?.height || activeTratta.customHeight || 75;
+                        const w = sz?.width || activeTratta.customWidth || 200;
+
+                        // Peso cavi tot (kg/m)
+                        let pesoCavi = 0;
+                        activeTratta.cables.forEach(c => {
+                          pesoCavi += (c.weight || 0) * (c.qty || 1);
+                        });
+
+                        // Peso canale base + coperchio
+                        const pesoCanaleBase = sz?.weight || activeTratta.customWeight || 0;
+                        const pesoCoperchio = activeTratta.hasCover ? (sz?.coverWeight || activeTratta.customCoverWeight || 0) : 0;
+                        const q_tot = parseFloat((pesoCavi + pesoCanaleBase + pesoCoperchio).toFixed(2)) || 10.0;
+
+                        let tipologia: 'Canale Chiuso M/F' | 'Passerella Forata M/F' | 'Passerella a filo ZF31/Cablofil' = 'Canale Chiuso M/F';
+                        const famNameLower = (fam?.name || '').toLowerCase();
+                        if (famNameLower.includes('forat') || famNameLower.includes('asolat')) {
+                          tipologia = 'Passerella Forata M/F';
+                        } else if (famNameLower.includes('filo') || famNameLower.includes('cablofil') || famNameLower.includes('zf31')) {
+                          tipologia = 'Passerella a filo ZF31/Cablofil';
+                        }
+
+                        const isNonSupportedForStaffaggio = 
+                          fam?.installationType === 'cavidotto' || 
+                          fam?.sectionType === 'circolare' || 
+                          fam?.id === 'canala_pvc';
+
+                        if (isNonSupportedForStaffaggio && window.suiteUI) {
+                          window.suiteUI.alert(
+                            `Avviso Staffaggio Legrand:\n\nLa tratta "${activeTratta.name}" utilizza una tipologia non sospesa o non metallica (${fam?.name || 'Cavidotto/PVC/Tubo'}).\n\nLe curve di carico Legrand P31+/ZF31 (CEI EN 61537) si riferiscono a passerelle e canali metallici sospesi. I dati di carico (${q_tot} kg/m) sono stati comunque trasferiti allo Staffaggio per consentire la verifica su canale metallico equivalente.`
+                          );
+                        }
+
+                        onVerifyStaffaggio({
+                          trattaName: activeTratta.name,
+                          q_tot,
+                          height: h,
+                          width: w,
+                          serie: tipologia === 'Passerella a filo ZF31/Cablofil' ? 'ZF31 / Cablofil' : 'P31+',
+                          tipologia
+                        });
+                      }}
+                      className="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                      title="Esporta il carico lineare e le dimensioni verso lo Staffaggio"
+                    >
+                      <span>📏</span> Invia a Staffaggio
                     </button>
                   )}
                   <button 

@@ -4,7 +4,7 @@ import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
 import { formatNumber } from '../utils/format';
 import { fetchElectricalCables, getCableColor } from '../utils/electricalDbHelper';
-import { CableProduct, CAVIDOTTI_DOPPIA_PARETE, POZZETTI_CLS_PRESETS, PozzettoClsPreset, CavidottoDoppiaParete } from '../data/electricalDatabase';
+import { CableProduct, ContainerFamily, INITIAL_CONTAINERS, CAVIDOTTI_DOPPIA_PARETE, POZZETTI_CLS_PRESETS, PozzettoClsPreset, CavidottoDoppiaParete } from '../data/electricalDatabase';
 import { 
   Plus, 
   Trash2, 
@@ -26,6 +26,7 @@ interface ToolDimensionamentoPozzettiElettriciProps {
   setProjectData: (data: any) => void;
   setAppMode: (mode: string) => void;
   cablesCatalog?: CableProduct[];
+  containersCatalog?: ContainerFamily[];
   importedCables?: any | null;
   clearImportedCables?: () => void;
 }
@@ -38,17 +39,39 @@ export interface CavoSelezionatoPozzetto {
   weight: number;               // Peso in kg/m
   qty: number;                  // Quantità
   customBendingFactor?: number; // Fattore k personalizzato se cavo personalizzato
+  destinationSide?: 'sx' | 'dx' | 'alto' | 'basso'; // Lato di uscita specifico per il cavo
+  destinationFamilyId?: string; // Famiglia del condotto di uscita per il cavo
 }
 
 export interface GruppoCavidotto {
   id: string;
-  dn: number;                  // DN nominale (es. 50, 63, 90, 110, 125, 160, 200)
-  outerDiameter: number;       // OD (mm)
-  innerDiameter: number;       // ID (mm)
-  bendingFactor: number;       // default 8
-  qty: number;                 // numero di tubi paralleli
+  familyId?: string;           // ID famiglia dal catalogo o 'cavidotto'/'canala_pvc'/etc.
+  familyName?: string;         // Nome descrittivo (es. "Passerella metallica P31+", "Canale PVC", ecc.)
+  sizeCode?: string;           // Codice della taglia scelta nel catalogo (es. 'CEFD90', 'P31_100x50', ecc.)
+  sectionType?: 'circolare' | 'rettangolare'; // Tipo sezione
+  width?: number;              // Larghezza in mm (se rettangolare)
+  height?: number;             // Altezza in mm (se rettangolare)
+  dn: number;                  // DN nominale (es. 50, 63, 90, 110, 125, 160, 200) o dimensione caratteristica
+  outerDiameter: number;       // OD (mm) o Larghezza esterna
+  innerDiameter: number;       // ID (mm) o Altezza interna
+  bendingFactor: number;       // default 8 per tubi, 6 per canali
+  qty: number;                 // numero di condotti/canali paralleli
   cables: CavoSelezionatoPozzetto[];
   destinationSide?: 'sx' | 'dx' | 'alto' | 'basso';
+}
+
+export function getConduitLabel(cond: GruppoCavidotto): string {
+  const isRect = cond.sectionType === 'rettangolare' || Boolean(cond.width && cond.height);
+  if (cond.familyName) {
+    if (isRect && cond.width && cond.height) {
+      return `${cond.familyName} ${cond.width}x${cond.height} mm`;
+    }
+    return `${cond.familyName} (DN ${cond.dn})`;
+  }
+  if (isRect && cond.width && cond.height) {
+    return `Canale Rettangolare ${cond.width}x${cond.height} mm`;
+  }
+  return `Cavidotto DN ${cond.dn} (Est: ${cond.outerDiameter}, Int: ${cond.innerDiameter} mm)`;
 }
 
 export interface ParetePozzetto {
@@ -93,13 +116,16 @@ export function ensurePozzettoPareti(p: any): ParetePozzetto[] {
     return sides.map(side => {
       const existing = p.pareti.find((w: any) => w.side === side);
       if (existing) {
-        // Forza tipi e array se mancanti
+        // Forza tipi ed esplicito sectionType
         return {
           id: existing.id || `parete_${side}_${Date.now()}`,
           side,
           label: existing.label || labels[side],
           destinationSide: existing.destinationSide,
-          cavidotti: Array.isArray(existing.cavidotti) ? existing.cavidotti : []
+          cavidotti: Array.isArray(existing.cavidotti) ? existing.cavidotti.map((c: any) => ({
+            ...c,
+            sectionType: c.sectionType || (c.width && c.height && !c.outerDiameter ? 'rettangolare' : 'circolare')
+          })) : []
         };
       }
       return {
@@ -118,13 +144,17 @@ export function ensurePozzettoPareti(p: any): ParetePozzetto[] {
       id: `parete_sx_${Date.now()}`,
       side: 'sx',
       label: 'Lato Sinistro (Arrivo)',
-      destinationSide: defaultCables.length > 0 ? 'dx' : undefined,
+      destinationSide: undefined,
       cavidotti: defaultCables.length > 0 ? [
         {
           id: `cond_mig_${Date.now()}`,
+          familyId: 'cavidotto',
+          familyName: 'Cavidotto doppia parete',
+          sectionType: 'circolare',
+          sizeCode: 'CEFD090',
           dn: 90,
-          outerDiameter: 110,
-          innerDiameter: 92,
+          outerDiameter: 90,
+          innerDiameter: 77,
           bendingFactor: 8,
           qty: 1,
           cables: defaultCables
@@ -218,11 +248,17 @@ export function calcolaCompliancePozzetto(p: PozzettoProgetto, cablesCatalog: Ca
       });
     });
   });
-
   // Informazioni di conformità per ciascuna parete
+  const CORNER_MARGIN_CM = 5; // Margine di rispetto standard da ciascun angolo interno per carotaggi/spalla pareti adiacenti
+  let totalConduitsOuterAreaGlobal = 0;
+
   const paretiCompliance = pareti.map(w => {
     const wallArea = (w.side === 'sx' || w.side === 'dx') ? innerL * innerH : innerB * innerH;
+    const wallW = (w.side === 'sx' || w.side === 'dx') ? innerL : innerB;
+    const wallWUtile = Math.max(0, wallW - 2 * CORNER_MARGIN_CM);
+
     let conduitsOuterArea = 0;
+    let totalConduitsWidthCm = 0;
     let wallMaxRMin = 0;
     let wallMaxRMinName = '';
 
@@ -232,7 +268,7 @@ export function calcolaCompliancePozzetto(p: PozzettoProgetto, cablesCatalog: Ca
     const egressCavidotti: typeof ingressCavidotti = [];
     pareti.forEach(otherW => {
       otherW.cavidotti.forEach(otherCond => {
-        if (otherW.side !== w.side && otherCond.destinationSide === w.side) {
+        if (otherW.side !== w.side && (otherCond.destinationSide === w.side || otherCond.cables.some(c => c.destinationSide === w.side))) {
           egressCavidotti.push(otherCond);
         }
       });
@@ -241,12 +277,21 @@ export function calcolaCompliancePozzetto(p: PozzettoProgetto, cablesCatalog: Ca
     const allCavidotti = [...ingressCavidotti, ...egressCavidotti];
 
     allCavidotti.forEach(cond => {
-      // Sezione esterna del cavidotto in cm^2
-      const dExtCm = cond.outerDiameter / 10;
-      const condOuterSec = (Math.PI * Math.pow(dExtCm / 2, 2)) * cond.qty;
+      // Sezione esterna e larghezza del cavidotto/canale in cm
+      const isRect = cond.sectionType === 'rettangolare';
+      let condOuterSec = 0;
+      let condWCm = 0;
+      if (isRect) {
+        condWCm = (cond.width || cond.outerDiameter || 100) / 10;
+        const hCm = (cond.height || cond.innerDiameter || 75) / 10;
+        condOuterSec = (condWCm * hCm) * cond.qty;
+      } else {
+        const dExtCm = (cond.outerDiameter || cond.dn || 90) / 10;
+        condWCm = dExtCm;
+        condOuterSec = (Math.PI * Math.pow(dExtCm / 2, 2)) * cond.qty;
+      }
       conduitsOuterArea += condOuterSec;
-
-
+      totalConduitsWidthCm += (condWCm * cond.qty);
 
       // Cavi all'interno del cavidotto
       cond.cables.forEach(c => {
@@ -271,7 +316,13 @@ export function calcolaCompliancePozzetto(p: PozzettoProgetto, cablesCatalog: Ca
       });
     });
 
+    totalConduitsOuterAreaGlobal += conduitsOuterArea;
+
     const fillRate = wallArea > 0 ? (conduitsOuterArea / wallArea) * 100 : 0;
+    const linearFillRate = wallW > 0 ? (totalConduitsWidthCm / wallW) * 100 : 0;
+    const linearFillRateNet = wallWUtile > 0 ? (totalConduitsWidthCm / wallWUtile) * 100 : 0;
+    const isLinearOverflow = linearFillRate > 100;
+    const isCornerOverflow = totalConduitsWidthCm > wallWUtile;
     
     // Se c'è una destinazione/curva o un transito di uscita attivo
     const hasCurve = allCavidotti.some(cond => cond.destinationSide !== undefined && cond.destinationSide !== w.side);
@@ -285,8 +336,15 @@ export function calcolaCompliancePozzetto(p: PozzettoProgetto, cablesCatalog: Ca
       side: w.side,
       label: w.label,
       wallArea,
+      wallW,
+      wallWUtile,
       conduitsOuterArea,
+      totalConduitsWidthCm,
       fillRate,
+      linearFillRate,
+      linearFillRateNet,
+      isLinearOverflow,
+      isCornerOverflow,
       maxRMin: wallMaxRMin,
       maxRMinName: wallMaxRMinName,
       hasCurve: hasCurve || isEgress
@@ -301,54 +359,65 @@ export function calcolaCompliancePozzetto(p: PozzettoProgetto, cablesCatalog: Ca
     l_passaggio = innerB;
   }
 
-  // 4. Volume Occupato Cavi (V_c) in cm^3 (con maggiorazione scorta)
+  // 4. Volume Occupato Cavi (V_c) e Volume Occupato Condotti (V_tubi) in cm^3
   const volumeCaviSenzaScorta = a_tot * l_passaggio;
   const maggiorazioneScorta = volumeCaviSenzaScorta * (p.scortaPct / 100);
   const volumeCaviConScorta = volumeCaviSenzaScorta + maggiorazioneScorta;
 
-  // 5. Grado di riempimento volumetrico complessivo (%)
-  const fillRate = volumePozzetto > 0 ? (volumeCaviConScorta / volumePozzetto) * 100 : 0;
+  const volumeTubiTotale = totalConduitsOuterAreaGlobal * l_passaggio;
 
-  // 6. Raggio Minimo di Curvatura (basato su curva a 90°, quindi R_min e non 2*R_min)
+  // 5. Grado di riempimento volumetrico complessivo (%)
+  const fillRateCavi = volumePozzetto > 0 ? (volumeCaviConScorta / volumePozzetto) * 100 : 0;
+  const fillRateTubi = volumePozzetto > 0 ? (volumeTubiTotale / volumePozzetto) * 100 : 0;
+
+  // 6. Raggio Minimo di Curvatura
   const maxRMinCm = globalMaxRMin / 10; // mm -> cm
-  const spaceRequired = 1.0 * maxRMinCm; // cm (limite fisico reale per curva 90°)
+  const spaceRequired = 1.0 * maxRMinCm;
   const dimMin = p.shape === 'rettangolare' ? Math.min(innerB, innerL) : innerB;
 
   const bendingRadiusOk = dimMin >= spaceRequired;
   const bendingRadiusClose = dimMin >= spaceRequired && dimMin < 1.25 * maxRMinCm;
 
-  // 7. Verifica Fill Rate delle Pareti (soglia CEI 40%)
+  // 7. Verifica Fill Rate delle Pareti
   const worstWall = paretiCompliance.reduce((prev, curr) => curr.fillRate > prev.fillRate ? curr : prev, paretiCompliance[0]);
+  const worstLinearWall = paretiCompliance.reduce((prev, curr) => curr.linearFillRate > prev.linearFillRate ? curr : prev, paretiCompliance[0]);
+  const worstCornerWall = paretiCompliance.reduce((prev, curr) => curr.linearFillRateNet > prev.linearFillRateNet ? curr : prev, paretiCompliance[0]);
 
   // 8. Esito finale
   let esito: 'verificato' | 'attenzione' | 'rosso' = 'verificato';
   let dettagliVerifica = '';
 
-  if (fillRate > 25 || !bendingRadiusOk || worstWall.fillRate > 40) {
+  if (fillRateCavi > 25 || !bendingRadiusOk || worstWall.fillRate > 40 || worstLinearWall.linearFillRate > 100) {
     esito = 'rosso';
-    if (worstWall.fillRate > 40) {
-      dettagliVerifica = `NON CONFORME: Sovraccarico sulla parete ${worstWall.label} (${formatNumber(worstWall.fillRate, 1)}% > 40% max consentito per posa corrugati).`;
-    } else if (fillRate > 25 && !bendingRadiusOk) {
-      dettagliVerifica = `NON CONFORME: Riempimento volumetrico critico (${formatNumber(fillRate, 1)}% > 25%) e spazio di curvatura insufficiente. Elemento limitante: ${maxRMinCableName}. Richiesto: ${formatNumber(spaceRequired, 1)} cm, Interno netto pozzetto: ${formatNumber(dimMin, 1)} cm.`;
-    } else if (fillRate > 25) {
-      dettagliVerifica = `NON CONFORME: Tasso di riempimento volumetrico globale critico (${formatNumber(fillRate, 1)}% > 25% max).`;
+    if (worstLinearWall.linearFillRate > 100) {
+      dettagliVerifica = `NON VERIFICATO: Sovraccarico di ingombro sulla parete ${worstLinearWall.label} (${formatNumber(worstLinearWall.linearFillRate, 1)}% > 100%). I condotti occupano ${formatNumber(worstLinearWall.totalConduitsWidthCm, 1)} cm su una larghezza parete di ${formatNumber(worstLinearWall.wallW, 1)} cm e non possono stare su un solo livello.`;
+    } else if (worstWall.fillRate > 40) {
+      dettagliVerifica = `NON VERIFICATO: Sovraccarico di area sulla parete ${worstWall.label} (${formatNumber(worstWall.fillRate, 1)}% > 40% max consentito per posa corrugati).`;
+    } else if (fillRateCavi > 25 && !bendingRadiusOk) {
+      dettagliVerifica = `NON VERIFICATO: Riempimento volumetrico cavi critico (${formatNumber(fillRateCavi, 1)}% > 25%) e spazio di curvatura insufficiente. Elemento limitante: ${maxRMinCableName}. Richiesto: ${formatNumber(spaceRequired, 1)} cm, Interno netto pozzetto: ${formatNumber(dimMin, 1)} cm.`;
+    } else if (fillRateCavi > 25) {
+      dettagliVerifica = `NON VERIFICATO: Tasso di riempimento volumetrico globale cavi critico (${formatNumber(fillRateCavi, 1)}% > 25% max).`;
     } else {
-      dettagliVerifica = `NON CONFORME: Spazio di curvatura insufficiente per la piegatura a 90°. Elemento limitante: ${maxRMinCableName}. Spazio minimo richiesto: ${formatNumber(spaceRequired, 1)} cm, Interno utile pozzetto: ${formatNumber(dimMin, 1)} cm.`;
+      dettagliVerifica = `NON VERIFICATO: Spazio di curvatura insufficiente per la piegatura a 90°. Elemento limitante: ${maxRMinCableName}. Spazio minimo richiesto: ${formatNumber(spaceRequired, 1)} cm, Interno utile pozzetto: ${formatNumber(dimMin, 1)} cm.`;
     }
-  } else if (fillRate > 15 || bendingRadiusClose || worstWall.fillRate > 25) {
+  } else if (fillRateCavi > 15 || bendingRadiusClose || worstWall.fillRate > 25 || worstLinearWall.linearFillRate > 85 || worstCornerWall.isCornerOverflow) {
     esito = 'attenzione';
-    if (worstWall.fillRate > 25) {
-      dettagliVerifica = `ATTENZIONE: Riempimento elevato sulla parete ${worstWall.label} (${formatNumber(worstWall.fillRate, 1)}% > 25%).`;
-    } else if (fillRate > 15 && bendingRadiusClose) {
-      dettagliVerifica = `ATTENZIONE: Riempimento elevato (${formatNumber(fillRate, 1)}% > 15%) e spazio di curvatura al limite per la piegatura a 90°. Elemento limitante: ${maxRMinCableName}. Spazio minimo richiesto: ${formatNumber(spaceRequired, 1)} cm (consigliato >= ${formatNumber(1.25 * maxRMinCm, 1)} cm), Interno utile: ${formatNumber(dimMin, 1)} cm.`;
-    } else if (fillRate > 15) {
-      dettagliVerifica = `ATTENZIONE: Grado di riempimento volumetrico globale elevato (${formatNumber(fillRate, 1)}% > 15%).`;
+    if (worstCornerWall.isCornerOverflow) {
+      dettagliVerifica = `ATTENZIONE: I condotti sulla parete ${worstCornerWall.label} (${formatNumber(worstCornerWall.totalConduitsWidthCm, 1)} cm) invadono il margine di rispetto d'angolo (5 cm per lato, larghezza utile ${formatNumber(worstCornerWall.wallWUtile, 1)} cm su ${formatNumber(worstCornerWall.wallW, 1)} cm). Rischio interferenza con le pareti adiacenti.`;
+    } else if (worstLinearWall.linearFillRate > 85) {
+      dettagliVerifica = `ATTENZIONE: Ingombro lineare elevato sulla parete ${worstLinearWall.label} (${formatNumber(worstLinearWall.linearFillRate, 1)}% della larghezza parete di ${formatNumber(worstLinearWall.wallW, 1)} cm).`;
+    } else if (worstWall.fillRate > 25) {
+      dettagliVerifica = `ATTENZIONE: Riempimento elevato di area sulla parete ${worstWall.label} (${formatNumber(worstWall.fillRate, 1)}% > 25%).`;
+    } else if (fillRateCavi > 15 && bendingRadiusClose) {
+      dettagliVerifica = `ATTENZIONE: Riempimento elevato (${formatNumber(fillRateCavi, 1)}% > 15%) e spazio di curvatura al limite per la piegatura a 90°. Elemento limitante: ${maxRMinCableName}. Spazio minimo richiesto: ${formatNumber(spaceRequired, 1)} cm (consigliato >= ${formatNumber(1.25 * maxRMinCm, 1)} cm), Interno utile: ${formatNumber(dimMin, 1)} cm.`;
+    } else if (fillRateCavi > 15) {
+      dettagliVerifica = `ATTENZIONE: Grado di riempimento volumetrico globale cavi elevato (${formatNumber(fillRateCavi, 1)}% > 15%).`;
     } else {
       dettagliVerifica = `ATTENZIONE: Spazio di curvatura al limite per la piegatura a 90°. Elemento limitante: ${maxRMinCableName}. Spazio minimo richiesto: ${formatNumber(spaceRequired, 1)} cm (consigliato >= ${formatNumber(1.25 * maxRMinCm, 1)} cm), Interno utile: ${formatNumber(dimMin, 1)} cm.`;
     }
   } else {
     esito = 'verificato';
-    dettagliVerifica = `VERIFICATO: Riempimento volumetrico ottimale (${formatNumber(fillRate, 1)}% <= 15%), riempimento pareti conforme ed elemento limitante verificato per la posa (${maxRMinCableName} con ${formatNumber(dimMin, 1)} cm >= richiesto ${formatNumber(spaceRequired, 1)} cm).`;
+    dettagliVerifica = `VERIFICATO: Riempimento volumetrico cavi ottimale (${formatNumber(fillRateCavi, 1)}% <= 15%, condotti: ${formatNumber(fillRateTubi, 1)}%), riempimento pareti conforme ed elemento limitante verificato per la posa (${maxRMinCableName} con ${formatNumber(dimMin, 1)} cm >= richiesto ${formatNumber(spaceRequired, 1)} cm).`;
   }
 
   return {
@@ -358,21 +427,25 @@ export function calcolaCompliancePozzetto(p: PozzettoProgetto, cablesCatalog: Ca
     volumeCaviSenzaScorta,
     maggiorazioneScorta,
     volumeCaviConScorta,
-    fillRate,
-    riempimentoPct: fillRate,
+    fillRate: fillRateCavi,
+    fillRateCavi,
+    fillRateTubi,
+    riempimentoPct: fillRateCavi,
+    paretiCompliance,
+    worstWall,
+    worstWallFillRate: worstWall.fillRate,
+    worstLinearWall,
+    worstCornerWall,
     maxRMin: globalMaxRMin,
     maxRMinCm,
+    maxRMinCableName,
     spaceRequired,
     dimMin,
+    dMax,
     bendingRadiusOk,
     bendingRadiusClose,
     esito,
     dettagliVerifica,
-    maxRMinCableName,
-    pesoTotCaviLineare,
-    dMax,
-    paretiCompliance,
-    worstWallFillRate: worstWall.fillRate,
     innerB,
     innerL,
     innerH
@@ -499,8 +572,15 @@ const PozzettoGraficaDettaglio: React.FC<{
   pozzetto: PozzettoProgetto;
   compliance: any;
   cablesCatalog: CableProduct[];
-}> = ({ pozzetto, compliance, cablesCatalog }) => {
-  const [activeWallSide, setActiveWallSide] = useState<'sx' | 'dx' | 'alto' | 'basso'>('sx');
+  selectedWallSide?: 'sx' | 'dx' | 'alto' | 'basso';
+}> = ({ pozzetto, compliance, cablesCatalog, selectedWallSide }) => {
+  const [activeWallSide, setActiveWallSide] = useState<'sx' | 'dx' | 'alto' | 'basso'>(selectedWallSide || 'sx');
+
+  useEffect(() => {
+    if (selectedWallSide) {
+      setActiveWallSide(selectedWallSide);
+    }
+  }, [selectedWallSide]);
   const [imgUrlPianta, setImgUrlPianta] = useState<string>('');
   const [imgUrlSezione, setImgUrlSezione] = useState<string>('');
   const canvasPiantaRef = useRef<HTMLCanvasElement>(null);
@@ -604,8 +684,9 @@ const PozzettoGraficaDettaglio: React.FC<{
     const cx = 360 / 2;
     const cy = 280 / 2;
 
+    const pad = 36;
     const maxDim = isRect ? Math.max(B, L) : D;
-    const scale = Math.min((360 - 80) / maxDim, (280 - 80) / maxDim);
+    const scale = Math.min((360 - 2 * pad) / maxDim, (280 - 2 * pad) / maxDim);
 
     const wExtScaled = (isRect ? B : D) * scale;
     const hExtScaled = (isRect ? L : D) * scale;
@@ -653,8 +734,8 @@ const PozzettoGraficaDettaglio: React.FC<{
 
     // Linee di quota esterne ed interne
     if (isRect) {
-      drawDimensionLine(ctx, xStartExt, yStartExt, xStartExt + wExtScaled, yStartExt, `${B} cm (Est)`, -30, false);
-      drawDimensionLine(ctx, xStartExt, yStartExt, xStartExt, yStartExt + hExtScaled, `${L} cm (Est)`, -30, true);
+      drawDimensionLine(ctx, xStartExt, yStartExt, xStartExt + wExtScaled, yStartExt, `${B} cm (Est)`, -20, false);
+      drawDimensionLine(ctx, xStartExt, yStartExt, xStartExt, yStartExt + hExtScaled, `${L} cm (Est)`, -20, true);
     } else {
       drawDimensionLine(ctx, cx - wExtScaled/2, cy, cx + wExtScaled/2, cy, `Ø Ext: ${D} cm`, -wExtScaled/2 - 12, false);
     }
@@ -672,18 +753,40 @@ const PozzettoGraficaDettaglio: React.FC<{
       if (w.cavidotti.length === 0) return;
       const coords = sideCoords[w.side];
       
-      // Calcola larghezza totale occupata dai corrugati per centrarli sulla parete
-      const totalWidth = w.cavidotti.reduce((acc, c) => acc + (c.outerDiameter/10) * scale * c.qty, 0);
-      let currentOffset = -totalWidth / 2;
+      // Calcola ingombro totale puro dei condotti/canali (in pixel)
+      let pureTotalWidthScaled = 0;
+      let totalConduitsQty = 0;
+      w.cavidotti.forEach(c => {
+        const isRect = c.sectionType === 'rettangolare';
+        const wCm = isRect ? (c.width || 100) / 10 : (c.outerDiameter || 90) / 10;
+        pureTotalWidthScaled += (wCm * scale) * c.qty;
+        totalConduitsQty += c.qty;
+      });
+
+      const wallSpanScaled = (w.side === 'sx' || w.side === 'dx') ? hIntScaled : wIntScaled;
+      const fitsOnWall = pureTotalWidthScaled <= wallSpanScaled + 1.0;
+      let itemGap = 0;
+
+      if (fitsOnWall) {
+        const remainingSpace = Math.max(0, wallSpanScaled - pureTotalWidthScaled);
+        itemGap = totalConduitsQty > 1 ? Math.min(1.5, remainingSpace / (totalConduitsQty - 1)) : 0;
+      } else {
+        itemGap = 2;
+      }
+
+      const totalUsedSpanScaled = pureTotalWidthScaled + itemGap * Math.max(0, totalConduitsQty - 1);
+      let currentOffset = -totalUsedSpanScaled / 2;
 
       w.cavidotti.forEach(cond => {
-        const dExtScaled = (cond.outerDiameter / 10) * scale;
+        const isRect = cond.sectionType === 'rettangolare';
+        const wCm = isRect ? (cond.width || 100) / 10 : (cond.outerDiameter || 90) / 10;
+        const dExtScaled = wCm * scale;
         
         for (let q = 0; q < cond.qty; q++) {
           ctx.save();
-          ctx.fillStyle = 'rgba(59, 130, 246, 0.85)'; // Blu Cavidotto
-          ctx.strokeStyle = '#2563eb';
-          ctx.lineWidth = 0.8;
+          ctx.fillStyle = isRect ? (cond.familyId === 'canala_pvc' ? '#cbd5e1' : '#64748b') : 'rgba(59, 130, 246, 0.85)';
+          ctx.strokeStyle = isRect ? '#334155' : '#2563eb';
+          ctx.lineWidth = 1.2;
 
           let rx = coords.x;
           let ry = coords.y;
@@ -696,14 +799,20 @@ const PozzettoGraficaDettaglio: React.FC<{
             rh = dExtScaled;
             ctx.fillRect(rx, ry, rw, rh);
             ctx.strokeRect(rx, ry, rw, rh);
-            // Righe corrugate
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.lineWidth = 0.5;
-            for (let ox = 0; ox < Math.abs(rw); ox += 3) {
-              ctx.beginPath();
-              ctx.moveTo(rx + (rw < 0 ? -ox : ox), ry);
-              ctx.lineTo(rx + (rw < 0 ? -ox : ox), ry + rh);
-              ctx.stroke();
+            if (isRect) {
+              // Interno vuoto canala rettangolare vista dall'alto
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(rx + (rw < 0 ? rw + 2 : 2), ry + 2, Math.abs(rw) - 4, Math.max(1, rh - 4));
+            } else {
+              // Righe corrugate per cavidotto circolare
+              ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+              ctx.lineWidth = 0.5;
+              for (let ox = 0; ox < Math.abs(rw); ox += 3) {
+                ctx.beginPath();
+                ctx.moveTo(rx + (rw < 0 ? -ox : ox), ry);
+                ctx.lineTo(rx + (rw < 0 ? -ox : ox), ry + rh);
+                ctx.stroke();
+              }
             }
           } else {
             rx = coords.x + currentOffset;
@@ -711,86 +820,71 @@ const PozzettoGraficaDettaglio: React.FC<{
             rh = coords.dy;
             ctx.fillRect(rx, ry, rw, rh);
             ctx.strokeRect(rx, ry, rw, rh);
-            // Righe corrugate
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.lineWidth = 0.5;
-            for (let oy = 0; oy < Math.abs(rh); oy += 3) {
-              ctx.beginPath();
-              ctx.moveTo(rx, ry + (rh < 0 ? -oy : oy));
-              ctx.lineTo(rx + rw, ry + (rh < 0 ? -oy : oy));
-              ctx.stroke();
+            if (isRect) {
+              // Interno vuoto canala rettangolare vista dall'alto
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(rx + 2, ry + (rh < 0 ? rh + 2 : 2), Math.max(1, rw - 4), Math.abs(rh) - 4);
+            } else {
+              // Righe corrugate per cavidotto circolare
+              ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+              ctx.lineWidth = 0.5;
+              for (let oy = 0; oy < Math.abs(rh); oy += 3) {
+                ctx.beginPath();
+                ctx.moveTo(rx, ry + (rh < 0 ? -oy : oy));
+                ctx.lineTo(rx + rw, ry + (rh < 0 ? -oy : oy));
+                ctx.stroke();
+              }
             }
           }
           ctx.restore();
-          // Se c'è una curva/destinazione, traccia i cavi passanti
-          if (cond.destinationSide && cond.destinationSide !== w.side) {
-            const destCoords = sideCoords[cond.destinationSide];
-            
-            // Coord d'inizio e fine curva
-            const startX = w.side === 'sx' || w.side === 'dx' ? coords.x : coords.x + currentOffset + dExtScaled/2;
-            const startY = w.side === 'sx' || w.side === 'dx' ? coords.y + currentOffset + dExtScaled/2 : coords.y;
-            
-            let endX = destCoords.x;
-            let endY = destCoords.y;
 
-            // Calcola le coordinate del tubo di uscita sulla parete di destinazione
-            let erx = destCoords.x;
-            let ery = destCoords.y;
-            let erw = 0;
-            let erh = 0;
-
-            if (cond.destinationSide === 'sx' || cond.destinationSide === 'dx') {
-              ery = destCoords.y + currentOffset;
-              erw = destCoords.dx;
-              erh = dExtScaled;
+          // Traccia le curve per ciascun cavo in base al proprio lato di uscita
+          cond.cables.forEach((c, cIdx) => {
+            const destSide = c.destinationSide || cond.destinationSide;
+            if (destSide && destSide !== w.side) {
+              const destCoords = sideCoords[destSide];
               
-              endX = destCoords.x;
-              endY = ery + dExtScaled / 2;
-            } else {
-              erx = destCoords.x + currentOffset;
-              erw = dExtScaled;
-              erh = destCoords.dy;
+              const startX = w.side === 'sx' || w.side === 'dx' ? coords.x : coords.x + currentOffset + dExtScaled/2;
+              const startY = w.side === 'sx' || w.side === 'dx' ? coords.y + currentOffset + dExtScaled/2 : coords.y;
               
-              endX = erx + dExtScaled / 2;
-              endY = destCoords.y;
-            }
+              let endX = destCoords.x;
+              let endY = destCoords.y;
 
-            // Disegna il tubo di uscita corrispondente
-            ctx.save();
-            ctx.fillStyle = 'rgba(59, 130, 246, 0.85)'; // Blu Cavidotto
-            ctx.strokeStyle = '#2563eb';
-            ctx.lineWidth = 0.8;
-            ctx.fillRect(erx, ery, erw, erh);
-            ctx.strokeRect(erx, ery, erw, erh);
-            // Righe corrugate per il tubo di uscita
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.lineWidth = 0.5;
-            if (cond.destinationSide === 'sx' || cond.destinationSide === 'dx') {
-              for (let ox = 0; ox < Math.abs(erw); ox += 3) {
-                ctx.beginPath();
-                ctx.moveTo(erx + (erw < 0 ? -ox : ox), ery);
-                ctx.lineTo(erx + (erw < 0 ? -ox : ox), ery + erh);
-                ctx.stroke();
-              }
-            } else {
-              for (let oy = 0; oy < Math.abs(erh); oy += 3) {
-                ctx.beginPath();
-                ctx.moveTo(erx, ery + (erh < 0 ? -oy : oy));
-                ctx.lineTo(erx + erw, ery + (erh < 0 ? -oy : oy));
-                ctx.stroke();
-              }
-            }
-            ctx.restore();
+              let erx = destCoords.x;
+              let ery = destCoords.y;
+              let erw = 0;
+              let erh = 0;
 
-            // Disegna i cavi passanti all'interno con curve Bezier
-            cond.cables.forEach((c, cIdx) => {
+              if (destSide === 'sx' || destSide === 'dx') {
+                ery = destCoords.y + currentOffset;
+                erw = destCoords.dx;
+                erh = dExtScaled;
+                endX = destCoords.x;
+                endY = ery + dExtScaled / 2;
+              } else {
+                erx = destCoords.x + currentOffset;
+                erw = dExtScaled;
+                erh = destCoords.dy;
+                endX = erx + dExtScaled / 2;
+                endY = destCoords.y;
+              }
+
+              // Disegna il tubo/canale di uscita sulla parete di destinazione
+              ctx.save();
+              ctx.fillStyle = isRect ? '#64748b' : 'rgba(59, 130, 246, 0.85)';
+              ctx.strokeStyle = isRect ? '#334155' : '#2563eb';
+              ctx.lineWidth = 0.8;
+              ctx.fillRect(erx, ery, erw, erh);
+              ctx.strokeRect(erx, ery, erw, erh);
+              ctx.restore();
+
+              // Curve Bezier per ciascun cavo
               ctx.save();
               ctx.strokeStyle = getCableColor(c.cableId);
               ctx.lineWidth = Math.max(1.2, (c.diameter/10) * scale * 0.45);
               ctx.beginPath();
               ctx.moveTo(startX, startY);
 
-              // Control point all'angolo corrispondente
               let cpX = startX;
               let cpY = startY;
 
@@ -805,10 +899,10 @@ const PozzettoGraficaDettaglio: React.FC<{
               ctx.quadraticCurveTo(cpX, cpY, endX, endY);
               ctx.stroke();
               ctx.restore();
-            });
-          }
+            }
+          });
 
-          currentOffset += dExtScaled;
+          currentOffset += dExtScaled + itemGap;
         }
       });
     });
@@ -837,7 +931,7 @@ const PozzettoGraficaDettaglio: React.FC<{
     setImgUrlPianta(url);
   }, [pozzetto, compliance, activeWallSide]);
 
-  // 2. Render Sezione Parete (Skyline packing dei corrugati)
+  // 2. Render Sezione Parete (Skyline packing dei corrugati/canali con centraggio orizzontale)
   useEffect(() => {
     const canvas = canvasSezioneRef.current;
     if (!canvas) return;
@@ -848,11 +942,12 @@ const PozzettoGraficaDettaglio: React.FC<{
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, 360, 280);
 
-    const pad = 25;
+    const pad = 36;
     const wallW = (activeWallSide === 'sx' || activeWallSide === 'dx') ? innerL : innerB;
     const wallH = innerH;
 
-    const scale = Math.min((360 - 2 * pad) / wallW, (280 - 2 * pad) / wallH);
+    const maxWallDim = Math.max(wallW, wallH);
+    const scale = Math.min((360 - 2 * pad) / maxWallDim, (280 - 2 * pad) / maxWallDim);
     const wScaled = wallW * scale;
     const hScaled = wallH * scale;
 
@@ -871,8 +966,31 @@ const PozzettoGraficaDettaglio: React.FC<{
     ctx.restore();
 
     // Disegna quote interne sezione
-    drawDimensionLine(ctx, xStart, yStart, xStart + wScaled, yStart, `${formatNumber(wallW, 0)} cm`, -15, false);
-    drawDimensionLine(ctx, xStart, yStart, xStart, yStart + hScaled, `${formatNumber(wallH, 0)} cm`, -15, true);
+    drawDimensionLine(ctx, xStart, yStart, xStart + wScaled, yStart, `${formatNumber(wallW, 0)} cm`, -20, false);
+    drawDimensionLine(ctx, xStart, yStart, xStart, yStart + hScaled, `${formatNumber(wallH, 0)} cm`, -20, true);
+
+    // Linee tratteggiate di rispetto angoli interni (5 cm per lato)
+    const cornerPx = 5 * scale;
+    if (wScaled > 2 * cornerPx) {
+      ctx.save();
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 0.8;
+
+      // Linea sinistra (5 cm)
+      ctx.beginPath();
+      ctx.moveTo(xStart + cornerPx, yStart);
+      ctx.lineTo(xStart + cornerPx, yStart + hScaled);
+      ctx.stroke();
+
+      // Linea destra (5 cm)
+      ctx.beginPath();
+      ctx.moveTo(xStart + wScaled - cornerPx, yStart);
+      ctx.lineTo(xStart + wScaled - cornerPx, yStart + hScaled);
+      ctx.stroke();
+
+      ctx.restore();
+    }
 
     const pareti = ensurePozzettoPareti(pozzetto);
     const activeWall = pareti.find(w => w.side === activeWallSide);
@@ -881,7 +999,7 @@ const PozzettoGraficaDettaglio: React.FC<{
     const egressCavidotti: typeof ingressCavidotti = [];
     pareti.forEach(w => {
       w.cavidotti.forEach(cond => {
-        if (w.side !== activeWallSide && cond.destinationSide === activeWallSide) {
+        if (w.side !== activeWallSide && (cond.destinationSide === activeWallSide || cond.cables.some(c => c.destinationSide === activeWallSide))) {
           egressCavidotti.push(cond);
         }
       });
@@ -890,82 +1008,213 @@ const PozzettoGraficaDettaglio: React.FC<{
     const allCavidotti = [...ingressCavidotti, ...egressCavidotti];
 
     if (allCavidotti.length > 0) {
-      // Calcola la larghezza totale occupata dai corrugati per centrarli sulla parete come in pianta
-      let totalConduitsWidth = 0;
+      // 1. Calcoliamo l'ingombro orizzontale totale puro dei condotti (in pixel)
+      let pureConduitsWidthScaled = 0;
+      let totalConduitItems = 0;
+
       allCavidotti.forEach(cond => {
-        const dExtScaled = ((cond.outerDiameter / 10)) * scale;
-        totalConduitsWidth += (dExtScaled * cond.qty) + ((cond.qty - 1) * 4);
+        const isRect = cond.sectionType === 'rettangolare';
+        const condW = isRect ? (cond.width || cond.outerDiameter || 100) / 10 : (cond.outerDiameter || 90) / 10;
+        pureConduitsWidthScaled += (condW * scale) * cond.qty;
+        totalConduitItems += cond.qty;
       });
 
-      const startX = totalConduitsWidth < wScaled 
-        ? xStart + (wScaled - totalConduitsWidth) / 2 
-        : xStart + 5;
+      // Fino al 100% dell'ingombro lineare, i condotti DEVONO stare tutti sulla prima fila in basso
+      const fitsOnSingleRow = pureConduitsWidthScaled <= wScaled + 1.0;
+      let itemGap = 0;
+      let curX = xStart;
 
-      let curX = startX;
+      if (fitsOnSingleRow) {
+        const remainingSpace = Math.max(0, wScaled - pureConduitsWidthScaled);
+        itemGap = totalConduitItems > 1 ? Math.min(2, remainingSpace / (totalConduitItems - 1)) : 0;
+        const totalUsedRowWidth = pureConduitsWidthScaled + itemGap * Math.max(0, totalConduitItems - 1);
+        curX = xStart + (wScaled - totalUsedRowWidth) / 2;
+      } else {
+        itemGap = 2;
+        curX = xStart;
+      }
+
+
       let curY = yStart + hScaled;
       let rowHeight = 0;
 
       allCavidotti.forEach(cond => {
-        const rExtScaled = ((cond.outerDiameter / 10) / 2) * scale;
-        const dExtScaled = rExtScaled * 2;
-        const rIntScaled = ((cond.innerDiameter / 10) / 2) * scale;
+        const isRect = cond.sectionType === 'rettangolare';
 
         for (let q = 0; q < cond.qty; q++) {
-          // Va accapo se esce dalla parete
-          if (curX + dExtScaled > xStart + wScaled - 4) {
-            curX = startX;
-            curY -= rowHeight + 3;
-            rowHeight = 0;
-          }
+          if (isRect) {
+            const wCm = (cond.width || cond.outerDiameter || 100) / 10;
+            const hCm = (cond.height || cond.innerDiameter || 75) / 10;
+            const rectWScaled = wCm * scale;
+            const rectHScaled = hCm * scale;
 
-          const cx = curX + rExtScaled;
-          const cy = curY - rExtScaled;
 
-          // Disegna Cavidotto (Corrugato)
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(cx, cy, rExtScaled, 0, 2 * Math.PI);
-          ctx.fillStyle = '#3b82f6'; // Blu
-          ctx.fill();
-          ctx.strokeStyle = '#1d4ed8';
-          ctx.lineWidth = 1;
-          ctx.stroke();
+            if (!fitsOnSingleRow && curX + rectWScaled > xStart + wScaled + 0.5) {
+              curX = xStart;
+              curY -= rowHeight + 4;
+              rowHeight = 0;
+            }
 
-          // Interno Cavidotto
-          ctx.beginPath();
-          ctx.arc(cx, cy, rIntScaled, 0, 2 * Math.PI);
-          ctx.fillStyle = '#ffffff'; // Bianco
-          ctx.fill();
-          ctx.strokeStyle = '#2563eb';
-          ctx.lineWidth = 0.8;
-          ctx.stroke();
-          ctx.restore();
+            const rx = curX;
+            const ry = curY - rectHScaled;
 
-          // Disegna i cavi disposti per gravità al fondo del corrugato
-          if (cond.cables.length > 0) {
-            const flatCables: { color: string; diameter: number }[] = [];
-            cond.cables.forEach(c => {
-              for (let i = 0; i < c.qty; i++) {
-                flatCables.push({ color: getCableColor(c.cableId), diameter: c.diameter });
+            // Disegna Canale Rettangolare (sezione con profilo metallico/PVC distinto)
+            ctx.save();
+            ctx.fillStyle = cond.familyId === 'canala_pvc' ? '#94a3b8' : '#64748b'; // Grigio metallo / PVC
+            ctx.fillRect(rx, ry, rectWScaled, rectHScaled);
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1.2;
+            ctx.strokeRect(rx, ry, rectWScaled, rectHScaled);
+
+            // Interno vuoto canale
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(rx + 2, ry + 2, Math.max(1, rectWScaled - 4), Math.max(1, rectHScaled - 4));
+            
+            // Etichetta misura canale
+            ctx.font = 'bold 8px sans-serif';
+            ctx.fillStyle = '#334155';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${cond.width || 100}x${cond.height || 75}`, rx + rectWScaled/2, ry - 3);
+            ctx.restore();
+
+            // Layout a Griglia per i cavi interni al canale rettangolare
+            if (cond.cables.length > 0) {
+              const flatCables: { color: string; diameter: number }[] = [];
+              cond.cables.forEach(c => {
+                for (let i = 0; i < c.qty; i++) {
+                  flatCables.push({ color: getCableColor(c.cableId), diameter: c.diameter });
+                }
+              });
+
+              const maxCavoD = Math.max(...flatCables.map(c => c.diameter), 10);
+              const cRadius = Math.max(1.2, Math.min((maxCavoD / 20) * scale, (rectHScaled - 4) / 3));
+              const cols = Math.max(1, Math.floor((rectWScaled - 4) / (2.4 * cRadius)));
+              
+              flatCables.forEach((cItem, idx) => {
+                const col = idx % cols;
+                const row = Math.floor(idx / cols);
+                const ccx = rx + 3 + cRadius + col * (2.4 * cRadius);
+                const ccy = ry + rectHScaled - 3 - cRadius - row * (2.4 * cRadius);
+
+                if (ccy >= ry + 2 + cRadius && ccx <= rx + rectWScaled - 2 - cRadius) {
+                  ctx.save();
+                  ctx.beginPath();
+                  ctx.arc(ccx, ccy, cRadius, 0, 2 * Math.PI);
+                  ctx.fillStyle = cItem.color;
+                  ctx.fill();
+                  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+                  ctx.lineWidth = 0.5;
+                  ctx.stroke();
+                  ctx.restore();
+                }
+              });
+            }
+
+            curX += rectWScaled + itemGap;
+            rowHeight = Math.max(rowHeight, rectHScaled);
+          } else {
+            // Circolare (Tubo / Cavidotto)
+            const rExtScaled = ((cond.outerDiameter / 10) / 2) * scale;
+            const dExtScaled = rExtScaled * 2;
+            const rIntScaled = ((cond.innerDiameter / 10) / 2) * scale;
+
+            if (!fitsOnSingleRow && curX + dExtScaled > xStart + wScaled + 0.5) {
+              curX = xStart;
+              curY -= rowHeight + 4;
+              rowHeight = 0;
+            }
+
+            const cx = curX + rExtScaled;
+            const cy = curY - rExtScaled;
+
+            // Disegna Tubo / Corrugato Circolare
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(cx, cy, rExtScaled, 0, 2 * Math.PI);
+            ctx.fillStyle = '#3b82f6'; // Blu
+            ctx.fill();
+            ctx.strokeStyle = '#1d4ed8';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+
+            // Interno Cavidotto
+            ctx.beginPath();
+            ctx.arc(cx, cy, rIntScaled, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ffffff'; // Bianco
+            ctx.fill();
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+
+            // Etichetta misura tubo
+            ctx.font = 'bold 8px sans-serif';
+            ctx.fillStyle = '#1d4ed8';
+            ctx.textAlign = 'center';
+            ctx.fillText(`Ø${cond.outerDiameter || cond.dn}`, cx, cy - rExtScaled - 3);
+            ctx.restore();
+
+            // Concentric Ring Spiral Packing per i cavi interni al corrugato
+            if (cond.cables.length > 0) {
+              const flatCables: { color: string; diameter: number }[] = [];
+              cond.cables.forEach(c => {
+                for (let i = 0; i < c.qty; i++) {
+                  flatCables.push({ color: getCableColor(c.cableId), diameter: c.diameter });
+                }
+              });
+
+              const maxCavoD = Math.max(...flatCables.map(c => c.diameter), 10);
+              const cRadius = Math.max(1.0, Math.min((maxCavoD / 20) * scale, (rIntScaled - 2) / 3));
+
+              let currentIdx = 0;
+              let ring = 0;
+              while (currentIdx < flatCables.length) {
+                if (ring === 0) {
+                  // Cavo al centro
+                  const cItem = flatCables[currentIdx];
+                  ctx.save();
+                  ctx.beginPath();
+                  ctx.arc(cx, cy, cRadius, 0, 2 * Math.PI);
+                  ctx.fillStyle = cItem.color;
+                  ctx.fill();
+                  ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+                  ctx.lineWidth = 0.5;
+                  ctx.stroke();
+                  ctx.restore();
+                  currentIdx++;
+                  ring++;
+                } else {
+                  const ringRadius = ring * (2.2 * cRadius);
+                  if (ringRadius > rIntScaled - cRadius - 1) break;
+                  const maxInRing = Math.floor((2 * Math.PI * ringRadius) / (2.4 * cRadius));
+                  const countInRing = Math.max(1, Math.min(maxInRing, flatCables.length - currentIdx));
+                  for (let i = 0; i < countInRing; i++) {
+                    const angle = (i * 2 * Math.PI) / countInRing;
+                    const ccx = cx + Math.cos(angle) * ringRadius;
+                    const ccy = cy + Math.sin(angle) * ringRadius;
+                    const cItem = flatCables[currentIdx];
+
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(ccx, ccy, cRadius, 0, 2 * Math.PI);
+                    ctx.fillStyle = cItem.color;
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+                    ctx.lineWidth = 0.5;
+                    ctx.stroke();
+                    ctx.restore();
+
+                    currentIdx++;
+                  }
+                  ring++;
+                }
+
               }
-            });
+            }
 
-            const cablePositions = getPackedCablePositions(flatCables, cx, cy, rIntScaled, scale);
-            cablePositions.forEach(cp => {
-              ctx.save();
-              ctx.beginPath();
-              ctx.arc(cp.ccx, cp.ccy, cp.r, 0, 2 * Math.PI);
-              ctx.fillStyle = cp.color;
-              ctx.fill();
-              ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-              ctx.lineWidth = 0.6;
-              ctx.stroke();
-              ctx.restore();
-            });
+            curX += dExtScaled + itemGap;
+            rowHeight = Math.max(rowHeight, dExtScaled);
+
           }
-
-          curX += dExtScaled + 4;
-          rowHeight = Math.max(rowHeight, dExtScaled);
         }
       });
     }
@@ -979,8 +1228,8 @@ const PozzettoGraficaDettaglio: React.FC<{
   return (
     <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col gap-6 relative w-full">
       {/* Selector della Parete da Ispezionare */}
-      <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap md:flex-nowrap justify-between items-center gap-4 border-b border-slate-100 pb-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <span className="text-sm font-bold text-slate-800">Ispezione Parete Pozzetto:</span>
           <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
             {(['sx', 'dx', 'alto', 'basso'] as const).map(side => (
@@ -998,12 +1247,24 @@ const PozzettoGraficaDettaglio: React.FC<{
             ))}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2.5 ml-auto pl-4">
           <span className="bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-black px-2.5 py-1 rounded-lg">
-            Riempimento Globale: {formatNumber(compliance?.fillRate || 0, 1)}%
+            Riempimento Volumetrico Cavi: {formatNumber(compliance?.fillRateCavi || compliance?.fillRate || 0, 1)}%
           </span>
-          <span className="bg-blue-50 border border-blue-100 text-blue-700 text-[10px] font-black px-2.5 py-1 rounded-lg">
-            Riempimento Parete {activeWallSide.toUpperCase()}: {formatNumber(activeWallComp?.fillRate || 0, 1)}%
+          <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg border transition-all ${
+            activeWallComp?.isLinearOverflow
+              ? 'bg-rose-50 border-rose-200 text-rose-700 font-extrabold animate-pulse'
+              : activeWallComp?.isCornerOverflow
+              ? 'bg-amber-50 border-amber-200 text-amber-700 font-bold'
+              : (activeWallComp?.linearFillRate || 0) > 85
+              ? 'bg-amber-50 border-amber-200 text-amber-700'
+              : 'bg-blue-50 border-blue-100 text-blue-700'
+          }`}>
+            {activeWallComp?.isLinearOverflow 
+              ? '⚠️ SOVRACCARICO LINEARE' 
+              : activeWallComp?.isCornerOverflow 
+              ? '⚠️ INVASIONE RISPETTO ANGOLO (5cm)' 
+              : 'Ingombro Parete'} {activeWallSide.toUpperCase()}: {formatNumber(activeWallComp?.linearFillRate || 0, 1)}% Larghezza
           </span>
         </div>
       </div>
@@ -1013,8 +1274,10 @@ const PozzettoGraficaDettaglio: React.FC<{
         
         {/* Vista Pianta */}
         <div className="flex flex-col justify-between items-center bg-slate-50/50 border border-slate-100 rounded-2xl p-4 w-full">
-          <div className="w-full flex justify-between items-center mb-3">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+          <div className="w-full flex items-center justify-between pb-2 border-b border-slate-200/60 mb-3">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block"></span>
+
               VISTA IN PIANTA (Dall'alto)
             </span>
           </div>
@@ -1040,8 +1303,10 @@ const PozzettoGraficaDettaglio: React.FC<{
 
         {/* Vista Sezione Parete */}
         <div className="flex flex-col justify-between items-center bg-slate-50/50 border border-slate-100 rounded-2xl p-4 w-full">
-          <div className="w-full flex justify-between items-center mb-3">
-            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">
+          <div className="w-full flex items-center justify-between pb-2 border-b border-slate-200/60 mb-3">
+            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-500 inline-block"></span>
+
               SEZIONE PARETE {activeWallSide.toUpperCase()}
             </span>
           </div>
@@ -1108,6 +1373,7 @@ export function ToolDimensionamentoPozzettiElettrici({
   setProjectData, 
   setAppMode, 
   cablesCatalog: propCablesCatalog,
+  containersCatalog: propContainersCatalog,
   importedCables,
   clearImportedCables
 }: ToolDimensionamentoPozzettiElettriciProps) {
@@ -1116,6 +1382,73 @@ export function ToolDimensionamentoPozzettiElettrici({
   const [cablesCatalog, setCablesCatalog] = useState<CableProduct[]>(propCablesCatalog || []);
   const [loadingDb, setLoadingDb] = useState<boolean>(false);
   const [configWallSide, setConfigWallSide] = useState<'sx' | 'dx' | 'alto' | 'basso'>('sx');
+
+  // Stato per instradamento cumulativo / selezione multipla cavi
+  const [selectedCableIndicesMap, setSelectedCableIndicesMap] = useState<Record<string, number[]>>({});
+  const [batchExitSide, setBatchExitSide] = useState<'sx' | 'dx' | 'alto' | 'basso' | 'none' | ''>('');
+  const [batchExitFamily, setBatchExitFamily] = useState<string>('cavidotto');
+
+  const availableContainers = useMemo(() => {
+    if (propContainersCatalog && propContainersCatalog.length > 0) return propContainersCatalog;
+    return INITIAL_CONTAINERS;
+  }, [propContainersCatalog]);
+
+  const toggleSelectCable = (condId: string, idx: number) => {
+    setSelectedCableIndicesMap(prev => {
+      const current = prev[condId] || [];
+      const updated = current.includes(idx) ? current.filter(i => i !== idx) : [...current, idx];
+      return { ...prev, [condId]: updated };
+    });
+  };
+
+  const toggleSelectAllCables = (condId: string, totalCount: number, forceSelect?: boolean) => {
+    setSelectedCableIndicesMap(prev => {
+      const current = prev[condId] || [];
+      if (forceSelect !== undefined) {
+        return { ...prev, [condId]: forceSelect ? Array.from({ length: totalCount }, (_, i) => i) : [] };
+      }
+      const allSelected = current.length === totalCount;
+      return { ...prev, [condId]: allSelected ? [] : Array.from({ length: totalCount }, (_, i) => i) };
+    });
+  };
+
+  const handleApplyBatchRouting = (side: 'sx' | 'dx' | 'alto' | 'basso', condId: string) => {
+    const selectedIndices = selectedCableIndicesMap[condId] || [];
+    if (selectedIndices.length === 0 || !batchExitSide) return;
+
+    const destSide = batchExitSide === 'none' ? undefined : (batchExitSide as 'sx' | 'dx' | 'alto' | 'basso');
+    const destFamily = destSide ? batchExitFamily : undefined;
+
+    const updatedPareti = activePozzetto.pareti.map(w => {
+      if (w.side === side) {
+        return {
+          ...w,
+          cavidotti: w.cavidotti.map(cond => {
+            if (cond.id === condId) {
+              const updatedCables = cond.cables.map((c, idx) => {
+                if (selectedIndices.includes(idx)) {
+                  return {
+                    ...c,
+                    destinationSide: destSide,
+                    destinationFamilyId: destFamily
+                  };
+                }
+                return c;
+              });
+              return { ...cond, cables: updatedCables };
+            }
+            return cond;
+          })
+        };
+      }
+      return w;
+    });
+
+    updatePozzettoField(activePozzetto.tag, 'pareti', updatedPareti);
+    if ((window as any).suiteUI) {
+      (window as any).suiteUI.toast(`Instradamento applicato a ${selectedIndices.length} cavi!`, "success");
+    }
+  };
 
   // Inizializza DB
   useEffect(() => {
@@ -1147,21 +1480,30 @@ export function ToolDimensionamentoPozzettiElettrici({
       if (payloadCables.length > 0) {
         const timer = setTimeout(() => {
           const newTag = `TEMP_${Date.now()}`;
-          const name = `Pozzetto da Canala`;
+          const name = payloadConduit?.familyName ? `Pozzetto da ${payloadConduit.familyName}` : `Pozzetto da Canalizzazione`;
           
           let importedConduits: GruppoCavidotto[] = [];
           if (payloadConduit) {
-            const od = payloadConduit.outerDiameter || 40;
-            const id = payloadConduit.innerDiameter || 31.5;
-            const dnVal = payloadConduit.dn || Math.round(od);
+            const isRect = payloadConduit.sectionType === 'rettangolare' || Boolean(payloadConduit.width && payloadConduit.height);
+            const w = payloadConduit.width || (isRect ? payloadConduit.outerDiameter || 100 : undefined);
+            const h = payloadConduit.height || (isRect ? payloadConduit.innerDiameter || 75 : undefined);
+            const od = payloadConduit.outerDiameter || (isRect ? (w || 100) : 110);
+            const id = payloadConduit.innerDiameter || (isRect ? (h || 75) : 92);
+
             importedConduits = [{
               id: `cond_${Date.now()}`,
-              dn: dnVal,
+              familyId: payloadConduit.familyId,
+              familyName: payloadConduit.familyName || 'Canalizzazione',
+              sectionType: isRect ? 'rettangolare' : 'circolare',
+              width: w,
+              height: h,
+              dn: isRect ? Math.max(w || 100, h || 75) : od,
               outerDiameter: od,
               innerDiameter: id,
-              bendingFactor: 8,
+              bendingFactor: isRect ? 6 : 8,
+
               qty: 1,
-              destinationSide: 'dx',
+              destinationSide: undefined,
               cables: payloadCables.map((c: any, idx: number) => ({
                 cableId: c.cableId,
                 sigla: c.sigla || String(idx + 1).padStart(2, '0'),
@@ -1173,15 +1515,18 @@ export function ToolDimensionamentoPozzettiElettrici({
               }))
             }];
           } else {
-            // Default DN90
+            // Default Cavidotto DN90
             importedConduits = [{
               id: `cond_default_${Date.now()}`,
+              familyId: 'cavidotto',
+              familyName: 'Cavidotto doppia parete',
+              sectionType: 'circolare',
               dn: 90,
               outerDiameter: 110,
               innerDiameter: 92,
               bendingFactor: 8,
               qty: 1,
-              destinationSide: 'dx',
+              destinationSide: undefined,
               cables: payloadCables.map((c: any, idx: number) => ({
                 cableId: c.cableId,
                 sigla: c.sigla || String(idx + 1).padStart(2, '0'),
@@ -1410,17 +1755,22 @@ export function ToolDimensionamentoPozzettiElettrici({
     });
   };
 
-  // Gestione pareti/cavidotti/cavi
   const handleAddCavidotto = (side: 'sx' | 'dx' | 'alto' | 'basso') => {
+    const defaultFam = availableContainers.find(f => f.id === 'cavidotto') || availableContainers[0];
+    const defaultSize = defaultFam?.sizes.find(s => s.outerDiameter === 90 || s.code === 'CEFD90') || defaultFam?.sizes[0];
+
     const newCond: GruppoCavidotto = {
       id: `cond_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-      dn: 90,
-      outerDiameter: 110,
-      innerDiameter: 92,
+      familyId: defaultFam?.id || 'cavidotto',
+      familyName: defaultFam?.name || 'Cavidotto doppia parete',
+      sectionType: defaultFam?.sectionType || 'circolare',
+      sizeCode: defaultSize?.code || 'CEFD90',
+      dn: defaultSize?.outerDiameter || 90,
+      outerDiameter: defaultSize?.outerDiameter || 90,
+      innerDiameter: defaultSize?.innerDiameter || 77,
       bendingFactor: 8,
       qty: 1,
-      cables: [],
-      destinationSide: side === 'sx' ? 'dx' : side === 'dx' ? 'sx' : side === 'alto' ? 'basso' : 'alto'
+      cables: []
     };
     
     const updatedPareti = activePozzetto.pareti.map(w => {
@@ -1444,7 +1794,7 @@ export function ToolDimensionamentoPozzettiElettrici({
     if ((window as any).suiteUI) (window as any).suiteUI.toast("Cavidotto rimosso dalla parete!", "info");
   };
 
-  const handleUpdateCavidotto = (side: 'sx' | 'dx' | 'alto' | 'basso', condId: string, field: keyof GruppoCavidotto, value: any) => {
+  const handleUpdateCavidotto = (side: 'sx' | 'dx' | 'alto' | 'basso', condId: string, field: string, value: any) => {
     const updatedPareti = activePozzetto.pareti.map(w => {
       if (w.side === side) {
         return {
@@ -1453,7 +1803,64 @@ export function ToolDimensionamentoPozzettiElettrici({
             if (c.id === condId) {
               const updatedCond = { ...c, [field]: value } as GruppoCavidotto;
               
-              if (field === 'dn') {
+              if (field === 'familyId') {
+                const fam = availableContainers.find(f => f.id === value);
+                if (fam) {
+                  updatedCond.familyId = fam.id;
+                  updatedCond.familyName = fam.name;
+                  updatedCond.sectionType = fam.sectionType;
+                  const firstSize = fam.sizes[0];
+                  if (firstSize) {
+                    updatedCond.sizeCode = firstSize.code;
+                    if (fam.sectionType === 'rettangolare') {
+                      updatedCond.width = firstSize.width || 100;
+                      updatedCond.height = firstSize.height || 75;
+                      updatedCond.outerDiameter = firstSize.width || 100;
+                      updatedCond.innerDiameter = firstSize.height || 75;
+                      updatedCond.dn = Math.max(firstSize.width || 100, firstSize.height || 75);
+                      updatedCond.bendingFactor = 6;
+                    } else {
+                      delete updatedCond.width;
+                      delete updatedCond.height;
+                      updatedCond.outerDiameter = firstSize.outerDiameter || 90;
+                      updatedCond.innerDiameter = firstSize.innerDiameter || 77;
+                      updatedCond.dn = firstSize.outerDiameter || 90;
+                      updatedCond.bendingFactor = 8;
+                    }
+                  }
+                } else if (value === 'personalizzato') {
+                  updatedCond.familyId = 'personalizzato';
+                  updatedCond.familyName = 'Personalizzato';
+                  updatedCond.sectionType = 'rettangolare';
+                  updatedCond.sizeCode = 'custom';
+                  updatedCond.width = 100;
+                  updatedCond.height = 75;
+                  updatedCond.outerDiameter = 100;
+                  updatedCond.innerDiameter = 75;
+                  updatedCond.dn = 100;
+                  updatedCond.bendingFactor = 6;
+                }
+              } else if (field === 'sizeCode') {
+                const fam = availableContainers.find(f => f.id === updatedCond.familyId) || availableContainers.find(f => f.sizes.some(s => s.code === value)) || availableContainers[0];
+                const sz = fam?.sizes.find(s => s.code === value);
+                if (sz) {
+                  updatedCond.sizeCode = sz.code;
+                  updatedCond.sectionType = fam.sectionType;
+                  if (fam.sectionType === 'rettangolare' || sz.width) {
+                    updatedCond.width = sz.width || 100;
+                    updatedCond.height = sz.height || 75;
+                    updatedCond.outerDiameter = sz.width || 100;
+                    updatedCond.innerDiameter = sz.height || 75;
+                    updatedCond.dn = Math.max(sz.width || 100, sz.height || 75);
+                  } else {
+                    delete updatedCond.width;
+                    delete updatedCond.height;
+                    updatedCond.outerDiameter = sz.outerDiameter || 90;
+                    updatedCond.innerDiameter = sz.innerDiameter || 77;
+                    updatedCond.dn = sz.outerDiameter || 90;
+                  }
+                }
+              } else if (field === 'dn') {
                 const cat = CAVIDOTTI_DOPPIA_PARETE.find(item => item.dn === Number(value));
                 if (cat) {
                   updatedCond.outerDiameter = cat.outerDiameter;
@@ -1836,8 +2243,8 @@ export function ToolDimensionamentoPozzettiElettrici({
                         type="number"
                         min="1"
                         disabled={activePozzetto.presetSize !== 'custom'}
-                        value={activePozzetto.baseB}
-                        onChange={e => updatePozzettoField(activePozzetto.tag, 'baseB', parseFloat(e.target.value) || 0)}
+                        value={activePozzetto.baseB ?? ''}
+                        onChange={e => updatePozzettoField(activePozzetto.tag, 'baseB', e.target.value === '' ? '' : parseFloat(e.target.value))}
                         className="w-full bg-slate-50 disabled:opacity-60 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 font-semibold"
                       />
                     </div>
@@ -1847,8 +2254,8 @@ export function ToolDimensionamentoPozzettiElettrici({
                         type="number"
                         min="1"
                         disabled={activePozzetto.presetSize !== 'custom'}
-                        value={activePozzetto.lengthL}
-                        onChange={e => updatePozzettoField(activePozzetto.tag, 'lengthL', parseFloat(e.target.value) || 0)}
+                        value={activePozzetto.lengthL ?? ''}
+                        onChange={e => updatePozzettoField(activePozzetto.tag, 'lengthL', e.target.value === '' ? '' : parseFloat(e.target.value))}
                         className="w-full bg-slate-50 disabled:opacity-60 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 font-semibold"
                       />
                     </div>
@@ -1860,8 +2267,8 @@ export function ToolDimensionamentoPozzettiElettrici({
                       type="number"
                       min="1"
                       disabled={activePozzetto.presetSize !== 'custom'}
-                      value={activePozzetto.diameterD}
-                      onChange={e => updatePozzettoField(activePozzetto.tag, 'diameterD', parseFloat(e.target.value) || 0)}
+                      value={activePozzetto.diameterD ?? ''}
+                      onChange={e => updatePozzettoField(activePozzetto.tag, 'diameterD', e.target.value === '' ? '' : parseFloat(e.target.value))}
                       className="w-full bg-slate-50 disabled:opacity-60 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 font-semibold"
                     />
                   </div>
@@ -1872,8 +2279,8 @@ export function ToolDimensionamentoPozzettiElettrici({
                     type="number"
                     min="1"
                     disabled={activePozzetto.presetSize !== 'custom'}
-                    value={activePozzetto.depthH}
-                    onChange={e => updatePozzettoField(activePozzetto.tag, 'depthH', parseFloat(e.target.value) || 0)}
+                    value={activePozzetto.depthH ?? ''}
+                    onChange={e => updatePozzettoField(activePozzetto.tag, 'depthH', e.target.value === '' ? '' : parseFloat(e.target.value))}
                     className="w-full bg-slate-50 disabled:opacity-60 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 font-semibold"
                   />
                 </div>
@@ -1917,92 +2324,90 @@ export function ToolDimensionamentoPozzettiElettrici({
 
                 return (
                   <div className="space-y-6">
-                    {/* Elenco Cavidotti */}
+                    {/* Elenco Condotti / Canalizzazioni */}
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-black text-slate-700 uppercase tracking-wide">Cavidotti / Corrugati ({w.cavidotti.length})</span>
+                        <span className="text-xs font-black text-slate-700 uppercase tracking-wide">Innestati / Canalizzazioni ({w.cavidotti.length})</span>
                         <button
                           type="button"
                           onClick={() => handleAddCavidotto(configWallSide)}
                           className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[10px] rounded-lg flex items-center gap-1 transition-colors cursor-pointer"
                         >
-                          <Plus className="w-3.5 h-3.5" /> Cavidotto
+                          <Plus className="w-3.5 h-3.5" /> Condotto/Canala
                         </button>
                       </div>
 
                       {w.cavidotti.length === 0 ? (
                         <div className="p-8 text-center text-xs text-slate-400 font-semibold border-2 border-dashed border-slate-200 rounded-2xl">
-                          Nessun cavidotto installato su questa parete. Clicca su "+ Cavidotto".
+                          Nessuna canalizzazione o cavidotto installato su questa parete. Clicca su "+ Condotto/Canala".
                         </div>
                       ) : (
-                        w.cavidotti.map((cond, condIdx) => (
-                          <div key={cond.id} className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 space-y-4">
-                            {/* Dati Cavidotto */}
-                            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-3">
-                              <div className="flex flex-wrap items-center gap-3">
-                                <span className="text-xs font-black text-slate-700">Cavidotto #{condIdx + 1}</span>
-                                
-                                {/* Diametro DN */}
-                                <div>
-                                  <select
-                                    value={cond.dn}
-                                    onChange={e => handleUpdateCavidotto(configWallSide, cond.id, 'dn', parseInt(e.target.value))}
-                                    className="bg-white border border-slate-200 rounded-lg p-1 text-[11px] font-bold text-slate-700"
-                                  >
-                                    {CAVIDOTTI_DOPPIA_PARETE.map(c => (
-                                      <option key={c.dn} value={c.dn}>
-                                        DN {c.dn} (Ø Est. {c.outerDiameter} / Ø Int. {c.innerDiameter} mm)
-                                      </option>
-                                    ))}
-                                    {!CAVIDOTTI_DOPPIA_PARETE.some(c => c.dn === cond.dn) && (
-                                      <option value={cond.dn}>
-                                        DN {cond.dn} (Ø Est. {cond.outerDiameter} / Ø Int. {cond.innerDiameter} mm)
-                                      </option>
-                                    )}
-                                  </select>
-                                </div>
+                        w.cavidotti.map((cond, condIdx) => {
+                          const isRect = cond.sectionType === 'rettangolare' || Boolean(cond.width && cond.height);
+                          const curFam = availableContainers.find(f => f.id === (cond.familyId || 'cavidotto'));
 
-                                {/* Qty */}
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase">Tubi:</span>
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={cond.qty}
-                                    onChange={e => handleUpdateCavidotto(configWallSide, cond.id, 'qty', Math.max(1, parseInt(e.target.value) || 1))}
-                                    className="bg-white border border-slate-200 rounded-lg p-1 text-[11px] w-12 text-center"
-                                  />
-                                </div>
 
-                                {/* Bending Factor */}
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase">k Raggio:</span>
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={cond.bendingFactor}
-                                    onChange={e => handleUpdateCavidotto(configWallSide, cond.id, 'bendingFactor', Math.max(1, parseInt(e.target.value) || 8))}
-                                    className="bg-white border border-slate-200 rounded-lg p-1 text-[11px] w-12 text-center"
-                                  />
-                                  <span className="text-[10px] text-slate-400 font-bold">xDN ({cond.bendingFactor * cond.dn} mm)</span>
-                                </div>
+                          return (
+                            <div key={cond.id} className="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 space-y-4">
+                              {/* Header Dati Condotto */}
+                              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-3">
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <span className="text-xs font-black text-slate-800 bg-white border border-slate-200 px-2 py-1 rounded-lg">
+                                    #{condIdx + 1} {getConduitLabel(cond)}
+                                  </span>
 
-                                {/* Tratta di Uscita */}
-                                <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase">Uscita:</span>
-                                  <select
-                                    value={cond.destinationSide || ''}
-                                    onChange={e => handleUpdateCavidotto(configWallSide, cond.id, 'destinationSide', e.target.value ? e.target.value as any : undefined)}
-                                    className="bg-white border border-slate-200 rounded-lg p-1 text-[11px] font-bold text-slate-700"
-                                  >
-                                    <option value="">Termina</option>
-                                    <option value="sx" disabled={configWallSide === 'sx'}>SX</option>
-                                    <option value="dx" disabled={configWallSide === 'dx'}>DX</option>
-                                    <option value="alto" disabled={configWallSide === 'alto'}>ALTO</option>
-                                    <option value="basso" disabled={configWallSide === 'basso'}>BASSO</option>
-                                  </select>
+                                  {/* Famiglia Condotto */}
+                                  <div>
+                                    <select
+                                      value={cond.familyId || (isRect ? 'canala_pvc' : 'cavidotto')}
+                                      onChange={e => handleUpdateCavidotto(configWallSide, cond.id, 'familyId', e.target.value)}
+                                      className="bg-white border border-slate-200 rounded-lg p-1 text-[11px] font-bold text-slate-700 max-w-[170px] truncate"
+                                    >
+                                      {availableContainers.map(f => (
+                                        <option key={f.id} value={f.id}>{f.name}</option>
+                                      ))}
+                                      <option value="personalizzato">Personalizzato</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Misura / Taglia */}
+                                  {curFam && curFam.sizes && (
+                                    <div>
+                                      <select
+                                        value={cond.sizeCode || curFam.sizes.find(s => (isRect ? (s.width === cond.width && s.height === cond.height) : (s.outerDiameter === cond.outerDiameter)))?.code || curFam.sizes[0]?.code || ''}
+                                        onChange={e => handleUpdateCavidotto(configWallSide, cond.id, 'sizeCode', e.target.value)}
+                                        className="bg-white border border-slate-200 rounded-lg p-1 text-[11px] font-bold text-slate-700"
+                                      >
+                                        {curFam.sizes.map(sz => (
+                                          <option key={sz.code} value={sz.code}>{sz.label}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  )}
+
+                                  {/* Quantità condotti paralleli */}
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] text-slate-400 font-bold uppercase">Q.tà:</span>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      value={cond.qty}
+                                      onChange={e => handleUpdateCavidotto(configWallSide, cond.id, 'qty', Math.max(1, parseInt(e.target.value) || 1))}
+                                      className="bg-white border border-slate-200 rounded-lg p-1 text-[11px] w-12 text-center font-bold text-slate-700"
+                                    />
+                                  </div>
+
+                                  {/* Info Raggio Curvatura Tubo nel Terreno (solo per tubi/sezione circolare) */}
+                                  {!isRect && (
+                                    <div className="flex items-center gap-1 bg-blue-50 border border-blue-100 px-2 py-1 rounded-lg">
+                                      <span className="text-[10px] text-blue-600 font-bold uppercase">R_min Tubo:</span>
+                                      <span className="text-[11px] font-extrabold text-blue-700 font-mono">
+                                        {formatNumber(((cond.bendingFactor || 8) * (cond.outerDiameter || cond.dn || 90)) / 10, 0)} cm
+                                      </span>
+                                      <span className="text-[9px] text-blue-500 font-bold">({cond.bendingFactor || 8}xDN)</span>
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
 
                               <button
                                 type="button"
@@ -2032,31 +2437,120 @@ export function ToolDimensionamentoPozzettiElettrici({
                                   Nessun cavo in questo condotto. Clicca su "+ Cavo" per aggiungerne uno.
                                 </div>
                               ) : (
-                                <div className="overflow-x-auto bg-white rounded-xl border border-slate-200 p-2 shadow-2xs">
-                                  <table className="w-full text-left text-[11px] divide-y divide-slate-100">
-                                    <thead>
-                                      <tr className="text-slate-400 uppercase font-black tracking-wide text-[9px]">
-                                        <th className="py-2 px-1">Sigla</th>
-                                        <th className="py-2 px-1">Cavo</th>
-                                        <th className="py-2 px-1">Formazione</th>
-                                        <th className="py-2 px-1 text-center">Q.tà</th>
-                                        <th className="py-2 px-1 text-center">Ø [mm]</th>
-                                        <th className="py-2 px-1 text-center">R_min</th>
-                                        <th className="py-2 px-1 text-right">Azioni</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 text-slate-700 font-bold">
-                                      {cond.cables.map((cavo, cIdx) => {
-                                        const prod = cablesCatalog.find(c => c.id === cavo.cableId);
-                                        let bFact = 12;
-                                        if (cavo.cableId === 'personalizzato') {
-                                          bFact = cavo.customBendingFactor || 12;
-                                        } else {
-                                          bFact = prod?.raggioCurvaturaMinFattore || 12;
-                                        }
+                                <div className="space-y-3">
+                                  {/* Pannello Assegnazione Massiva Uscite (Batch Routing) */}
+                                  {(selectedCableIndicesMap[cond.id] || []).length > 0 && (
+                                    <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 animate-fadeIn">
+                                      <div className="flex items-center gap-2">
+                                        <CheckCircle className="w-4 h-4 text-indigo-600" />
+                                        <span className="text-xs font-black text-indigo-900">
+                                          {(selectedCableIndicesMap[cond.id] || []).length} { (selectedCableIndicesMap[cond.id] || []).length === 1 ? 'cavo selezionato' : 'cavi selezionati' }
+                                        </span>
+                                      </div>
 
-                                        return (
-                                          <tr key={cIdx} className="hover:bg-slate-50/50">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        {/* Lato Uscita */}
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-[10px] font-bold text-slate-500 uppercase">Uscita:</span>
+                                          <select
+                                            value={batchExitSide}
+                                            onChange={e => setBatchExitSide(e.target.value as any)}
+                                            className="bg-white border border-indigo-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 shadow-2xs"
+                                          >
+                                            <option value="">(Scegli Uscita...)</option>
+                                            <option value="sx" disabled={configWallSide === 'sx'}>Lato SX</option>
+                                            <option value="dx" disabled={configWallSide === 'dx'}>Lato DX</option>
+                                            <option value="alto" disabled={configWallSide === 'alto'}>Lato ALTO</option>
+                                            <option value="basso" disabled={configWallSide === 'basso'}>Lato BASSO</option>
+                                            <option value="none">Termina nel Pozzetto</option>
+                                          </select>
+                                        </div>
+
+                                        {/* Tipo Condotto Uscita */}
+                                        {batchExitSide && batchExitSide !== 'none' && (
+                                          <div className="flex items-center gap-1">
+                                            <span className="text-[10px] font-bold text-slate-500 uppercase">Condotto:</span>
+                                            <select
+                                              value={batchExitFamily}
+                                              onChange={e => setBatchExitFamily(e.target.value)}
+                                              className="bg-white border border-indigo-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 shadow-2xs"
+                                            >
+                                              {availableContainers.map(f => (
+                                                <option key={f.id} value={f.id}>{f.name}</option>
+                                              ))}
+                                              <option value="personalizzato">Personalizzato</option>
+                                            </select>
+                                          </div>
+                                        )}
+
+                                        {/* Button Applica */}
+                                        <button
+                                          type="button"
+                                          onClick={() => handleApplyBatchRouting(configWallSide, cond.id)}
+                                          disabled={!batchExitSide}
+                                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
+                                        >
+                                          <Save className="w-3.5 h-3.5" /> Applica Uscita ai Cavi Selezionati
+                                        </button>
+
+                                        {/* Button Annulla Selezione */}
+                                        <button
+                                          type="button"
+                                          onClick={() => setSelectedCableIndicesMap(prev => ({ ...prev, [cond.id]: [] }))}
+                                          className="px-2 py-1.5 text-slate-500 hover:text-slate-700 text-xs font-bold"
+                                        >
+                                          Deseleziona
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  <div className="overflow-x-auto bg-white rounded-xl border border-slate-200 p-2 shadow-2xs">
+                                    <table className="w-full text-left text-[11px] divide-y divide-slate-100">
+                                      <thead>
+                                        <tr className="text-slate-400 uppercase font-black tracking-wide text-[9px]">
+                                          <th className="py-2 px-1 text-center w-6">
+                                            <input
+                                              type="checkbox"
+                                              checked={(selectedCableIndicesMap[cond.id] || []).length === cond.cables.length && cond.cables.length > 0}
+                                              onChange={e => toggleSelectAllCables(cond.id, cond.cables.length, e.target.checked)}
+                                              className="rounded text-indigo-600 cursor-pointer"
+                                            />
+                                          </th>
+                                          <th className="py-2 px-1">Sigla</th>
+                                          <th className="py-2 px-1">Cavo</th>
+                                          <th className="py-2 px-1">Formazione</th>
+                                          <th className="py-2 px-1 text-center">Q.tà</th>
+                                          <th className="py-2 px-1 text-center">Ø [mm]</th>
+                                          <th className="py-2 px-1 text-center">R_min</th>
+                                          <th className="py-2 px-1">Uscita Cavo</th>
+                                          <th className="py-2 px-1">Condotto Uscita</th>
+                                          <th className="py-2 px-1 text-right">Azioni</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-slate-100 text-slate-700 font-bold">
+                                        {cond.cables.map((cavo, cIdx) => {
+                                          const prod = cablesCatalog.find(c => c.id === cavo.cableId);
+                                          let bFact = 12;
+                                          if (cavo.cableId === 'personalizzato') {
+                                            bFact = cavo.customBendingFactor || 12;
+                                          } else {
+                                            bFact = prod?.raggioCurvaturaMinFattore || 12;
+                                          }
+
+                                          const effDestSide = cavo.destinationSide || cond.destinationSide;
+                                          const isSelected = (selectedCableIndicesMap[cond.id] || []).includes(cIdx);
+
+                                          return (
+                                            <tr key={cIdx} className={`hover:bg-slate-50/50 ${isSelected ? 'bg-indigo-50/60' : ''}`}>
+                                              <td className="py-1.5 px-1 text-center">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={isSelected}
+                                                  onChange={() => toggleSelectCable(cond.id, cIdx)}
+                                                  className="rounded text-indigo-600 cursor-pointer"
+                                                />
+                                              </td>
                                             <td className="py-1.5 px-1">
                                               <input
                                                 type="text"
@@ -2122,6 +2616,32 @@ export function ToolDimensionamentoPozzettiElettrici({
                                             <td className="py-1.5 px-1 text-center font-mono text-[10px] text-slate-500">
                                               {formatNumber(bFact * cavo.diameter, 0)} mm
                                             </td>
+                                            <td className="py-1.5 px-1">
+                                              <select
+                                                value={cavo.destinationSide || ''}
+                                                onChange={e => handleUpdateCableInConduit(configWallSide, cond.id, cIdx, 'destinationSide', e.target.value ? e.target.value as any : undefined)}
+                                                className="bg-white border border-slate-200 rounded-md p-0.5 text-[10px] font-bold text-indigo-700 max-w-[95px]"
+                                              >
+                                                <option value="">Termina nel Pozzetto</option>
+                                                <option value="sx" disabled={configWallSide === 'sx'}>Lato SX</option>
+                                                <option value="dx" disabled={configWallSide === 'dx'}>Lato DX</option>
+                                                <option value="alto" disabled={configWallSide === 'alto'}>Lato ALTO</option>
+                                                <option value="basso" disabled={configWallSide === 'basso'}>Lato BASSO</option>
+                                              </select>
+                                            </td>
+                                            <td className="py-1.5 px-1">
+                                              <select
+                                                value={cavo.destinationFamilyId || cond.familyId || 'cavidotto'}
+                                                disabled={!cavo.destinationSide}
+                                                onChange={e => handleUpdateCableInConduit(configWallSide, cond.id, cIdx, 'destinationFamilyId', e.target.value)}
+                                                className="bg-white border border-slate-200 rounded-md p-0.5 text-[10px] max-w-[110px] truncate font-bold text-slate-700 disabled:opacity-40"
+                                              >
+                                                {availableContainers.map(f => (
+                                                  <option key={f.id} value={f.id}>{f.name}</option>
+                                                ))}
+                                                <option value="personalizzato">Personalizzato</option>
+                                              </select>
+                                            </td>
                                             <td className="py-1.5 px-1 text-right">
                                               <button
                                                 type="button"
@@ -2137,10 +2657,12 @@ export function ToolDimensionamentoPozzettiElettrici({
                                     </tbody>
                                   </table>
                                 </div>
+                              </div>
                               )}
                             </div>
                           </div>
-                        ))
+                        );
+                      })
                       )}
                     </div>
                   </div>
@@ -2154,6 +2676,7 @@ export function ToolDimensionamentoPozzettiElettrici({
                 pozzetto={activePozzetto} 
                 compliance={calcoliActive} 
                 cablesCatalog={cablesCatalog} 
+                selectedWallSide={configWallSide}
               />
             )}
 
@@ -2286,65 +2809,43 @@ export function ToolDimensionamentoPozzettiElettrici({
                 if (!calc) return null;
 
                 const activePareti = ensurePozzettoPareti(pozz);
+                let conduitsCount = 0;
                 let totalCablesQty = 0;
+                const activeSidesList: string[] = [];
+
                 activePareti.forEach(w => {
-                  w.cavidotti.forEach(cond => {
-                    totalCablesQty += cond.cables.length;
-                  });
+                  if (w.cavidotti.length > 0) {
+                    activeSidesList.push(`${w.side.toUpperCase()}: ${w.cavidotti.length}`);
+                    w.cavidotti.forEach(cond => {
+                      conduitsCount += cond.qty;
+                      totalCablesQty += cond.cables.reduce((a, b) => a + b.qty, 0);
+                    });
+                  }
                 });
 
                 return (
                   <tr key={pozz.tag} className="border-b border-slate-200">
                     <td className="py-3 px-3 font-bold text-slate-800">{pozz.name}</td>
                     <td className="py-3 px-2">
-                      <div className="font-semibold">
+                      <div className="font-semibold text-slate-700">
                         {pozz.shape === 'rettangolare' ? 'Rettangolare' : 'Cilindrico'}
                       </div>
-                      <div className="text-[10px] text-slate-500">
+                      <div className="text-[10px] text-slate-500 font-mono">
                         {pozz.shape === 'rettangolare' 
-                          ? `${pozz.baseB}x${pozz.lengthL}x${pozz.depthH}` 
-                          : `Ø ${pozz.diameterD}x${pozz.depthH}`}
+                          ? `${pozz.baseB}x${pozz.lengthL}x${pozz.depthH} cm` 
+                          : `Ø ${pozz.diameterD}x${pozz.depthH} cm`}
                       </div>
                     </td>
                     <td className="py-3 px-2 text-right font-mono font-semibold">
                       {formatNumber(calc.volumePozzetto / 1000, 1)} L
                     </td>
                     <td className="py-3 px-2">
-                      {totalCablesQty === 0 ? (
-                        <span className="text-slate-400 italic text-[10px]">Vuoto</span>
+                      {conduitsCount === 0 ? (
+                        <span className="text-slate-400 italic text-[10px]">Nessun condotto</span>
                       ) : (
-                        <div className="space-y-2">
-                          {activePareti.map(w => {
-                            if (w.cavidotti.length === 0) return null;
-                            return (
-                              <div key={w.side} className="border-b border-slate-100 last:border-0 pb-1 last:pb-0">
-                                <span className="text-[9px] font-black text-indigo-700 uppercase block">{w.label}</span>
-                                {w.cavidotti.map((cond, condIdx) => (
-                                  <div key={cond.id} className="pl-1 mt-0.5">
-                                    <span className="text-[9px] font-bold text-slate-500">Cavidotto #{condIdx + 1} (DN {cond.dn} x {cond.qty} tubi - R_min cavidotto: {(cond.bendingFactor || 8) * cond.dn} mm) {cond.destinationSide && `→ Uscita: ${cond.destinationSide.toUpperCase()}`}:</span>
-                                    <div className="pl-2 space-y-0.5">
-                                      {cond.cables.map((c, cIdx) => {
-                                        const prod = cablesCatalog.find(p => p.id === c.cableId);
-                                        const name = c.cableId === 'personalizzato' ? 'Cavo Personalizzato' : (prod?.name || c.cableId);
-                                        let bendingFactor = 12;
-                                        if (c.cableId === 'personalizzato') bendingFactor = c.customBendingFactor || 12;
-                                        else bendingFactor = prod?.raggioCurvaturaMinFattore || 12;
-
-                                        return (
-                                          <div key={cIdx} className="text-[10px] leading-tight text-slate-650 flex flex-wrap gap-x-2">
-                                            <span>[{c.sigla}] <strong>{name}</strong> ({c.formation})</span>
-                                            <span>Q.tà: <strong>{c.qty}</strong></span>
-                                            <span>Ø: <strong>{formatNumber(c.diameter, 1)} mm</strong></span>
-                                            <span>R_min: <strong>{bendingFactor * c.diameter} mm</strong></span>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          })}
+                        <div className="space-y-0.5 text-[10px]">
+                          <div className="font-bold text-slate-700">{conduitsCount} Condotti ({activeSidesList.join(', ')})</div>
+                          <div className="text-slate-500 font-medium">{totalCablesQty} Cavi totali posati</div>
                         </div>
                       )}
                     </td>
@@ -2353,12 +2854,15 @@ export function ToolDimensionamentoPozzettiElettrici({
                       <div className="text-[10px] text-slate-500">Scorta: +{pozz.scortaPct}%</div>
                     </td>
                     <td className="py-3 px-3 text-center whitespace-nowrap">
-                      <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                        calc.esito === 'verificato' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
-                        calc.esito === 'attenzione' ? 'bg-amber-50 text-amber-800 border border-amber-200' :
-                        'bg-rose-50 text-rose-800 border border-rose-200'
+                      <span className={`inline-block text-[9px] font-black px-2.5 py-1 rounded-lg border ${
+                        calc.esito === 'verificato' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                        calc.esito === 'attenzione' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                        'bg-rose-50 text-rose-800 border-rose-200'
                       }`}>
-                        {calc.esito === 'verificato' ? 'Idoneo' : calc.esito === 'attenzione' ? 'Attenzione' : 'Non Idoneo'} • {formatNumber(calc.fillRate, 1)}%
+                        <div>{calc.esito === 'verificato' ? 'VERIFICATO' : calc.esito === 'attenzione' ? 'ATTENZIONE' : 'NON VERIFICATO'}</div>
+                        <div className="text-[8px] font-semibold opacity-80 mt-0.5">
+                          Vol: {formatNumber(calc.fillRateCavi, 1)}% | Parete Max: {formatNumber(calc.worstLinearWall.linearFillRate, 1)}%
+                        </div>
                       </span>
                     </td>
                   </tr>
@@ -2368,31 +2872,166 @@ export function ToolDimensionamentoPozzettiElettrici({
           </table>
         </div>
 
-        <div className="print:break-before-page w-full">
-          <h4 className="text-xs font-bold text-slate-800 border-b border-slate-200 pb-2 mb-4 uppercase tracking-wider">
-            Rappresentazione Sezioni e Piante Pozzetti
+        {/* Schede Dettagliate e Grafici Sezioni Pozzetti */}
+        <div className="print:break-before-page w-full space-y-10">
+          <h4 className="text-xs font-bold text-slate-800 border-b border-slate-200 pb-2 uppercase tracking-wider">
+            Schede Dettagliate Posa e Grafici Sezioni Pareti per Ciascun Pozzetto
           </h4>
-          <div className="space-y-8">
-            {state.pozzetti.map(p => {
-              const comp = calcolaCompliancePozzetto(p, cablesCatalog);
-              if (!comp) return null;
-              return (
-                <div key={p.tag} className="border border-slate-200 rounded-2xl p-4 bg-white flex flex-col items-center print:break-inside-avoid">
-                  <span className="text-xs font-bold text-slate-800 mb-2">{p.name}</span>
-                  <div className="w-full max-w-2xl">
-                    <PozzettoGraficaDettaglio
-                      pozzetto={p}
-                      compliance={comp}
-                      cablesCatalog={cablesCatalog}
-                    />
+
+          {state.pozzetti.map(p => {
+            const comp = calcolaCompliancePozzetto(p, cablesCatalog);
+            if (!comp) return null;
+            const activePareti = ensurePozzettoPareti(p);
+
+            return (
+              <div key={p.tag} className="border border-slate-200 rounded-2xl p-5 bg-white space-y-6 print:break-inside-avoid shadow-xs">
+                {/* Header Pozzetto */}
+                <div className="flex flex-wrap items-center justify-between border-b border-slate-200 pb-3 gap-2">
+                  <div>
+                    <h5 className="text-sm font-black text-slate-800">{p.name}</h5>
+                    <span className="text-[10px] text-slate-500 font-semibold">
+                      Tipologia: {p.shape === 'rettangolare' ? `Rettangolare ${p.baseB}x${p.lengthL}x${p.depthH} cm` : `Cilindrico Ø${p.diameterD}x${p.depthH} cm`} • Volume: {formatNumber(comp.volumePozzetto / 1000, 1)} L
+                    </span>
                   </div>
-                  <div className="text-[10px] font-bold text-slate-550 mt-2">
-                    Riempimento Pareti: {comp.paretiCompliance.map(wc => `${wc.side.toUpperCase()}: ${formatNumber(wc.fillRate, 1)}%`).join(' | ')}
+                  <span className={`text-[10px] font-black px-3 py-1 rounded-lg border ${
+                    comp.esito === 'verificato' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                    comp.esito === 'attenzione' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                    'bg-rose-50 text-rose-800 border-rose-200'
+                  }`}>
+                    ESITO: {comp.esito.toUpperCase()} (Volumetr. Cavi: {formatNumber(comp.fillRateCavi, 1)}% | Ingombro Max Parete: {formatNumber(comp.worstLinearWall.linearFillRate, 1)}%)
+                  </span>
+                </div>
+
+                {/* Tabella Elenco Esteso Condotti e Cavi */}
+                <div className="space-y-2">
+                  <span className="text-[10px] font-black text-slate-700 uppercase tracking-wide block">
+                    1. Registro Canalizzazioni e Cavi Innestati
+                  </span>
+                  <div className="overflow-x-auto border border-slate-200 rounded-xl">
+                    <table className="w-full text-left border-collapse text-[10px]">
+                      <thead>
+                        <tr className="bg-slate-100 border-b border-slate-200 text-[9px] font-black text-slate-600 uppercase">
+                          <th className="py-2 px-2.5">Parete</th>
+                          <th className="py-2 px-2.5">Condotto / Canala</th>
+                          <th className="py-2 px-2 text-center">Q.tà</th>
+                          <th className="py-2 px-2 text-center">R_min Tubo Terreno</th>
+                          <th className="py-2 px-2.5">Sigla & Cavo Formazione</th>
+                          <th className="py-2 px-2 text-center">Q.tà Cavi</th>
+                          <th className="py-2 px-2 text-center">Ø Cavo</th>
+                          <th className="py-2 px-2 text-center">R_min Cavo</th>
+                          <th className="py-2 px-2.5">Uscita Destinazione</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {activePareti.map(w => {
+                          if (w.cavidotti.length === 0) return null;
+                          return w.cavidotti.map((cond, cIdx) => {
+                            const isRect = cond.sectionType === 'rettangolare';
+                            const rMinTubo = !isRect ? formatNumber(((cond.bendingFactor || 8) * (cond.outerDiameter || cond.dn || 90)) / 10, 0) + ' cm' : 'N/A';
+
+                            if (cond.cables.length === 0) {
+                              return (
+                                <tr key={`${w.side}_${cond.id}_empty`} className="hover:bg-slate-50">
+                                  <td className="py-2 px-2.5 font-bold text-indigo-700 uppercase">{w.label}</td>
+                                  <td className="py-2 px-2.5 font-semibold text-slate-800">{getConduitLabel(cond)}</td>
+                                  <td className="py-2 px-2 text-center font-bold">{cond.qty}</td>
+                                  <td className="py-2 px-2 text-center font-mono text-slate-600">{rMinTubo}</td>
+                                  <td colSpan={4} className="py-2 px-2.5 text-slate-400 italic">Nessun cavo posato</td>
+                                  <td className="py-2 px-2.5 font-semibold text-slate-700">
+                                    {cond.destinationSide ? cond.destinationSide.toUpperCase() : 'Termina nel Pozzetto'}
+                                  </td>
+                                </tr>
+                              );
+                            }
+
+                            return cond.cables.map((cavo, cableIdx) => {
+                              const prod = cablesCatalog.find(p => p.id === cavo.cableId);
+                              const cableName = cavo.cableId === 'personalizzato' ? 'Cavo Personalizzato' : (prod?.name || cavo.cableId);
+                              let bFact = 12;
+                              if (cavo.cableId === 'personalizzato') bFact = cavo.customBendingFactor || 12;
+                              else bFact = prod?.raggioCurvaturaMinFattore || 12;
+
+                              const destSide = cavo.destinationSide || cond.destinationSide;
+
+                              return (
+                                <tr key={`${w.side}_${cond.id}_${cableIdx}`} className="hover:bg-slate-50">
+                                  {cableIdx === 0 && (
+                                    <>
+                                      <td rowSpan={cond.cables.length} className="py-2 px-2.5 font-bold text-indigo-700 uppercase align-top border-r border-slate-100">
+                                        {w.label}
+                                      </td>
+                                      <td rowSpan={cond.cables.length} className="py-2 px-2.5 font-semibold text-slate-800 align-top border-r border-slate-100">
+                                        #{cIdx + 1} {getConduitLabel(cond)}
+                                      </td>
+                                      <td rowSpan={cond.cables.length} className="py-2 px-2 text-center font-bold align-top border-r border-slate-100">
+                                        {cond.qty}
+                                      </td>
+                                      <td rowSpan={cond.cables.length} className="py-2 px-2 text-center font-mono text-slate-600 align-top border-r border-slate-100">
+                                        {rMinTubo}
+                                      </td>
+                                    </>
+                                  )}
+                                  <td className="py-2 px-2.5 font-semibold text-slate-800">
+                                    <span className="text-indigo-600 font-bold mr-1">[{cavo.sigla}]</span> {cableName} ({cavo.formation})
+                                  </td>
+                                  <td className="py-2 px-2 text-center font-bold">{cavo.qty}</td>
+                                  <td className="py-2 px-2 text-center font-mono">{formatNumber(cavo.diameter, 1)} mm</td>
+                                  <td className="py-2 px-2 text-center font-mono font-semibold text-slate-700">{formatNumber(bFact * cavo.diameter, 0)} mm</td>
+                                  <td className="py-2 px-2.5 font-semibold text-indigo-700">
+                                    {destSide ? `Lato ${destSide.toUpperCase()}` : 'Termina nel Pozzetto'}
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          });
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+
+                {/* Grafici Sezioni Pareti per TUTTI i Lati Attivi */}
+                <div className="space-y-3">
+                  <span className="text-[10px] font-black text-slate-700 uppercase tracking-wide block">
+                    2. Grafici 2D Sezioni Pareti e Vista in Pianta (Lati Non Vuoti)
+                  </span>
+                  
+                  <div className="space-y-6">
+                    {(['sx', 'dx', 'alto', 'basso'] as const).map(side => {
+                      const wallObj = activePareti.find(w => w.side === side);
+                      const hasConduits = wallObj && wallObj.cavidotti.length > 0;
+                      const hasEgress = activePareti.some(otherW => otherW.cavidotti.some(c => c.destinationSide === side || c.cables.some(cb => cb.destinationSide === side)));
+                      
+                      if (!hasConduits && !hasEgress) return null;
+
+                      const wallComp = comp.paretiCompliance.find(wc => wc.side === side);
+
+                      return (
+                        <div key={side} className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 space-y-2 print:break-inside-avoid">
+                          <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
+                            <span className="text-[10px] font-black text-slate-800 uppercase tracking-wider">
+                              Parete {side.toUpperCase()} — Sezione e Pianta
+                            </span>
+                            <span className="text-[9px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                              Ingombro Parete {side.toUpperCase()}: {formatNumber(wallComp?.linearFillRate || 0, 1)}% Larghezza
+                            </span>
+                          </div>
+                          <div className="w-full flex justify-center">
+                            <PozzettoGraficaDettaglio
+                              pozzetto={p}
+                              compliance={comp}
+                              cablesCatalog={cablesCatalog}
+                              selectedWallSide={side}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Attestato di conformità in stampa */}
@@ -2404,9 +3043,9 @@ export function ToolDimensionamentoPozzettiElettrici({
                 Si attesta che la verifica volumetrica e la verifica del raggio minimo di curvatura per i pozzetti elettrici del presente report sono state eseguite nel pieno rispetto dei parametri di piegatura e degli ingombri fisici dei cavi forniti dai rispettivi produttori nelle schede tecniche di prodotto.
               </p>
             </div>
-            <div className="shrink-0 flex items-center gap-2 border border-slate-350 bg-slate-50 px-3 py-1.5 rounded-lg text-slate-800 font-bold">
-              <span className="text-xs">📜</span>
-              <span className="text-[10px] font-black uppercase tracking-wider">Verifica Raggi da PDF</span>
+            <div className="shrink-0 flex items-center gap-2 border border-emerald-300 bg-emerald-50 px-3 py-1.5 rounded-lg text-emerald-800 font-bold shadow-xs">
+              <span className="text-xs">🛡️</span>
+              <span className="text-[10px] font-black uppercase tracking-wider">CONFORME A SCHEDE TECNICHE COSTRUTTORE</span>
             </div>
           </div>
         </div>

@@ -1,17 +1,13 @@
 const fs = require('fs');
+const text = fs.readFileSync('scratch_legrand_text.txt', 'utf8');
+const lines = text.split('\n');
 
-const content = fs.readFileSync('./scratch_extracted_text.txt', 'utf8');
-const sections = content.split('\nFILE: ');
-
-console.log(`Found ${sections.length} sections.`);
-
-for (let i = 1; i < sections.length; i++) {
-    const lines = sections[i].split('\n');
-    const title = lines[0];
-    console.log(`\n=============================================`);
-    console.log(`SECTION: ${title}`);
-    console.log(`=============================================`);
-    lines.slice(1, 16).forEach((line, index) => {
-        console.log(`${index + 1}: ${line}`);
+function printRange(start, count, label) {
+    console.log(`\n=== ${label} (Lines ${start} - ${start+count}) ===`);
+    lines.slice(start, start + count).forEach((l, idx) => {
+        console.log(`${start + idx}: ${l.trim()}`);
     });
 }
+
+printRange(800, 100, "Around line 800 (SWL Table)");
+printRange(7670, 100, "Around line 7670 (CEI EN 61537 Load tests)");

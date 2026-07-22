@@ -17,6 +17,7 @@ import { ToolPompeFognarie } from './tools/ToolPompeFognarie';
 import { ToolAspiratore } from './tools/ToolAspiratore';
 import { ToolVerificaRiempimentoCanalizzazioni } from './tools/ToolVerificaRiempimentoCanalizzazioni';
 import { ToolDimensionamentoPozzettiElettrici } from './tools/ToolDimensionamentoPozzettiElettrici';
+import { ToolStaffaggioSupportiCanalizzazioni } from './tools/ToolStaffaggioSupportiCanalizzazioni';
 import { DatabaseManager } from './components/DatabaseManager';
 import { 
     seedThermodynamicCatalog,
@@ -31,7 +32,7 @@ import { ProvinceClimateData } from './data/climateData';
 import { seedElectricalCatalog, fetchElectricalCables, fetchElectricalContainers } from './utils/electricalDbHelper';
 import { CableProduct, ContainerFamily } from './data/electricalDatabase';
 import { IconWaves, IconFlame, IconThermometer, IconArrowUp, IconWind, IconPump, IconImpeller } from './components/Icons';
-import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap, Scale, Fan, Layers, Grid } from 'lucide-react';
+import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap, Scale, Fan, Layers, Grid, Ruler } from 'lucide-react';
 
 import logoImg from './assets/Logo.png';
 
@@ -115,6 +116,7 @@ export default function App() {
     });
     const [dashboardSection, setDashboardSection] = useState<'home' | 'termoidraulica' | 'elettrica'>('home');
     const [importedCables, setImportedCables] = useState<any | null>(null);
+    const [importedStaffaggioData, setImportedStaffaggioData] = useState<any | null>(null);
     
     const [projectData, setProjectData] = useState<ProjectData>({
         client: '',
@@ -211,7 +213,7 @@ export default function App() {
     }, [appMode, projectData]);
 
     useEffect(() => {
-        const electricalModes = ['calcoli_elettrici', 'dimensionamento_canali', 'database_elettrico', 'dimensionamento_pozzetti'];
+        const electricalModes = ['calcoli_elettrici', 'dimensionamento_canali', 'database_elettrico', 'dimensionamento_pozzetti', 'staffaggio_supporti'];
         if (electricalModes.includes(appMode)) {
             loadElectricalDbs();
         }
@@ -650,6 +652,7 @@ export default function App() {
                         {appMode === 'aspiratore' && <>🌪️ <span className="inline-block pb-1 bg-gradient-to-r from-cyan-600 to-sky-600 bg-clip-text text-transparent">Aspiratore / Ventilatore Industriale</span></>}
                         {appMode === 'dimensionamento_canali' && <>⚡ <span className="inline-block pb-1 bg-gradient-to-r from-amber-500 to-yellow-600 bg-clip-text text-transparent">Verifica Riempimento Canalizzazioni Elettriche</span></>}
                         {appMode === 'dimensionamento_pozzetti' && <>🕳️ <span className="inline-block pb-1 bg-gradient-to-r from-amber-500 to-yellow-600 bg-clip-text text-transparent">Dimensionamento e Verifica Pozzetti Elettrici</span></>}
+                        {appMode === 'staffaggio_supporti' && <>📏 <span className="inline-block pb-1 bg-gradient-to-r from-indigo-600 to-blue-600 bg-clip-text text-transparent">Staffaggio e Supporti Canalizzazioni</span></>}
                     </h1>
                 </div>
             )}
@@ -831,7 +834,14 @@ export default function App() {
                                         <p className="text-[11px] text-slate-500 text-center leading-relaxed">Verifica del riempimento volumetrico e del raggio minimo di curvatura per pozzetti.</p>
                                     </button>
 
-                                    {/* 3. Calcoli Elettrici Rapidi */}
+                                    {/* 3. Staffaggio e Supporti Canalizzazioni */}
+                                    <button onClick={() => setAppMode('staffaggio_supporti')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-indigo-500 hover:bg-indigo-50 transition-all text-left cursor-pointer w-full">
+                                        <div className="w-14 h-14 bg-indigo-100 text-indigo-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><Ruler className="w-7 h-7" /></div>
+                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Staffaggio e Supporti Canalizzazioni</h2>
+                                        <p className="text-[11px] text-slate-500 text-center leading-relaxed">Passo massimo tra le staffe e verifica forza peso sui supporti (CEI EN 61537 / Legrand P31+).</p>
+                                    </button>
+
+                                    {/* 4. Calcoli Elettrici Rapidi */}
                                     <button onClick={() => setAppMode('calcoli_elettrici')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-amber-500 hover:bg-amber-50 transition-all text-left cursor-pointer w-full">
                                         <div className="w-14 h-14 bg-amber-100 text-amber-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><Zap className="w-7 h-7" /></div>
                                         <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Calcoli Elettrici Rapidi</h2>
@@ -853,8 +863,9 @@ export default function App() {
                 {appMode === 'hvac' && <ToolHVAC projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} climateData={climateData || undefined} />}
                 {appMode === 'pompe_fognarie' && <ToolPompeFognarie projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 {appMode === 'aspiratore' && <ToolAspiratore projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
-                {appMode === 'dimensionamento_canali' && <ToolVerificaRiempimentoCanalizzazioni projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} cablesCatalog={cablesCatalog || undefined} containersCatalog={containersCatalog || undefined} onVerifyPozzetto={(payload) => { setImportedCables(payload); setAppMode('dimensionamento_pozzetti'); }} />}
-                {appMode === 'dimensionamento_pozzetti' && <ToolDimensionamentoPozzettiElettrici projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} cablesCatalog={cablesCatalog || undefined} importedCables={importedCables} clearImportedCables={() => setImportedCables(null)} />}
+                {appMode === 'dimensionamento_canali' && <ToolVerificaRiempimentoCanalizzazioni projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} cablesCatalog={cablesCatalog || undefined} containersCatalog={containersCatalog || undefined} onVerifyPozzetto={(payload) => { setImportedCables(payload); setAppMode('dimensionamento_pozzetti'); }} onVerifyStaffaggio={(payload) => { setImportedStaffaggioData(payload); setAppMode('staffaggio_supporti'); }} />}
+                {appMode === 'dimensionamento_pozzetti' && <ToolDimensionamentoPozzettiElettrici projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} cablesCatalog={cablesCatalog || undefined} containersCatalog={containersCatalog || undefined} importedCables={importedCables} clearImportedCables={() => setImportedCables(null)} />}
+                {appMode === 'staffaggio_supporti' && <ToolStaffaggioSupportiCanalizzazioni projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} importedStaffaggioData={importedStaffaggioData} clearImportedStaffaggioData={() => setImportedStaffaggioData(null)} />}
                 {appMode === 'database_termo' && <DatabaseManager type="termo" setAppMode={setAppMode} projectData={projectData} pipeCatalog={pipeCatalog || undefined} equivalentLengths={equivalentLengths || undefined} gasEquivalentLengths={gasEquivalentLengths || undefined} climateData={climateData || undefined} onDatabaseChange={() => loadThermodynamicDbs(true)} />}
                 {appMode === 'database_elettrico' && <DatabaseManager type="elettrico" setAppMode={setAppMode} projectData={projectData} cablesCatalog={cablesCatalog || undefined} containersCatalog={containersCatalog || undefined} onDatabaseChange={() => loadElectricalDbs(true)} />}
             </div>
