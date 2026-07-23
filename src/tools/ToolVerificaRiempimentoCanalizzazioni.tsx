@@ -1061,11 +1061,17 @@ export function regenerateTratteTags(
       childDa = node.da || 'Cabina elettrica';
     }
 
+    // Preserva il nome personalizzato se l'utente ne ha inserito uno specifico
+    const oldTag = (node as any).originalTagForMap || node.tag;
+    const isTempName = node.name && node.name.startsWith('TEMP_');
+    const isAutoName = !node.name || node.name === oldTag || node.name === node.tag || node.name === `Tratta ${oldTag}` || node.name === `Tratta ${node.tag}`;
+    const preservedName = (isTempName || isAutoName) ? newTag : node.name;
+
     const updatedNode: TrattaProgetto = {
       ...node,
       originalTagForMap: node.tag,
       tag: newTag,
-      name: newTag,
+      name: preservedName,
       parentId: newParentId,
       da: childDa
     };
@@ -1242,7 +1248,7 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
         .filter((t: any) => t && typeof t.tag === 'string')
         .map((t: any) => ({
           tag: t.tag,
-          name: (t.name || t.tag).replace(/^Tratta\s+/i, ''),
+          name: t.name || t.tag,
           parentId: t.parentId || null,
           length: t.length !== undefined ? t.length : '',
           containmentType: t.containmentType || 'vista',
@@ -1370,7 +1376,7 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
     const duplicatedTratta: TrattaProgetto = {
       ...activeTratta,
       tag: tempTag,
-      name: tempTag,
+      name: activeTratta.name ? `${activeTratta.name} (Copia)` : tempTag,
       parentId: null, // Nuova linea separata e indipendente
       cables: activeTratta.cables.map(c => ({ ...c }))
     };
