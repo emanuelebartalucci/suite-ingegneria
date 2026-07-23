@@ -179,6 +179,28 @@ const formatContainerSizeLabel = (
   }
 };
 
+const formatCompactDimensions = (
+  family?: ContainerFamily,
+  size?: ContainerSize,
+  tratta?: TrattaProgetto
+): string => {
+  if (tratta && (tratta.selectedFamilyId === 'personalizzato' || tratta.selectedSizeCode === 'personalizzato')) {
+    const isRect = family ? family.sectionType === 'rettangolare' : (tratta.customWidth !== undefined);
+    if (isRect) {
+      return `${tratta.customWidth || 100}x${tratta.customHeight || 75} mm`;
+    } else {
+      return `Ø ${tratta.customOuterDiameter || 90} mm`;
+    }
+  }
+  if (!size) return '';
+  if (family && family.sectionType === 'rettangolare') {
+    return `${size.width}x${size.height} mm`;
+  } else {
+    const ext = size.outerDiameter || size.width || 0;
+    return `Ø ${ext} mm`;
+  }
+};
+
 const defaultState: ToolState = {
   tratte: [
     {
@@ -1610,6 +1632,43 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
       {/* Intestazione del progetto standard */}
       <ProjectHeader pData={projectData} setPData={setProjectData} title="Verifica Riempimento Canalizzazioni Elettriche" setAppMode={setAppMode} iconColor="orange" />
 
+      {/* Spiegazione & Formule */}
+      <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+        <p>
+          <strong>Descrizione:</strong> Calcola il tasso di riempimento percentuale delle sezioni trasversali e verifica i requisiti di sfilabilità (norme CEI 64-8 e CEI EN 50085) per cavi elettrici posati in canali metallici, cavidotti e tubazioni protettive.
+        </p>
+        <div className="bg-white/80 border border-amber-100 rounded-xl p-4 text-slate-600">
+          <p className="font-bold text-slate-700 mb-2.5 text-[11px] uppercase tracking-wide">Formule applicate e Criteri di Verifica:</p>
+          <div className="space-y-3 pl-2 text-xs">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span>• Tasso di Riempimento Sezione (Area %):</span>
+              <span className="font-serif font-bold text-slate-800 flex items-center">
+                Fill Rate = 
+                <span className="inline-flex flex-col items-center align-middle mx-1.5 text-center text-[10px]">
+                  <span className="border-b border-slate-400 px-1 pb-0.5">Σ A<sub>cavi</sub></span>
+                  <span className="px-1 pt-0.5">A<sub>netta condotto</sub></span>
+                </span>
+                × 100 [%]
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span>• Condizione di Sfilabilità Tubi (CEI 64-8):</span>
+              <span className="font-serif font-bold text-slate-800 flex items-center">
+                D<sub>int, tubo</sub> ≥ 1.5 × d<sub>circ, fascio</sub>
+                <span className="text-[11px] text-slate-500 font-sans font-normal ml-2">(Max 40% area occupata per 3+ cavi)</span>
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span>• Carico Peso Lineare Totale:</span>
+              <span className="font-serif font-bold text-slate-800 flex items-center">
+                q<sub>tot</sub> = q<sub>condotto</sub> + q<sub>coperchio</sub> + q<sub>setto</sub> + Σ q<sub>cavi</sub>
+                <span className="text-[11px] text-slate-500 font-sans font-normal ml-1">[kg/m]</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Contenuto principale interattivo (nascosto in stampa) */}
       <div className="print:hidden space-y-6">
         
@@ -2512,9 +2571,14 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
                 const fam = containersCatalog.find(f => f.id === t.selectedFamilyId);
                 const sz = fam?.sizes.find(s => s.code === t.selectedSizeCode);
                 const comp = tratteCompliance.find(c => c.tag === t.tag);
+                const dimLabel = formatCompactDimensions(fam, sz, t);
+
                 return (
-                  <div key={t.tag} className="border border-slate-200 rounded-2xl p-4 bg-white flex flex-col items-center print:break-inside-avoid shadow-xs">
-                    <span className="text-xs font-bold text-slate-800 mb-2">{t.name}</span>
+                  <div key={t.tag} className="border border-slate-200 rounded-2xl p-4 bg-white flex flex-col items-center print:break-inside-avoid shadow-xs text-center">
+                    <span className="text-xs font-black text-slate-900">{t.name}</span>
+                    <span className="text-[11px] font-bold text-amber-700 mt-0.5 mb-2">
+                      {fam?.name ? `${fam.name} ` : ''}{dimLabel ? `(${dimLabel})` : ''}
+                    </span>
                     <div className="scale-90 origin-top">
                       <SezioneCanvas
                         tratta={t}
@@ -2523,8 +2587,8 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
                         fillRate={comp?.fillRate || 0}
                       />
                     </div>
-                    <div className="text-[10px] font-bold text-slate-500 mt-2">
-                      Riempimento: {formatNumber(comp?.fillRate, 1)}% | Stato: {comp?.verificato ? 'CONFORME' : 'NON CONFORME'}
+                    <div className="text-[10px] font-bold text-slate-600 mt-2">
+                      Riempimento: {formatNumber(comp?.fillRate, 1)}% | Stato: <span className={comp?.verificato ? 'text-emerald-700 font-extrabold' : 'text-rose-700 font-extrabold'}>{comp?.verificato ? 'CONFORME' : 'NON CONFORME'}</span>
                     </div>
                   </div>
                 );

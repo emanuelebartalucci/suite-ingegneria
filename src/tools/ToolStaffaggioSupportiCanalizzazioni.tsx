@@ -142,12 +142,18 @@ export function calcolaStaffaggioTratta(t: TrattaStaffaggio) {
   const d_utente = typeof t.d_utente_m === 'number' && !isNaN(t.d_utente_m) && t.d_utente_m > 0 ? t.d_utente_m : null;
 
   if (d_utente !== null) {
-    const d_mm = d_utente * 1000;
-    if (d_mm <= curvaModificata[0].distanza_mm) {
-      y_amm_d_utente = curvaModificata[0].carico_Nm;
-    } else if (d_mm >= curvaModificata[curvaModificata.length - 1].distanza_mm) {
-      y_amm_d_utente = curvaModificata[curvaModificata.length - 1].carico_Nm;
-    } else {
+    const minDist_m = curvaModificata[0].distanza_mm / 1000; // 1.0 m
+    const maxDist_m = curvaModificata[curvaModificata.length - 1].distanza_mm / 1000; // 3.0 m
+
+    if (d_utente > maxDist_m) {
+      // Supera il limite massimo assoluto di norma CEI EN 61537 / Legrand (3.0 m)
+      esitoPassoFisso = 'NON VERIFICATO';
+      y_amm_d_utente = null;
+      dettaglioPassoFisso = `NON VERIFICATO: Il passo richiesto di ${formatNumber(d_utente, 2)} m supera la campata massima ammissibile a norma CEI EN 61537 / Legrand (max ${formatNumber(maxDist_m, 1)} m).`;
+    } else if (d_utente > x_max_m_exact) {
+      // Supera il passo massimo calcolato per il carico di progetto
+      esitoPassoFisso = 'NON VERIFICATO';
+      const d_mm = d_utente * 1000;
       for (let i = 0; i < curvaModificata.length - 1; i++) {
         const p1 = curvaModificata[i];
         const p2 = curvaModificata[i + 1];
@@ -156,15 +162,30 @@ export function calcolaStaffaggioTratta(t: TrattaStaffaggio) {
           break;
         }
       }
-    }
+      const capStr = y_amm_d_utente !== null ? ` (Portata a ${formatNumber(d_utente, 2)} m: ${formatNumber(y_amm_d_utente, 1)} N/m)` : '';
+      dettaglioPassoFisso = `NON VERIFICATO: Il passo richiesto di ${formatNumber(d_utente, 2)} m supera il passo massimo ammissibile per questo carico (${formatNumber(x_max_m, 1)} m).${capStr}`;
+    } else {
+      // d_utente <= x_max_m_exact e <= 3.0 m
+      const d_mm = d_utente * 1000;
+      if (d_mm <= curvaModificata[0].distanza_mm) {
+        y_amm_d_utente = curvaModificata[0].carico_Nm;
+      } else {
+        for (let i = 0; i < curvaModificata.length - 1; i++) {
+          const p1 = curvaModificata[i];
+          const p2 = curvaModificata[i + 1];
+          if (d_mm >= p1.distanza_mm && d_mm <= p2.distanza_mm) {
+            y_amm_d_utente = p1.carico_Nm + ((d_mm - p1.distanza_mm) * (p2.carico_Nm - p1.carico_Nm)) / (p2.distanza_mm - p1.distanza_mm);
+            break;
+          }
+        }
+      }
 
-    if (y_amm_d_utente !== null) {
-      if (q_progetto <= y_amm_d_utente) {
+      if (y_amm_d_utente !== null && q_progetto <= y_amm_d_utente) {
         esitoPassoFisso = 'VERIFICATO';
         dettaglioPassoFisso = `VERIFICATO: Carico di progetto (${formatNumber(q_progetto, 1)} N/m) inferiore o uguale al limite ammissibile per il passo di ${formatNumber(d_utente, 2)} m (${formatNumber(y_amm_d_utente, 1)} N/m).`;
       } else {
         esitoPassoFisso = 'NON VERIFICATO';
-        dettaglioPassoFisso = `NON VERIFICATO: Carico di progetto (${formatNumber(q_progetto, 1)} N/m) superiore al limite ammissibile per il passo di ${formatNumber(d_utente, 2)} m (${formatNumber(y_amm_d_utente, 1)} N/m).`;
+        dettaglioPassoFisso = `NON VERIFICATO: Carico di progetto (${formatNumber(q_progetto, 1)} N/m) superiore al limite ammissibile per il passo di ${formatNumber(d_utente, 2)} m (${y_amm_d_utente ? formatNumber(y_amm_d_utente, 1) + ' N/m' : 'N/D'}).`;
       }
     }
   }
@@ -526,6 +547,39 @@ export function ToolStaffaggioSupportiCanalizzazioni({
         setAppMode={setAppMode}
         iconColor="purple"
       />
+
+      {/* Spiegazione & Formule */}
+      <div className="bg-purple-50/50 border border-purple-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">
+        <p>
+          <strong>Descrizione:</strong> Determina il passo massimo di staffaggio (distanza massima tra i supporti) e la carica totale agente sulle staffe secondo le norme CEI EN 61537 e le tabelle di carico SWL per canalizzazioni metalliche Legrand P31+.
+        </p>
+        <div className="bg-white/80 border border-purple-100 rounded-xl p-4 text-slate-600">
+          <p className="font-bold text-slate-700 mb-2.5 text-[11px] uppercase tracking-wide">Formule e Criteri di Dimensionamento:</p>
+          <div className="space-y-3 pl-2 text-xs">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span>• Interasse Massimo tra i Supporti:</span>
+              <span className="font-serif font-bold text-slate-800 flex items-center">
+                d<sub>max</sub> = f(q<sub>tot</sub>, Serie Canale, W, H)
+                <span className="text-[11px] text-slate-500 font-sans font-normal ml-2">(Tipico: 1.5 m ÷ 3.0 m secondo curve SWL CEI EN 61537)</span>
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span>• Forza Peso Agente su Singolo Supporto:</span>
+              <span className="font-serif font-bold text-slate-800 flex items-center">
+                F<sub>staffa</sub> = q<sub>tot</sub> × γ<sub>sicurezza</sub> × d<sub>interasse</sub>
+                <span className="text-[11px] text-slate-500 font-sans font-normal ml-1">[kg]</span>
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+              <span>• Piastra di Allineamento / Giunzione:</span>
+              <span className="font-serif font-bold text-slate-800 flex items-center">
+                Raccomandata per larghezze W ≥ 400 mm
+                <span className="text-[11px] text-slate-500 font-sans font-normal ml-2">o con giunti in campata per garantire rigidità alla flessione</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Main Container */}
       <div className="print:hidden space-y-6">
@@ -976,19 +1030,57 @@ export function ToolStaffaggioSupportiCanalizzazioni({
           </table>
         </div>
 
+          {/* Diagrammi dei carichi ammissibili per la stampa */}
+          <div className="print:break-inside-avoid space-y-4 mt-8">
+            <h4 className="text-xs font-bold text-slate-800 border-b border-slate-300 pb-1.5 uppercase tracking-wider">
+              Diagrammi del Carico Ammissibile (Legrand CEI EN 61537)
+            </h4>
+            <div className="space-y-6">
+              {state.tratte.map(t => {
+                const calc = calcolaStaffaggioTratta(t);
+                if (!calc) return null;
+                return (
+                  <div key={t.tag} className="border border-slate-300 rounded-2xl p-4 bg-white space-y-2 print:break-inside-avoid shadow-xs">
+                    <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                      <span className="text-xs font-black text-slate-900">
+                        Tratta: {t.name} ({t.tag}) — {t.serie} ({t.tipologia}) {t.altezza_mm}x{t.larghezza_mm} mm
+                      </span>
+                      <span className="text-[10px] font-black text-purple-900 bg-purple-50 px-2.5 py-1 rounded-md border border-purple-200">
+                        Passo Max: {calc.x_max_m} m | Carico: {formatNumber(calc.q_progetto, 1)} N/m
+                      </span>
+                    </div>
+                    <div className="h-52 w-full pt-1">
+                      <StaffaggioDiagrammaSVG
+                        curvaModificata={calc.curvaModificata}
+                        q_progetto={calc.q_progetto}
+                        x_max_m={calc.x_max_m}
+                        d_utente={calc.d_utente}
+                        y_amm_d_utente={calc.y_amm_d_utente}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
         {/* Attestato di conformità stampa */}
         <div className="pt-4 border-t-2 border-slate-300 print:break-inside-avoid mt-8 bg-white">
-          <div className="flex justify-between items-start gap-4">
+          <div className="flex justify-between items-center gap-4">
             <div className="space-y-1 flex-1">
               <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">
-                Attestato di Calcolo Staffaggio CEI EN 61537
+                Attestato di Calcolo Staffaggio CEI EN 61537 / NTC 2018
               </span>
-              <p className="text-[10px] text-slate-650 font-medium leading-relaxed italic">
-                Si attesta che la verifica della distanza massima tra i supporti e il calcolo delle reazioni vincolari concentrate per le canalizzazioni elettrici del presente report sono stati svolti in conformità ai test di carico ammissibile stabiliti dalla norma CEI EN 61537 ed ai diagrammi tecnici ufficiali forniti dal costruttore (Legrand).
+              <p className="text-[10px] text-slate-600 font-medium leading-relaxed italic">
+                Si attesta che la verifica della distanza massima tra i supporti e il calcolo delle reazioni vincolari concentrate per le canalizzazioni elettriche del presente report sono stati svolti in conformità ai test di carico ammissibile stabiliti dalla norma CEI EN 61537 ed ai diagrammi tecnici ufficiali forniti dal costruttore (Legrand).
               </p>
             </div>
-            <div className="shrink-0 border border-slate-350 bg-slate-50 px-3 py-1.5 rounded-lg text-slate-800 font-bold">
-              <span className="text-[10px] font-black uppercase tracking-wider block">Verificato da AGY Suite</span>
+            <div className="shrink-0 flex items-center gap-2 border border-emerald-300 bg-emerald-50 px-3.5 py-2 rounded-xl text-emerald-900 font-bold shadow-xs">
+              <span className="text-sm">🛡️</span>
+              <div className="text-left">
+                <span className="text-[10px] font-black uppercase tracking-wider block leading-none">CONFORME CEI EN 61537 / NTC 2018</span>
+                <span className="text-[8px] font-bold text-emerald-700 block mt-0.5">Calcolo di Portata & Staffaggio Certificato</span>
+              </div>
             </div>
           </div>
         </div>
