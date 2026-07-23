@@ -2154,7 +2154,7 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
                         });
                       }}
                       className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-                      title="Esporta i cavi di questa tratta verso la Verifica Pozzetti"
+                      title="Apri la Verifica Pozzetti in una nuova scheda compilata con questi dati"
                     >
                       <span>🕳️</span> Verifica Pozzetto
                     </button>
@@ -2208,9 +2208,9 @@ export function ToolVerificaRiempimentoCanalizzazioni({ projectData, setProjectD
                         });
                       }}
                       className="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
-                      title="Esporta il carico lineare e le dimensioni verso lo Staffaggio"
+                      title="Apri lo Staffaggio Supporti in una nuova scheda compilata con questi dati"
                     >
-                      <span>📏</span> Invia a Staffaggio
+                      <span>📏</span> Verifica Staffaggio
                     </button>
                   )}
                   <button 

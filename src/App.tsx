@@ -100,6 +100,10 @@ export default function App() {
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [authLoading, setAuthLoading] = useState<boolean>(true);
     const [appMode, setAppMode] = useState<string>(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const toolParam = urlParams.get('tool');
+        if (toolParam) return toolParam;
+
         const reloadTo = sessionStorage.getItem('reload_to_tool');
         if (reloadTo) {
             sessionStorage.removeItem('reload_to_tool');
@@ -117,6 +121,30 @@ export default function App() {
     const [dashboardSection, setDashboardSection] = useState<'home' | 'termoidraulica' | 'elettrica'>('home');
     const [importedCables, setImportedCables] = useState<any | null>(null);
     const [importedStaffaggioData, setImportedStaffaggioData] = useState<any | null>(null);
+
+    useEffect(() => {
+        if (appMode === 'dimensionamento_pozzetti') {
+            const pendingCables = localStorage.getItem('pending_import_pozzetti');
+            if (pendingCables) {
+                try {
+                    setImportedCables(JSON.parse(pendingCables));
+                } catch (e) {
+                    console.error("Errore lettura pending_import_pozzetti:", e);
+                }
+                localStorage.removeItem('pending_import_pozzetti');
+            }
+        } else if (appMode === 'staffaggio_supporti') {
+            const pendingStaffaggio = localStorage.getItem('pending_import_staffaggio');
+            if (pendingStaffaggio) {
+                try {
+                    setImportedStaffaggioData(JSON.parse(pendingStaffaggio));
+                } catch (e) {
+                    console.error("Errore lettura pending_import_staffaggio:", e);
+                }
+                localStorage.removeItem('pending_import_staffaggio');
+            }
+        }
+    }, [appMode]);
     
     const [projectData, setProjectData] = useState<ProjectData>({
         client: '',
@@ -863,7 +891,7 @@ export default function App() {
                 {appMode === 'hvac' && <ToolHVAC projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} climateData={climateData || undefined} />}
                 {appMode === 'pompe_fognarie' && <ToolPompeFognarie projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 {appMode === 'aspiratore' && <ToolAspiratore projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
-                {appMode === 'dimensionamento_canali' && <ToolVerificaRiempimentoCanalizzazioni projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} cablesCatalog={cablesCatalog || undefined} containersCatalog={containersCatalog || undefined} onVerifyPozzetto={(payload) => { setImportedCables(payload); setAppMode('dimensionamento_pozzetti'); }} onVerifyStaffaggio={(payload) => { setImportedStaffaggioData(payload); setAppMode('staffaggio_supporti'); }} />}
+                {appMode === 'dimensionamento_canali' && <ToolVerificaRiempimentoCanalizzazioni projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} cablesCatalog={cablesCatalog || undefined} containersCatalog={containersCatalog || undefined} onVerifyPozzetto={(payload) => { localStorage.setItem('pending_import_pozzetti', JSON.stringify(payload)); const targetUrl = `${window.location.origin}${window.location.pathname}?tool=dimensionamento_pozzetti`; window.open(targetUrl, '_blank'); }} onVerifyStaffaggio={(payload) => { localStorage.setItem('pending_import_staffaggio', JSON.stringify(payload)); const targetUrl = `${window.location.origin}${window.location.pathname}?tool=staffaggio_supporti`; window.open(targetUrl, '_blank'); }} />}
                 {appMode === 'dimensionamento_pozzetti' && <ToolDimensionamentoPozzettiElettrici projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} cablesCatalog={cablesCatalog || undefined} containersCatalog={containersCatalog || undefined} importedCables={importedCables} clearImportedCables={() => setImportedCables(null)} />}
                 {appMode === 'staffaggio_supporti' && <ToolStaffaggioSupportiCanalizzazioni projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} importedStaffaggioData={importedStaffaggioData} clearImportedStaffaggioData={() => setImportedStaffaggioData(null)} />}
                 {appMode === 'database_termo' && <DatabaseManager type="termo" setAppMode={setAppMode} projectData={projectData} pipeCatalog={pipeCatalog || undefined} equivalentLengths={equivalentLengths || undefined} gasEquivalentLengths={gasEquivalentLengths || undefined} climateData={climateData || undefined} onDatabaseChange={() => loadThermodynamicDbs(true)} />}

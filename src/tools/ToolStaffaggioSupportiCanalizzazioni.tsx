@@ -237,9 +237,9 @@ export function StaffaggioDiagrammaSVG({
   d_utente: number | null;
   y_amm_d_utente: number | null;
 }) {
-  const width = 650;
-  const height = 290;
-  const margin = { top: 40, right: 35, bottom: 45, left: 65 };
+  const width = 680;
+  const height = 310;
+  const margin = { top: 40, right: 35, bottom: 50, left: 65 };
   const plotW = width - margin.left - margin.right;
   const plotH = height - margin.top - margin.bottom;
 
@@ -247,7 +247,7 @@ export function StaffaggioDiagrammaSVG({
   const xMax = 3.2;
 
   const maxYInCurve = Math.max(...curvaModificata.map(p => p.carico_Nm));
-  const yMax = Math.max(maxYInCurve * 1.1, q_progetto * 1.2, 400);
+  const yMax = Math.max(maxYInCurve * 1.1, q_progetto * 1.25, 400);
 
   const getXPixel = (dist_m: number) => margin.left + ((dist_m - xMin) / (xMax - xMin)) * plotW;
   const getYPixel = (load_Nm: number) => margin.top + plotH - (load_Nm / yMax) * plotH;
@@ -261,15 +261,30 @@ export function StaffaggioDiagrammaSVG({
   const qProjY = getYPixel(q_progetto);
   const xMaxX = getXPixel(x_max_m);
 
-  // Evita collisioni verticali tra Passo Max e D_utente se sono vicini
-  const isCloseX = d_utente !== null && Math.abs(d_utente - x_max_m) < 0.45;
-  const isDUtenteBelow = isCloseX;
+  const hasDUtente = d_utente !== null && d_utente >= 0.8 && d_utente <= 3.2 && y_amm_d_utente !== null;
+  const dX = hasDUtente ? getXPixel(d_utente!) : 0;
+  const dY = hasDUtente ? getYPixel(y_amm_d_utente!) : 0;
+
+  // Position for Red q_progetto Badge (on top of red dashed line at left)
+  const qBadgeY = qProjY - margin.top < 24 ? qProjY + 4 : qProjY - 24;
+
+  // Staggering for X-axis projection tags (inside plot area just above axis line)
+  const axisY = height - margin.bottom;
+  const isCloseX = hasDUtente && Math.abs(dX - xMaxX) < 140;
+
+  // Passo Max tag stays at axisY - 22
+  const pMaxTagY = axisY - 22;
+  const pMaxTagX = Math.max(margin.left + 5, Math.min(width - margin.right - 95, xMaxX - 47));
+
+  // D_utente tag goes to axisY - 46 if close to Passo Max tag to prevent ANY overlap, else axisY - 22
+  const dTagY = isCloseX ? axisY - 46 : axisY - 22;
+  const dTagX = Math.max(margin.left + 5, Math.min(width - margin.right - 145, dX - 72));
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full font-sans select-none">
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full font-sans select-none drop-shadow-sm">
       <defs>
         <linearGradient id="curveGradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2" />
+          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.22" />
           <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.02" />
         </linearGradient>
       </defs>
@@ -292,8 +307,8 @@ export function StaffaggioDiagrammaSVG({
         const xPx = getXPixel(dist);
         return (
           <g key={idx}>
-            <line x1={xPx} y1={margin.top} x2={xPx} y2={height - margin.bottom} stroke="#e2e8f0" strokeDasharray="3,3" />
-            <text x={xPx} y={height - margin.bottom + 18} textAnchor="middle" className="text-[11px] fill-slate-500 font-bold">
+            <line x1={xPx} y1={margin.top} x2={xPx} y2={axisY} stroke="#e2e8f0" strokeDasharray="3,3" />
+            <text x={xPx} y={axisY + 18} textAnchor="middle" className="text-[11px] fill-slate-500 font-bold">
               {dist.toFixed(1)} m
             </text>
           </g>
@@ -318,43 +333,45 @@ export function StaffaggioDiagrammaSVG({
       {/* Linea Carico Progetto (Rosso Trattato) */}
       <line x1={margin.left} y1={qProjY} x2={width - margin.right} y2={qProjY} stroke="#e11d48" strokeWidth="2" strokeDasharray="5,5" />
       
-      {/* Badge Etichetta Carico Progetto a sinistra per evitare sovrapposizioni */}
-      <g>
-        <rect x={margin.left + 10} y={qProjY - 12} width="165" height="22" rx="6" fill="#ffffff" stroke="#f43f5e" strokeWidth="1.5" />
-        <text x={margin.left + 92} y={qProjY + 3} textAnchor="middle" className="text-[10px] fill-rose-600 font-black">
+      {/* Badge Etichetta Carico Progetto (sfondo bianco solido per evitare trasparenza su linee) */}
+      <g transform={`translate(${margin.left + 10}, ${qBadgeY})`}>
+        <rect x="0" y="0" width="165" height="22" rx="6" fill="#ffffff" stroke="#f43f5e" strokeWidth="1.5" />
+        <text x="82.5" y="15" textAnchor="middle" className="text-[10px] fill-rose-600 font-black">
           q_progetto = {formatNumber(q_progetto, 1)} N/m
         </text>
       </g>
 
-      {/* Punto Operativo e Badge Passo Max Consigliato */}
+      {/* Punto Operativo e Proiezione Passo Max Consigliato */}
       {x_max_m >= 1.0 && x_max_m <= 3.0 && (
         <g>
-          <line x1={xMaxX} y1={qProjY} x2={xMaxX} y2={height - margin.bottom} stroke="#2563eb" strokeWidth="1.5" strokeDasharray="2,2" />
-          <circle cx={xMaxX} cy={qProjY} r="6" fill="#2563eb" stroke="#ffffff" strokeWidth="2" />
-          <rect x={xMaxX - 55} y={qProjY - 34} width="110" height="22" rx="6" fill="#0f172a" stroke="#ffffff" strokeWidth="1" />
-          <text x={xMaxX} y={qProjY - 19} textAnchor="middle" className="text-[10px] fill-white font-black tracking-wide">
-            Passo Max: {x_max_m} m
-          </text>
+          {/* Proiezione verticale tratteggiata blu verso il box Passo Max */}
+          <line x1={xMaxX} y1={qProjY} x2={xMaxX} y2={pMaxTagY} stroke="#2563eb" strokeWidth="1.5" strokeDasharray="2,2" />
+          <circle cx={xMaxX} cy={qProjY} r="6" fill="#2563eb" stroke="#ffffff" strokeWidth="2.5" />
+          
+          {/* Badge Etichetta Proiezione sopra l'asse X (dentro il grafico) */}
+          <g transform={`translate(${pMaxTagX}, ${pMaxTagY})`}>
+            <rect x="0" y="0" width="95" height="20" rx="5" fill="#0f172a" stroke="#ffffff" strokeWidth="1.5" />
+            <text x="47.5" y="13" textAnchor="middle" className="text-[9.5px] fill-white font-black tracking-wide">
+              Passo Max: {x_max_m} m
+            </text>
+          </g>
         </g>
       )}
 
-      {/* Punto Operativo e Badge Passo Fisso Personalizzato (D_utente) */}
-      {d_utente !== null && d_utente >= 0.8 && d_utente <= 3.2 && y_amm_d_utente !== null && (
+      {/* Punto Operativo e Proiezione Passo Fisso Personalizzato (D_utente) */}
+      {hasDUtente && (
         <g>
-          {(() => {
-            const dX = getXPixel(d_utente);
-            const dY = getYPixel(y_amm_d_utente);
-            const badgeY = isDUtenteBelow ? dY + 12 : dY - 34;
-            return (
-              <>
-                <circle cx={dX} cy={dY} r="6" fill="#10b981" stroke="#ffffff" strokeWidth="2" />
-                <rect x={dX - 65} y={badgeY} width="130" height="22" rx="6" fill="#065f46" stroke="#ffffff" strokeWidth="1" />
-                <text x={dX} y={badgeY + 15} textAnchor="middle" className="text-[10px] fill-white font-bold">
-                  D = {d_utente} m ({formatNumber(y_amm_d_utente, 0)} N/m)
-                </text>
-              </>
-            );
-          })()}
+          {/* Proiezione verticale tratteggiata verde verso il box D_utente */}
+          <line x1={dX} y1={dY} x2={dX} y2={dTagY} stroke="#10b981" strokeWidth="1.5" strokeDasharray="2,2" />
+          <circle cx={dX} cy={dY} r="6" fill="#10b981" stroke="#ffffff" strokeWidth="2.5" />
+
+          {/* Badge Etichetta Proiezione D_utente sopra l'asse X (sfalsato in altezza se vicino a Max) */}
+          <g transform={`translate(${dTagX}, ${dTagY})`}>
+            <rect x="0" y="0" width="144" height="20" rx="5" fill="#065f46" stroke="#ffffff" strokeWidth="1.5" />
+            <text x="72" y="13" textAnchor="middle" className="text-[9.5px] fill-white font-bold">
+              D = {d_utente} m ({formatNumber(y_amm_d_utente!, 0)} N/m)
+            </text>
+          </g>
         </g>
       )}
 
@@ -362,7 +379,7 @@ export function StaffaggioDiagrammaSVG({
       <text x={margin.left} y={margin.top - 15} textAnchor="start" className="text-[11px] fill-slate-700 font-black uppercase tracking-wider">
         Carico N/m
       </text>
-      <text x={width / 2} y={height - 6} textAnchor="middle" className="text-[11px] fill-slate-700 font-black uppercase tracking-wider">
+      <text x={width / 2} y={height - 4} textAnchor="middle" className="text-[11px] fill-slate-700 font-black uppercase tracking-wider">
         Distanza tra i supporti (m)
       </text>
     </svg>
@@ -957,7 +974,7 @@ export function ToolStaffaggioSupportiCanalizzazioni({
                     Diagramma del Carico Ammissibile (Legrand CEI EN 61537)
                   </h3>
 
-                  <div className="h-64 w-full">
+                  <div className="h-72 w-full">
                     <StaffaggioDiagrammaSVG
                       curvaModificata={activeCalc.curvaModificata}
                       q_progetto={activeCalc.q_progetto}
