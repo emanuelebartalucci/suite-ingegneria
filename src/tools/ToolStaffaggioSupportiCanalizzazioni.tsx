@@ -563,6 +563,7 @@ export function ToolStaffaggioSupportiCanalizzazioni({
         setPData={setProjectData}
         setAppMode={setAppMode}
         iconColor="purple"
+        docCode="M_4.4.6_E5_Elet_00"
       />
 
       {/* Spiegazione & Formule */}

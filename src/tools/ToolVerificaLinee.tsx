@@ -1614,7 +1614,7 @@ export function ToolVerificaLinee({ projectData, setProjectData, setAppMode, pip
                 />
             </div>
 
-            <ProjectHeader pData={projectData} setPData={setProjectData} title="Verifica Perdite di Carico Linee" setAppMode={setAppMode} iconColor="brand" />
+            <ProjectHeader pData={projectData} setPData={setProjectData} title="Verifica Perdite di Carico Linee" setAppMode={setAppMode} iconColor="brand" docCode="M_4.4.6_E4_Term_00" />
 
             {/* Spiegazione & Formula */}
             <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">

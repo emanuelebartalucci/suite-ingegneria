@@ -159,7 +159,7 @@ export function ToolCalcoliElettrici({ projectData, setProjectData, setAppMode }
       </div>
 
       {/* Intestazione del progetto standard */}
-      <ProjectHeader pData={projectData} setPData={setProjectData} title="Calcoli Elettrici Rapidi" setAppMode={setAppMode} iconColor="orange" />
+      <ProjectHeader pData={projectData} setPData={setProjectData} title="Calcoli Elettrici Rapidi" setAppMode={setAppMode} iconColor="orange" docCode="M_4.4.6_E5_Elet_00" />
 
       {/* Contenitore Principale a due colonne */}
       <div className="flex flex-col md:flex-row gap-6 items-start">

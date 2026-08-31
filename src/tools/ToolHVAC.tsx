@@ -1088,6 +1088,7 @@ export function ToolHVAC({ projectData, setProjectData, setAppMode, climateData 
         title="Dimensionamento Impianto di Climatizzazione" 
         setAppMode={setAppMode} 
         iconColor="brand" 
+        docCode="M_4.4.6_E4_Term_00"
         showPrintButton={activeTab === 'summary' || activeTab === 'hvacFlowSummary' || activeTab === 'freshAirCheck' || activeTab === 'reheat'}
       />
 

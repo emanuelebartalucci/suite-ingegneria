@@ -7,6 +7,7 @@ import { doc, getDoc, collection, getDocs, setDoc, deleteDoc, updateDoc } from '
 import Login from './components/Login';
 import { ToolProfiloIdraulico } from './tools/ToolProfiloIdraulico';
 import { ToolCarichiTermici } from './tools/ToolCarichiTermici';
+import { ToolCarichiClimatizzazione } from './tools/ToolCarichiClimatizzazione';
 import { ToolDispersione } from './tools/ToolDispersione';
 import { ToolVerificaLinee } from './tools/ToolVerificaLinee';
 import { ToolDimensionamentoGas } from './tools/ToolDimensionamentoGas';
@@ -32,9 +33,11 @@ import { ProvinceClimateData } from './data/climateData';
 import { seedElectricalCatalog, fetchElectricalCables, fetchElectricalContainers } from './utils/electricalDbHelper';
 import { CableProduct, ContainerFamily } from './data/electricalDatabase';
 import { IconWaves, IconFlame, IconThermometer, IconArrowUp, IconWind, IconPump, IconImpeller } from './components/Icons';
-import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap, Scale, Fan, Layers, Grid, Ruler } from 'lucide-react';
+import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap, Scale, Fan, Layers, Grid, Ruler, ThermometerSun, ShieldCheck } from 'lucide-react';
 
 import logoImg from './assets/Logo.png';
+import { APP_VERSION } from './config/version';
+import { PrintFooter } from './components/PrintFooter';
 
 export interface ProjectData {
     client: string;
@@ -118,7 +121,7 @@ export default function App() {
         }
         return 'dashboard';
     });
-    const [dashboardSection, setDashboardSection] = useState<'home' | 'termoidraulica' | 'elettrica'>('home');
+    const [dashboardSection, setDashboardSection] = useState<'home' | 'termoidraulica' | 'elettrica' | 'sicurezza'>('home');
     const [importedCables, setImportedCables] = useState<any | null>(null);
     const [importedStaffaggioData, setImportedStaffaggioData] = useState<any | null>(null);
 
@@ -152,7 +155,7 @@ export default function App() {
         date: new Date().toISOString().split('T')[0],
         notes: '',
         descriptionVerifica: '',
-        revision: ''
+        revision: 'Rev00'
     });
 
     // Stato Gestione Anagrafica (Admin)
@@ -366,7 +369,7 @@ export default function App() {
                 date: new Date().toISOString().split('T')[0],
                 notes: '',
                 descriptionVerifica: '',
-                revision: ''
+                revision: 'Rev00'
             });
             setPrevMode(appMode);
         }
@@ -602,6 +605,7 @@ export default function App() {
 
     return (
         <div className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans">
+            <PrintFooter />
             {/* Global User Header Bar (in alto a sinistra/destra) */}
             <div className="max-w-7xl mx-auto flex justify-between items-center mb-6 text-xs text-slate-500 print:hidden gap-3">
                 {/* Sinistra: Pulsante Torna Indietro e Pagina Principale (visibili solo se fuori dalla dashboard) */}
@@ -700,16 +704,16 @@ export default function App() {
                                 <p className="text-slate-500 mb-10 text-sm max-w-lg mx-auto">
                                     Seleziona l'area tematica per accedere agli strumenti di dimensionamento e calcolo.
                                 </p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto mb-4">
                                     {/* Pulsante 1: Termoidraulica & Fluidi */}
                                     <button 
                                         onClick={() => setDashboardSection('termoidraulica')}
                                         className="group flex flex-col items-center p-8 bg-slate-50 border-2 border-slate-200 rounded-[2rem] hover:border-brand-500 hover:bg-brand-50/30 shadow-md hover:shadow-xl transition-all text-center cursor-pointer min-h-[240px] justify-center"
                                     >
-                                        <div className="w-18 h-18 bg-blue-100 text-brand-600 p-4.5 rounded-full mb-6 group-hover:scale-110 transition-transform flex items-center justify-center">
+                                        <div className="w-18 h-18 bg-blue-100 text-brand-600 p-4.5 rounded-full mb-5 group-hover:scale-110 transition-transform flex items-center justify-center">
                                             <IconWaves className="w-9 h-9" />
                                         </div>
-                                        <h2 className="text-lg font-bold text-slate-800 mb-2">Termoidraulica & Fluidi</h2>
+                                        <h2 className="text-base font-bold text-slate-800 mb-2">Termoidraulica & Fluidi</h2>
                                         <p className="text-xs text-slate-500 leading-relaxed max-w-xs text-center">
                                             Profilo idraulico, carichi termici, isolamento termico, verifica linee e gas.
                                         </p>
@@ -720,12 +724,26 @@ export default function App() {
                                         onClick={() => setDashboardSection('elettrica')}
                                         className="group flex flex-col items-center p-8 bg-slate-50 border-2 border-slate-200 rounded-[2rem] hover:border-amber-500 hover:bg-amber-50/30 shadow-md hover:shadow-xl transition-all text-center cursor-pointer min-h-[240px] justify-center"
                                     >
-                                        <div className="w-18 h-18 bg-amber-100 text-amber-600 p-4.5 rounded-full mb-6 group-hover:scale-110 transition-transform flex items-center justify-center">
+                                        <div className="w-18 h-18 bg-amber-100 text-amber-600 p-4.5 rounded-full mb-5 group-hover:scale-110 transition-transform flex items-center justify-center">
                                             <Zap className="w-9 h-9" />
                                         </div>
-                                        <h2 className="text-lg font-bold text-slate-800 mb-2">Impianti Elettrici</h2>
+                                        <h2 className="text-base font-bold text-slate-800 mb-2">Impianti Elettrici</h2>
                                         <p className="text-xs text-slate-500 leading-relaxed max-w-xs text-center">
-                                            Calcoli elettrici, dimensionamento condutture e cavi BT (sezione in sviluppo).
+                                            Calcoli elettrici, canalizzazioni, pozzetti e staffaggio supporti.
+                                        </p>
+                                    </button>
+
+                                    {/* Pulsante 3: Sicurezza Luoghi di Lavoro */}
+                                    <button 
+                                        onClick={() => setDashboardSection('sicurezza')}
+                                        className="group flex flex-col items-center p-8 bg-slate-50 border-2 border-slate-200 rounded-[2rem] hover:border-emerald-500 hover:bg-emerald-50/30 shadow-md hover:shadow-xl transition-all text-center cursor-pointer min-h-[240px] justify-center"
+                                    >
+                                        <div className="w-18 h-18 bg-emerald-100 text-emerald-600 p-4.5 rounded-full mb-5 group-hover:scale-110 transition-transform flex items-center justify-center">
+                                            <ShieldCheck className="w-9 h-9" />
+                                        </div>
+                                        <h2 className="text-base font-bold text-slate-800 mb-2">Sicurezza Luoghi di Lavoro</h2>
+                                        <p className="text-xs text-slate-500 leading-relaxed max-w-xs text-center">
+                                            Salute e sicurezza sul lavoro, cantieri e conformità D.Lgs. 81/08.
                                         </p>
                                     </button>
                                 </div>
@@ -771,7 +789,14 @@ export default function App() {
                                         <p className="text-[11px] text-slate-500 text-center leading-relaxed">Portate, miscele glicole, calcolo Cp/ρ e tubi commerciali.</p>
                                     </button>
 
-                                    {/* 3. Dispersioni */}
+                                    {/* 3. Carichi Climatizzazione Ambienti */}
+                                    <button onClick={() => setAppMode('carichi_climatizzazione')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-sky-500 hover:bg-sky-50 transition-all text-left cursor-pointer w-full">
+                                        <div className="w-14 h-14 bg-sky-100 text-sky-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><ThermometerSun className="w-7 h-7" /></div>
+                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Carichi Climatizzazione</h2>
+                                        <p className="text-[11px] text-slate-500 text-center leading-relaxed">Calcolo rapido volumetrico caldo/freddo per stanze, piani e unità immobiliari.</p>
+                                    </button>
+
+                                    {/* 4. Dispersioni */}
                                     <button onClick={() => setAppMode('dispersione')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-redbrand-500 hover:bg-redbrand-50 transition-all text-left cursor-pointer w-full">
                                         <div className="w-14 h-14 bg-redbrand-100 text-redbrand-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform"><IconThermometer /></div>
                                         <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Dispersioni</h2>
@@ -878,11 +903,45 @@ export default function App() {
                                 </div>
                             </div>
                         )}
+
+                        {dashboardSection === 'sicurezza' && (
+                            <div className="animate-in fade-in duration-300 max-w-5xl mx-auto">
+                                {/* Header di sezione */}
+                                <div className="flex flex-col sm:flex-row items-center justify-between border-b border-slate-100 pb-4 mb-8 gap-4">
+                                    <button
+                                        onClick={() => setDashboardSection('home')}
+                                        className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-150 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all active:scale-95 cursor-pointer shadow-sm border border-slate-200"
+                                    >
+                                        ← Indietro
+                                    </button>
+                                    <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                                        <span className="p-1.5 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center"><ShieldCheck className="w-4 h-4" /></span>
+                                        Sicurezza Luoghi di Lavoro
+                                    </h3>
+                                    <div className="w-20 hidden sm:block"></div>
+                                </div>
+
+                                {/* Placeholder predisposizione */}
+                                <div className="bg-gradient-to-br from-emerald-50/50 via-white to-slate-50 border-2 border-dashed border-emerald-200/80 rounded-3xl p-10 text-center shadow-xs">
+                                    <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-inner">
+                                        <ShieldCheck className="w-10 h-10" />
+                                    </div>
+                                    <h4 className="text-xl font-black text-slate-800 mb-2">Area Sicurezza & D.Lgs. 81/2008</h4>
+                                    <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed mb-6">
+                                        La sezione è predisposta per ospitare gli strumenti di calcolo, valutazione e verifica dedicati alla sicurezza dei cantieri e dei luoghi di lavoro. A ciascun modulo verrà associato il proprio codice identificativo univoco.
+                                    </p>
+                                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-200/80 text-xs font-semibold">
+                                        <span>🛡️</span> Strumenti e normative in fase di integrazione
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
                 {appMode === 'idraulico' && <ToolProfiloIdraulico projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} pipeCatalog={pipeCatalog || undefined} />}
                 {appMode === 'termico' && <ToolCarichiTermici projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} pipeCatalog={pipeCatalog || undefined} />}
+                {appMode === 'carichi_climatizzazione' && <ToolCarichiClimatizzazione projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 {appMode === 'dispersione' && <ToolDispersione projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} pipeCatalog={pipeCatalog || undefined} />}
                 {appMode === 'verifica_linee' && <ToolVerificaLinee projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} pipeCatalog={pipeCatalog || undefined} equivalentLengths={equivalentLengths || undefined} />}
                 {appMode === 'gas' && <ToolDimensionamentoGas projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} pipeCatalog={pipeCatalog || undefined} gasEquivalentLengths={gasEquivalentLengths || undefined} />}
@@ -898,14 +957,15 @@ export default function App() {
                 {appMode === 'database_elettrico' && <DatabaseManager type="elettrico" setAppMode={setAppMode} projectData={projectData} cablesCatalog={cablesCatalog || undefined} containersCatalog={containersCatalog || undefined} onDatabaseChange={() => loadElectricalDbs(true)} />}
             </div>
 
-            {/* Footer con firma discreta, invisibile in stampa */}
-            <footer className="mt-8 mb-4 text-center text-[12px] text-slate-400 opacity-50 font-medium tracking-wide print:hidden select-none">
-                Sviluppato da Emanuele Bartalucci
+            {/* Footer con firma al centro e versione a schermo in fondo a destra, invisibile in stampa */}
+            <footer className="max-w-7xl mx-auto mt-10 mb-4 pt-4 border-t border-slate-200/60 relative flex items-center justify-center text-xs text-slate-400 font-medium print:hidden select-none px-2">
+                <span className="opacity-60 text-center">Sviluppato da Emanuele Bartalucci</span>
+                <span className="absolute right-2 font-mono text-slate-500 font-bold bg-slate-200/60 px-2.5 py-0.5 rounded-md text-[11px]">{APP_VERSION}</span>
             </footer>
 
             {/* ADMIN MODAL */}
             {showAdminModal && createPortal(
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-all">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-all print:hidden">
                     <div className="bg-white rounded-[2rem] shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-scale-up text-left">
                         {/* Header */}
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
@@ -1178,7 +1238,7 @@ export default function App() {
 
             {/* TOAST NOTIFICATIONS */}
             {createPortal(
-                <div className="fixed top-4 right-4 z-[99999] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+                <div className="fixed top-4 right-4 z-[99999] flex flex-col gap-2 max-w-sm w-full pointer-events-none print:hidden">
                     {toasts.map(t => (
                         <div 
                             key={t.id} 
@@ -1228,7 +1288,7 @@ export default function App() {
 
             {/* CUSTOM CONFIRM MODAL */}
             {confirmModal.visible && confirmModal.resolve && createPortal(
-                <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-all">
+                <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-all print:hidden">
                     <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-sm p-6 animate-scale-up text-left font-sans">
                         <h3 className="font-black text-base text-slate-800 flex items-center gap-2">
                             <span>❓</span> {confirmModal.title}
@@ -1263,7 +1323,7 @@ export default function App() {
 
             {/* CUSTOM ALERT MODAL */}
             {alertModal.visible && alertModal.resolve && createPortal(
-                <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-all">
+                <div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-all print:hidden">
                     <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-sm p-6 animate-scale-up text-left font-sans">
                         <h3 className="font-black text-base text-slate-800 flex items-center gap-2">
                             <span className="text-amber-500">⚠️</span> {alertModal.title}

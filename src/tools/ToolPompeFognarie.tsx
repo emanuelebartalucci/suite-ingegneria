@@ -209,6 +209,7 @@ export function ToolPompeFognarie({ projectData, setProjectData, setAppMode }: T
       setPData={setProjectData}
       title="Pompe di Sollevamento Fognario"
       setAppMode={setAppMode}
+      docCode="M_4.4.6_E4_Term_00"
     />
 
     <div className="print:hidden space-y-6 pb-12">

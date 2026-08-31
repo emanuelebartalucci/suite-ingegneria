@@ -369,6 +369,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
       setPData={setProjectData}
       title="Aspiratore / Ventilatore Industriale"
       setAppMode={setAppMode}
+      docCode="M_4.4.6_E4_Term_00"
     />
 
     <div className="print:hidden space-y-6 pb-12">

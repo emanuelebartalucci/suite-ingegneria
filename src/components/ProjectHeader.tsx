@@ -18,6 +18,7 @@ interface ProjectHeaderProps {
   setAppMode: (mode: string) => void;
   iconColor?: 'brand' | 'orange' | 'red' | 'redbrand' | 'purple';
   showPrintButton?: boolean;
+  docCode?: string;
 }
 
 export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ 
@@ -26,7 +27,8 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
   title, 
   setAppMode, 
   iconColor = 'brand',
-  showPrintButton = true
+  showPrintButton = true,
+  docCode
 }) => {
     const [logoError, setLogoError] = useState<boolean>(false);
     const iconBg = iconColor === 'brand' 
@@ -68,7 +70,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
             )}
 
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 print:flex-row print:justify-between print:items-start print:w-full print:border-b-2 print:border-slate-800 print:pb-4 print:mb-4">
-                <div className="flex items-center space-x-4 flex-1 w-full print:w-auto">
+                <div className="flex items-center space-x-4 flex-1 w-full print:w-full print:items-start">
                     {!logoError ? (
                         <img src={logoImg} alt="Logo" className="h-12 w-auto object-contain print:h-12" onError={() => setLogoError(true)} />
                     ) : (
@@ -76,9 +78,20 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
                             <IconDroplets className="text-white" />
                         </div>
                     )}
-                    <div className="flex-1">
-                        <p className={`text-xs font-bold uppercase tracking-wider mb-1 print:text-slate-500 ${textBrandClass}`}>{title}</p>
-                        <span className="hidden print:block text-2xl md:text-3xl font-bold text-slate-900">{pData.client || 'Progetto Impianto'}</span>
+                    <div className="flex-1 min-w-0">
+                        {/* Riga Superiore: Titolo Strumento a Sinistra e Codice Documento / Rev a Destra in Stampa */}
+                        <div className="flex justify-between items-baseline gap-4 w-full">
+                            <p className={`text-xs font-bold uppercase tracking-wider mb-1 print:text-slate-500 ${textBrandClass}`}>{title}</p>
+                            
+                            {/* Visualizzazione in Stampa: Codice Identificativo e subito a seguire la Revisione (sempre precompilata con Rev) */}
+                            <span className="hidden print:inline-block text-[11px] font-bold text-slate-600 font-mono tracking-tight text-right shrink-0">
+                                {docCode 
+                                    ? `${docCode} - ${pData.revision ? (pData.revision.toUpperCase().startsWith('REV') ? pData.revision : `Rev${pData.revision}`) : 'Rev00'}`
+                                    : (pData.revision ? (pData.revision.toUpperCase().startsWith('REV') ? pData.revision : `Rev${pData.revision}`) : 'Rev00')}
+                            </span>
+                        </div>
+
+                        <span className="hidden print:block text-2xl md:text-3xl font-bold text-slate-900 leading-tight">{pData.client || 'Progetto Impianto'}</span>
                         <input type="text" value={pData.client} onChange={e => setPData({...pData, client: e.target.value})} className={`text-2xl md:text-3xl font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:outline-none w-full max-w-xl print:hidden ${focusBorderClass}`} placeholder="Inserisci Titolo o Cliente..."/>
                         
                         {/* Descrizione Verifica */}
@@ -99,17 +112,37 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
                     </div>
                 </div>
 
-                {/* Revisione */}
-                <div className="flex flex-col items-end w-full md:w-auto print:items-end print:w-auto mt-2 md:mt-0 print:self-start">
-                    <label className="text-[10px] font-black uppercase tracking-wider text-slate-400 print:hidden">Rev.</label>
-                    <span className="hidden print:block text-base font-bold text-slate-800">{pData.revision || ''}</span>
-                    <input 
-                        type="text" 
-                        value={pData.revision || ''} 
-                        onChange={e => setPData({...pData, revision: e.target.value})} 
-                        className={`text-right text-base font-bold text-slate-800 bg-transparent border-b border-slate-200 focus:outline-none w-20 print:hidden ${focusBorderClass}`} 
-                        placeholder="es. Rev00"
-                    />
+                {/* Revisione & Codice a Schermo (Invisibile in Stampa) */}
+                <div className="flex flex-col items-end w-full md:w-auto print:hidden mt-2 md:mt-0">
+                    {docCode && (
+                        <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded mb-1 shadow-2xs">
+                            {docCode}
+                        </span>
+                    )}
+                    <div className="flex items-center gap-1">
+                        <span className="text-sm font-bold text-slate-600 select-none">Rev.</span>
+                        <input 
+                            type="text" 
+                            maxLength={4}
+                            value={(pData.revision ?? '').replace(/^rev\.?\s*/i, '')} 
+                            onChange={e => {
+                                const raw = e.target.value.replace(/^rev\.?\s*/i, '').replace(/[^0-9a-zA-Z]/g, '').trim();
+                                setPData({...pData, revision: raw ? `Rev${raw}` : ''});
+                            }} 
+                            onBlur={() => {
+                                const clean = (pData.revision || '').replace(/^rev\.?\s*/i, '').trim();
+                                if (!clean) {
+                                    setPData({...pData, revision: 'Rev00'});
+                                } else if (/^\d+$/.test(clean) && clean.length === 1) {
+                                    setPData({...pData, revision: `Rev0${clean}`});
+                                } else {
+                                    setPData({...pData, revision: `Rev${clean}`});
+                                }
+                            }}
+                            className={`text-center text-sm font-bold text-slate-800 bg-transparent border-b border-slate-300 focus:outline-none w-12 ${focusBorderClass}`} 
+                            placeholder="00"
+                        />
+                    </div>
                 </div>
             </div>
 

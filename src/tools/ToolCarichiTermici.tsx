@@ -45,6 +45,26 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode, pi
     const [vTarget, setVTarget] = useState<number | ''>(1.0); // m/s
     const [loads, setLoads] = useState<LoadItem[]>([]);
 
+    // Ascolto carichi importati da altri tool (es. Carichi Climatizzazione Ambienti)
+    React.useEffect(() => {
+        const pendingImport = sessionStorage.getItem('pending_import_carichi_termici');
+        if (pendingImport) {
+            try {
+                const parsed = JSON.parse(pendingImport);
+                if (parsed && Array.isArray(parsed.loads) && parsed.loads.length > 0) {
+                    setLoads(parsed.loads);
+                    sessionStorage.removeItem('pending_import_carichi_termici');
+                    setTimeout(() => {
+                        window.suiteUI?.toast(`${parsed.loads.length} carichi importati da ${parsed.source || 'Climatizzazione'}!`, 'success');
+                    }, 150);
+                }
+            } catch (e) {
+                console.error('Errore nel caricamento dei carichi importati:', e);
+                sessionStorage.removeItem('pending_import_carichi_termici');
+            }
+        }
+    }, []);
+
     // Calcolo automatico delle proprietà del fluido in base a tipo, temperatura e glicole
     const fluidProps = useMemo(() => {
         const T = Number(fluidTemp) || 55;
@@ -383,7 +403,7 @@ export function ToolCarichiTermici({ projectData, setProjectData, setAppMode, pi
                 />
             </div>
             
-            <ProjectHeader pData={projectData} setPData={setProjectData} title="Calcolo Carichi Termici & Reti" setAppMode={setAppMode} iconColor="orange" />
+            <ProjectHeader pData={projectData} setPData={setProjectData} title="Calcolo Carichi Termici & Reti" setAppMode={setAppMode} iconColor="orange" docCode="M_4.4.6_E4_Term_00" />
 
             {/* Spiegazione & Formula */}
             <div className="bg-amber-50/50 border border-amber-200/50 rounded-2xl p-4 mb-5 text-xs text-slate-650 space-y-2.5 print:hidden">

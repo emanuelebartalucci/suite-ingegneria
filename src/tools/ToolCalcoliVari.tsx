@@ -1364,7 +1364,7 @@ export function ToolCalcoliVari({ projectData, setProjectData, setAppMode, pipeC
         </div>
       </div>
       {/* Intestazione del progetto standard */}
-      <ProjectHeader pData={projectData} setPData={setProjectData} title="Calcoli Rapidi & Utilità" setAppMode={setAppMode} iconColor="brand" />
+      <ProjectHeader pData={projectData} setPData={setProjectData} title="Calcoli Rapidi & Utilità" setAppMode={setAppMode} iconColor="brand" docCode="M_4.4.6_E4_Term_00" />
 
       {/* Contenitore Principale a due colonne */}
       <div className="flex flex-col md:flex-row gap-6 items-start">

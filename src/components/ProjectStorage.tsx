@@ -321,7 +321,7 @@ export default function ProjectStorage({
         date: projectInfo.date || new Date().toISOString().split('T')[0],
         notes: projectInfo.notes || '',
         descriptionVerifica: projectInfo.descriptionVerifica || '',
-        revision: projectInfo.revision || '',
+        revision: projectInfo.revision || 'Rev00',
         data: JSON.parse(JSON.stringify(currentData)),
         updatedAt: new Date().toISOString()
       };
@@ -387,7 +387,7 @@ export default function ProjectStorage({
               date: projectInfo.date || new Date().toISOString().split('T')[0],
               notes: projectInfo.notes || '',
               descriptionVerifica: projectInfo.descriptionVerifica || '',
-              revision: projectInfo.revision || '',
+              revision: projectInfo.revision || 'Rev00',
               data: currentData,
               updatedAt: new Date().toISOString()
             };
@@ -407,7 +407,7 @@ export default function ProjectStorage({
             date: projectInfo.date || new Date().toISOString().split('T')[0],
             notes: projectInfo.notes || '',
             descriptionVerifica: projectInfo.descriptionVerifica || '',
-            revision: projectInfo.revision || '',
+            revision: projectInfo.revision || 'Rev00',
             data: JSON.parse(JSON.stringify(currentData)),
             updatedAt: new Date().toISOString()
           });
@@ -423,7 +423,7 @@ export default function ProjectStorage({
               date: projectInfo.date || new Date().toISOString().split('T')[0],
               notes: projectInfo.notes || '',
               descriptionVerifica: projectInfo.descriptionVerifica || '',
-              revision: projectInfo.revision || '',
+              revision: projectInfo.revision || 'Rev00',
               data: JSON.parse(JSON.stringify(currentData)),
               updatedAt: new Date().toISOString()
             });
@@ -457,7 +457,7 @@ export default function ProjectStorage({
       date: p.date,
       notes: p.notes,
       descriptionVerifica: p.descriptionVerifica || '',
-      revision: p.revision || ''
+      revision: p.revision || 'Rev00'
     });
     
     setShowModal(false);
@@ -522,7 +522,7 @@ export default function ProjectStorage({
       date: new Date().toISOString().split('T')[0],
       notes: p.notes,
       descriptionVerifica: p.descriptionVerifica || '',
-      revision: p.revision || ''
+      revision: p.revision || 'Rev00'
     });
     
     setShowModal(false);
