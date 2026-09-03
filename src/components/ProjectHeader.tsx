@@ -19,17 +19,20 @@ interface ProjectHeaderProps {
   iconColor?: 'brand' | 'orange' | 'red' | 'redbrand' | 'purple';
   showPrintButton?: boolean;
   docCode?: string;
+  hideClientInputs?: boolean;
 }
 
 export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ 
-  pData, 
-  setPData, 
+  pData = { client: '', author: '', date: '', notes: '', revision: 'Rev00' }, 
+  setPData = () => {}, 
   title, 
   setAppMode, 
   iconColor = 'brand',
   showPrintButton = true,
-  docCode
+  docCode,
+  hideClientInputs = false
 }) => {
+    const safeData = pData || { client: '', author: '', date: '', notes: '', revision: 'Rev00' };
     const [logoError, setLogoError] = useState<boolean>(false);
     const iconBg = iconColor === 'brand' 
       ? 'bg-brand-600' 
@@ -80,40 +83,46 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
                     )}
                     <div className="flex-1 min-w-0">
                         {/* Riga Superiore: Titolo Strumento a Sinistra e Codice Documento / Rev a Destra in Stampa */}
-                        <div className="flex justify-between items-baseline gap-4 w-full">
-                            <p className={`text-xs font-bold uppercase tracking-wider mb-1 print:text-slate-500 ${textBrandClass}`}>{title}</p>
+                        <div className="flex justify-between items-center gap-4 w-full">
+                            <h1 className={`${hideClientInputs ? 'text-xl sm:text-2xl md:text-3xl font-black uppercase tracking-tight text-slate-900' : `text-xs font-bold uppercase tracking-wider mb-1 ${textBrandClass}`} print:text-slate-900 leading-tight`}>
+                              {title}
+                            </h1>
                             
                             {/* Visualizzazione in Stampa: Codice Identificativo e subito a seguire la Revisione (sempre precompilata con Rev) */}
                             <span className="hidden print:inline-block text-[11px] font-bold text-slate-600 font-mono tracking-tight text-right shrink-0">
                                 {docCode 
-                                    ? `${docCode} - ${pData.revision ? (pData.revision.toUpperCase().startsWith('REV') ? pData.revision : `Rev${pData.revision}`) : 'Rev00'}`
-                                    : (pData.revision ? (pData.revision.toUpperCase().startsWith('REV') ? pData.revision : `Rev${pData.revision}`) : 'Rev00')}
+                                    ? `${docCode} - ${safeData.revision ? (safeData.revision.toUpperCase().startsWith('REV') ? safeData.revision : `Rev${safeData.revision}`) : 'Rev00'}`
+                                    : (safeData.revision ? (safeData.revision.toUpperCase().startsWith('REV') ? safeData.revision : `Rev${safeData.revision}`) : 'Rev00')}
                             </span>
                         </div>
 
-                        <span className="hidden print:block text-2xl md:text-3xl font-bold text-slate-900 leading-tight">{pData.client || 'Progetto Impianto'}</span>
-                        <input type="text" value={pData.client} onChange={e => setPData({...pData, client: e.target.value})} className={`text-2xl md:text-3xl font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:outline-none w-full max-w-xl print:hidden ${focusBorderClass}`} placeholder="Inserisci Titolo o Cliente..."/>
-                        
-                        {/* Descrizione Verifica */}
-                        <div className="mt-1">
-                            {pData.descriptionVerifica && (
-                                <span className="hidden print:block text-xs font-medium text-slate-500 italic">
-                                    {pData.descriptionVerifica}
-                                </span>
-                            )}
-                            <input 
-                                type="text" 
-                                value={pData.descriptionVerifica || ''} 
-                                onChange={e => setPData({...pData, descriptionVerifica: e.target.value})} 
-                                className={`text-xs font-medium text-slate-500 bg-transparent border-b border-transparent hover:border-slate-300 focus:outline-none w-full max-w-xl print:hidden ${focusBorderClass}`} 
-                                placeholder="Descrizione Verifica (opzionale)..."
-                            />
-                        </div>
+                        {!hideClientInputs && (
+                          <>
+                            <span className="hidden print:block text-2xl md:text-3xl font-bold text-slate-900 leading-tight">{safeData.client || 'Progetto Impianto'}</span>
+                            <input type="text" value={safeData.client || ''} onChange={e => setPData({...safeData, client: e.target.value})} className={`text-2xl md:text-3xl font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-slate-300 focus:outline-none w-full max-w-4xl lg:max-w-5xl print:hidden ${focusBorderClass}`} placeholder="Inserisci Titolo o Cliente..."/>
+                            
+                            {/* Descrizione Verifica */}
+                            <div className="mt-1">
+                                {safeData.descriptionVerifica && (
+                                    <span className="hidden print:block text-xs font-medium text-slate-500 italic">
+                                        {safeData.descriptionVerifica}
+                                    </span>
+                                )}
+                                <input 
+                                    type="text" 
+                                    value={safeData.descriptionVerifica || ''} 
+                                    onChange={e => setPData({...safeData, descriptionVerifica: e.target.value})} 
+                                    className={`text-xs font-medium text-slate-500 bg-transparent border-b border-transparent hover:border-slate-300 focus:outline-none w-full max-w-4xl lg:max-w-5xl print:hidden ${focusBorderClass}`} 
+                                    placeholder="Descrizione Verifica (opzionale)..."
+                                />
+                            </div>
+                          </>
+                        )}
                     </div>
                 </div>
 
                 {/* Revisione & Codice a Schermo (Invisibile in Stampa) */}
-                <div className="flex flex-col items-end w-full md:w-auto print:hidden mt-2 md:mt-0">
+                <div className="flex flex-col items-end w-full md:w-auto shrink-0 print:hidden mt-2 md:mt-0">
                     {docCode && (
                         <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded mb-1 shadow-2xs">
                             {docCode}
@@ -124,22 +133,22 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
                         <input 
                             type="text" 
                             maxLength={4}
-                            value={(pData.revision ?? '').replace(/^rev\.?\s*/i, '')} 
+                            value={(safeData.revision ?? '').replace(/^rev\.?\s*/i, '')} 
                             onChange={e => {
                                 const raw = e.target.value.replace(/^rev\.?\s*/i, '').replace(/[^0-9a-zA-Z]/g, '').trim();
-                                setPData({...pData, revision: raw ? `Rev${raw}` : ''});
+                                setPData({...safeData, revision: raw ? `Rev${raw}` : ''});
                             }} 
                             onBlur={() => {
-                                const clean = (pData.revision || '').replace(/^rev\.?\s*/i, '').trim();
+                                const clean = (safeData.revision || '').replace(/^rev\.?\s*/i, '').trim();
                                 if (!clean) {
-                                    setPData({...pData, revision: 'Rev00'});
+                                    setPData({...safeData, revision: 'Rev00'});
                                 } else if (/^\d+$/.test(clean) && clean.length === 1) {
-                                    setPData({...pData, revision: `Rev0${clean}`});
+                                    setPData({...safeData, revision: `Rev0${clean}`});
                                 } else {
-                                    setPData({...pData, revision: `Rev${clean}`});
+                                    setPData({...safeData, revision: `Rev${clean}`});
                                 }
                             }}
-                            className={`text-center text-sm font-bold text-slate-800 bg-transparent border-b border-slate-300 focus:outline-none w-12 ${focusBorderClass}`} 
+                            className="w-12 text-center text-sm font-mono font-bold text-slate-800 bg-slate-50 border border-slate-300 rounded px-1.5 py-0.5 focus:bg-white focus:outline-none focus:ring-1 focus:ring-slate-400"
                             placeholder="00"
                         />
                     </div>
@@ -151,19 +160,19 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
                     <div className="flex space-x-4">
                         <div className="flex-1">
                             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Progettista / Autore</label>
-                            <span className="hidden print:block text-sm font-medium text-slate-700">{pData.author || '-'}</span>
-                            <input type="text" value={pData.author} onChange={e => setPData({...pData, author: e.target.value})} placeholder="Tuo Nome..." className="w-full bg-transparent text-sm font-medium text-slate-700 focus:outline-none border-b border-slate-300 print:hidden" />
+                            <span className="hidden print:block text-sm font-medium text-slate-700">{safeData.author || '-'}</span>
+                            <input type="text" value={safeData.author || ''} onChange={e => setPData({...safeData, author: e.target.value})} placeholder="Tuo Nome..." className="w-full bg-transparent text-sm font-medium text-slate-700 focus:outline-none border-b border-slate-300 print:hidden" />
                         </div>
                         <div className="flex-1">
                             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data</label>
-                            <span className="hidden print:block text-sm font-medium text-slate-700">{pData.date ? new Date(pData.date).toLocaleDateString('it-IT') : '-'}</span>
-                            <input type="date" value={pData.date} onChange={e => setPData({...pData, date: e.target.value})} className="w-full bg-transparent text-sm font-medium text-slate-700 focus:outline-none border-b border-slate-300 print:hidden" />
+                            <span className="hidden print:block text-sm font-medium text-slate-700">{safeData.date ? new Date(safeData.date).toLocaleDateString('it-IT') : '-'}</span>
+                            <input type="date" value={safeData.date || ''} onChange={e => setPData({...safeData, date: e.target.value})} className="w-full bg-transparent text-sm font-medium text-slate-700 focus:outline-none border-b border-slate-300 print:hidden" />
                         </div>
                     </div>
                     <div>
                         <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Note Tecniche</label>
-                        <p className="hidden print:block text-sm text-slate-600 whitespace-pre-wrap">{pData.notes || 'Nessuna nota.'}</p>
-                        <input type="text" value={pData.notes} onChange={e => setPData({...pData, notes: e.target.value})} placeholder="Inserisci note sul progetto..." className="w-full bg-transparent text-sm font-medium text-slate-700 focus:outline-none border-b border-slate-300 print:hidden" />
+                        <p className="hidden print:block text-sm text-slate-600 whitespace-pre-wrap">{safeData.notes || 'Nessuna nota.'}</p>
+                        <input type="text" value={safeData.notes || ''} onChange={e => setPData({...safeData, notes: e.target.value})} placeholder="Inserisci note sul progetto..." className="w-full bg-transparent text-sm font-medium text-slate-700 focus:outline-none border-b border-slate-300 print:hidden" />
                     </div>
                 </div>
             </div>

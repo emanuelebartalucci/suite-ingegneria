@@ -1,5 +1,5 @@
 // Configurazione centralizzata versione per Suite Ingegneria
-export const APP_VERSION = "v1.0.2";
+export const APP_VERSION = "v1.0.3";
 export const APP_RELEASE_DATE = "31/08/2026";
 export const APP_NAME = "Suite Ingegneria";
 

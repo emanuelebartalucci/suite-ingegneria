@@ -167,6 +167,13 @@ body {
   body, html {
     margin: 0 !important;
     padding: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+  }
+
+  .min-h-screen {
+    min-height: auto !important;
+    height: auto !important;
   }
 
   .p-4, .p-6, .p-8, .p-10 {
@@ -188,8 +195,41 @@ body {
     gap: 0.5rem !important;
   }
 
+  /* Anti-troncamento righe tabelle e ripetizione testata colonne */
+  table thead {
+    display: table-header-group !important;
+  }
+  table tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Classi centralizzate Standard Suite Ingegneria per report di stampa */
+  .print-report {
+    color: #0f172a !important;
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif !important;
+    padding-bottom: 3rem !important;
+  }
+
+  .print-section {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 1.25rem !important;
+  }
+
+  .print-force-break {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+
+  .print-avoid-break {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
   @page {
-    margin: 0.6cm 0.8cm;
+    size: A4 portrait;
+    margin: 0.6cm 0.8cm 0.8cm 0.8cm;
     @bottom-center {
       content: "Pagina " counter(page);
       font-size: 8.5px;

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
 import { ChevronDown, ChevronUp, AlertTriangle, CheckCircle, Info, Zap, Droplets } from 'lucide-react';
+import { PrintReport, PrintSection } from '../components/print';
 
 interface ToolPompeFognarieProps {
   projectData: ProjectData;
@@ -672,7 +673,7 @@ export function ToolPompeFognarie({ projectData, setProjectData, setAppMode }: T
                       </tbody>
                     </table>
                   </div>
-                  <p className="text-[10px] text-slate-400 ml-1">âš ï¸ Limite raccomandato: ≤ 10 avviamenti/h per motori pompe sommerse</p>
+                  <p className="text-[10px] text-slate-400 ml-1">⚠️ Limite raccomandato: ≤ 10 avviamenti/h per motori pompe sommerse</p>
                 </div>
               )}
             </div>
@@ -681,17 +682,16 @@ export function ToolPompeFognarie({ projectData, setProjectData, setAppMode }: T
       </div>
     </div>
 
-    {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• REPORT STAMPA â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
-    {/* Visibile solo in stampa — il logo e le info progetto vengono dal ProjectHeader sopra */}
-    <div className="hidden print:block space-y-5">
-
+    {/* ══════════════════════════════════════════════════════════════════════
+        REPORT STAMPA CENTRALIZZATO
+       ══════════════════════════════════════════════════════════════════════ */}
+    <PrintReport className="space-y-5">
       {!results ? (
         <p className="text-sm text-slate-400 italic">Nessun risultato — inserire i dati nella scheda interattiva.</p>
       ) : (
         <>
           {/* Sezione: Dati di Progetto */}
-          <div>
-            <h3 className="text-sm font-bold text-slate-700 mb-3 pb-1 border-b border-slate-300">Dati di Progetto</h3>
+          <PrintSection title="1. Dati di Progetto">
             <div className="grid grid-cols-4 gap-4">
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Portata Media (m³/h)</label>
@@ -729,11 +729,10 @@ export function ToolPompeFognarie({ projectData, setProjectData, setAppMode }: T
                 <span className="text-lg font-semibold text-slate-800">{data.N_riserva}</span>
               </div>
             </div>
-          </div>
+          </PrintSection>
 
           {/* Sezione: Risultati Dimensionamento */}
-          <div>
-            <h3 className="text-sm font-bold text-slate-700 mb-3 pb-1 border-b border-slate-300">Risultati Dimensionamento</h3>
+          <PrintSection title="2. Risultati Dimensionamento">
             <div className="grid grid-cols-5 gap-4">
               <div>
                 <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Potenza Massima</label>
@@ -759,11 +758,10 @@ export function ToolPompeFognarie({ projectData, setProjectData, setAppMode }: T
                 <p className="text-[9px] text-slate-400 mt-1">Tot: {results.taglia_IEC * (results.Ns + results.Nr)} kW</p>
               </div>
             </div>
-          </div>
+          </PrintSection>
 
           {/* Sezione: Elenco Pompe */}
-          <div>
-            <h3 className="text-sm font-bold text-slate-700 mb-3 pb-1 border-b border-slate-300">Elenco Pompe</h3>
+          <PrintSection title="3. Elenco Pompe (Servizio e Riserva)">
             <table className="w-full">
               <thead>
                 <tr>
@@ -795,12 +793,11 @@ export function ToolPompeFognarie({ projectData, setProjectData, setAppMode }: T
                 ))}
               </tbody>
             </table>
-          </div>
+          </PrintSection>
 
           {/* Sezione: Vasca di Accumulo (se attiva) */}
           {data.showVasca && vascaResults && (
-            <div>
-              <h3 className="text-sm font-bold text-slate-700 mb-3 pb-1 border-b border-slate-300">Dimensionamento Vasca di Accumulo</h3>
+            <PrintSection title="4. Dimensionamento Vasca di Accumulo">
               <div className="grid grid-cols-2 gap-8">
                 <div className="grid grid-cols-2 gap-4">
                   {[
@@ -849,11 +846,11 @@ export function ToolPompeFognarie({ projectData, setProjectData, setAppMode }: T
                   </table>
                 </div>
               </div>
-            </div>
+            </PrintSection>
           )}
         </>
       )}
-    </div>
+    </PrintReport>
     </>
   );
 }

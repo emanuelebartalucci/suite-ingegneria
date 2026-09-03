@@ -28,5 +28,5 @@ Dopo ogni modifica di codice o rilascio di funzionalità, **DEVI SEMPRE AGGIORNA
 ## 🛠️ 4. Standard Grafici e Qualità del Codice
 - **Coerenza Grafica**: Rispetta rigorosamente i colori di categoria (Azzurro/Brand per Idraulica, Arancione per Termica, Viola per Gas, Ambra per Elettrica) e lo stile sobrio e professionale per le stampe A4/PDF.
 - **Feedback Utente**: Notifica sempre le azioni dell'utente con toast e dialoghi tramite `window.suiteUI`.
-- **Salvataggio Progetti**: Ogni nuovo strumento deve integrare `ProjectHeader` e `ProjectStorage` per garantire salvataggio Cloud su Firestore e bozza locale.
+- **Standard Stampa Centralizzato**: Utilizza sempre i componenti condivisi `PrintReport` e `PrintSection` (`src/components/print/`) per le relazioni di calcolo; non spezzare mai tabelle o capitoli a metà (`break-inside: avoid`), e affida il footer multipagina (con numerazione e versione) a `PrintFooter.tsx` e alle regole globali di `src/index.css`.
 - **Build Verification**: Esegui sempre `npm run build` (tramite `cmd /c npm run build`) al termine delle modifiche per garantire 0 errori di compilazione TypeScript prima di informare l'utente.

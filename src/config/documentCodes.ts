@@ -27,6 +27,9 @@ export const TOOL_DOC_CODES: Record<string, string> = {
   'dimensionamento_canali': SECTION_DOC_CODES.elettrica,
   'dimensionamento_pozzetti': SECTION_DOC_CODES.elettrica,
   'staffaggio_supporti': SECTION_DOC_CODES.elettrica,
+
+  // Sezione Sicurezza Luoghi di Lavoro (Codici Univoci per Strumento)
+  'rischio_chimico': 'M_4.4.6_O25_Ag.Chim.',
 };
 
 /**

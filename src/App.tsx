@@ -19,6 +19,7 @@ import { ToolAspiratore } from './tools/ToolAspiratore';
 import { ToolVerificaRiempimentoCanalizzazioni } from './tools/ToolVerificaRiempimentoCanalizzazioni';
 import { ToolDimensionamentoPozzettiElettrici } from './tools/ToolDimensionamentoPozzettiElettrici';
 import { ToolStaffaggioSupportiCanalizzazioni } from './tools/ToolStaffaggioSupportiCanalizzazioni';
+import { ToolRischioChimico } from './tools/ToolRischioChimico';
 import { DatabaseManager } from './components/DatabaseManager';
 import { 
     seedThermodynamicCatalog,
@@ -33,7 +34,7 @@ import { ProvinceClimateData } from './data/climateData';
 import { seedElectricalCatalog, fetchElectricalCables, fetchElectricalContainers } from './utils/electricalDbHelper';
 import { CableProduct, ContainerFamily } from './data/electricalDatabase';
 import { IconWaves, IconFlame, IconThermometer, IconArrowUp, IconWind, IconPump, IconImpeller } from './components/Icons';
-import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap, Scale, Fan, Layers, Grid, Ruler, ThermometerSun, ShieldCheck } from 'lucide-react';
+import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap, Scale, Fan, Layers, Grid, Ruler, ThermometerSun, ShieldCheck, FlaskConical } from 'lucide-react';
 
 import logoImg from './assets/Logo.png';
 import { APP_VERSION } from './config/version';
@@ -921,18 +922,23 @@ export default function App() {
                                     <div className="w-20 hidden sm:block"></div>
                                 </div>
 
-                                {/* Placeholder predisposizione */}
-                                <div className="bg-gradient-to-br from-emerald-50/50 via-white to-slate-50 border-2 border-dashed border-emerald-200/80 rounded-3xl p-10 text-center shadow-xs">
-                                    <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-inner">
-                                        <ShieldCheck className="w-10 h-10" />
-                                    </div>
-                                    <h4 className="text-xl font-black text-slate-800 mb-2">Area Sicurezza & D.Lgs. 81/2008</h4>
-                                    <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed mb-6">
-                                        La sezione è predisposta per ospitare gli strumenti di calcolo, valutazione e verifica dedicati alla sicurezza dei cantieri e dei luoghi di lavoro. A ciascun modulo verrà associato il proprio codice identificativo univoco.
-                                    </p>
-                                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-200/80 text-xs font-semibold">
-                                        <span>🛡️</span> Strumenti e normative in fase di integrazione
-                                    </div>
+                                {/* Griglia Strumenti Sicurezza */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <button
+                                        onClick={() => setAppMode('rischio_chimico')}
+                                        className="bg-white p-6 rounded-3xl shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-200/80 hover:border-emerald-500/50 flex flex-col items-center group relative overflow-hidden text-left cursor-pointer hover:-translate-y-1"
+                                    >
+                                        <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300 shadow-inner">
+                                            <FlaskConical className="w-7 h-7" />
+                                        </div>
+                                        <span className="font-mono text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full mb-2 border border-emerald-200">
+                                            M_4.4.6_O25_Ag.Chim.
+                                        </span>
+                                        <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Valutazione Rischio Chimico</h2>
+                                        <p className="text-[11px] text-slate-500 text-center leading-relaxed">
+                                            Algoritmo MoVaRisCh (Ed. 28/02/2026) per la salute dei lavoratori ex D.Lgs. 81/08.
+                                        </p>
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -953,6 +959,7 @@ export default function App() {
                 {appMode === 'dimensionamento_canali' && <ToolVerificaRiempimentoCanalizzazioni projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} cablesCatalog={cablesCatalog || undefined} containersCatalog={containersCatalog || undefined} onVerifyPozzetto={(payload) => { localStorage.setItem('pending_import_pozzetti', JSON.stringify(payload)); const targetUrl = `${window.location.origin}${window.location.pathname}?tool=dimensionamento_pozzetti`; window.open(targetUrl, '_blank'); }} onVerifyStaffaggio={(payload) => { localStorage.setItem('pending_import_staffaggio', JSON.stringify(payload)); const targetUrl = `${window.location.origin}${window.location.pathname}?tool=staffaggio_supporti`; window.open(targetUrl, '_blank'); }} />}
                 {appMode === 'dimensionamento_pozzetti' && <ToolDimensionamentoPozzettiElettrici projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} cablesCatalog={cablesCatalog || undefined} containersCatalog={containersCatalog || undefined} importedCables={importedCables} clearImportedCables={() => setImportedCables(null)} />}
                 {appMode === 'staffaggio_supporti' && <ToolStaffaggioSupportiCanalizzazioni projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} importedStaffaggioData={importedStaffaggioData} clearImportedStaffaggioData={() => setImportedStaffaggioData(null)} />}
+                {appMode === 'rischio_chimico' && <ToolRischioChimico projectData={projectData} setProjectData={setProjectData} setAppMode={setAppMode} />}
                 {appMode === 'database_termo' && <DatabaseManager type="termo" setAppMode={setAppMode} projectData={projectData} pipeCatalog={pipeCatalog || undefined} equivalentLengths={equivalentLengths || undefined} gasEquivalentLengths={gasEquivalentLengths || undefined} climateData={climateData || undefined} onDatabaseChange={() => loadThermodynamicDbs(true)} />}
                 {appMode === 'database_elettrico' && <DatabaseManager type="elettrico" setAppMode={setAppMode} projectData={projectData} cablesCatalog={cablesCatalog || undefined} containersCatalog={containersCatalog || undefined} onDatabaseChange={() => loadElectricalDbs(true)} />}
             </div>
