@@ -104,39 +104,52 @@ export const IconWind: React.FC<IconProps> = ({ className = "w-full h-full" }) =
 );
 
 /**
- * Simbolo P&ID pompa centrifuga:
- * cerchio = corpo pompa, triangolo = girante, pipe suction/discharge
+ * Simbolo P&ID pompa centrifuga di sollevamento fognario (a tutto campo 0-24):
+ * Corpo pompa circolare generoso (ISO 10628 / DIN / ISA-5.1), girante a triangolo
+ * con campitura semitrasparente, mandata verticale con freccia dinamica,
+ * aspirazione laterale flangiata e piede di appoggio a fondo vasca.
  */
 export const IconPump: React.FC<IconProps> = ({ className = "w-full h-full" }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    {/* Corpo pompa */}
-    <circle cx="12" cy="13" r="6" />
-    {/* Girante (triangolo che indica la rotazione) */}
-    <path d="M9 10.5v5l6-2.5-6-2.5z" />
-    {/* Tubo aspirazione dal basso */}
-    <line x1="12" y1="19" x2="12" y2="23" />
-    {/* Tubo mandata verso l'alto con freccia */}
-    <line x1="12" y1="7" x2="12" y2="3" />
-    <polyline points="9.5 5.5 12 3 14.5 5.5" />
+    {/* Grande corpo pompa circolare P&ID */}
+    <circle cx="11" cy="13" r="8" />
+    {/* Girante P&ID interna a triangolo proporzionata */}
+    <polygon points="7,8.5 7,17.5 16,13" fill="currentColor" fillOpacity="0.25" />
+    {/* Condotto di mandata tangenziale che sale fino in cima */}
+    <line x1="19" y1="13" x2="19" y2="2" />
+    {/* Freccia di mandata verso l'alto netta e visibile */}
+    <polyline points="15.5 5.5 19 2 22.5 5.5" />
+    {/* Condotto di aspirazione laterale / sommerso con flangia */}
+    <line x1="3" y1="13" x2="1" y2="13" />
+    <line x1="1" y1="10" x2="1" y2="16" />
+    {/* Piede di appoggio alla base vasca */}
+    <line x1="11" y1="21" x2="11" y2="23" />
+    <line x1="7" y1="23" x2="15" y2="23" />
   </svg>
 );
 
 /**
- * Ventilatore centrifugo / aspiratore industriale:
- * 3 pale ricurve intorno all'asse centrale
+ * Ventilatore centrifugo industriale / aspiratore a chiocciola (a tutto campo 0-24):
+ * Cassa voluta a spirale ad espansione continua con bocca di mandata tangenziale
+ * flangiata superiore, bocca di aspirazione circolare centrale e girante a pale centrifughe.
  */
-export const IconImpeller: React.FC<IconProps> = ({ className = "w-full h-full" }) => (
+export const IconBlower: React.FC<IconProps> = ({ className = "w-full h-full" }) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    {/* Cassa a chiocciola industriale (voluta centrifuga) a tutto campo */}
+    <path d="M12 4C6.5 4 2 8.5 2 14C2 19 6 22 11.5 22C17 22 20.5 18 20.5 13V2H15.5V5.5" />
+    {/* Flangia di mandata superiore */}
+    <line x1="14" y1="2" x2="22" y2="2" />
+    {/* Bocca di aspirazione circolare centrale generosa */}
+    <circle cx="11" cy="14" r="5" />
     {/* Mozzo centrale */}
-    <circle cx="12" cy="12" r="2.5" />
-    {/* Pala 1 — in alto a destra */}
-    <path d="M12 9.5C12 7 14 4 17 5" />
-    {/* Pala 2 — in basso a destra */}
-    <path d="M14.2 13C16.5 13.5 19.5 12 19 9" />
-    {/* Pala 3 — in basso a sinistra */}
-    <path d="M10 14C9 16.5 6 18 5 15" />
-    {/* Involucro esterno (cassa voluta) */}
-    <circle cx="12" cy="12" r="9" />
+    <circle cx="11" cy="14" r="1.5" fill="currentColor" />
+    {/* Pale centrifughe industriali (4 pale ricurve a forte dinamismo) */}
+    <path d="M11 12.5C11 10 12.8 8.8 14.5 9" />
+    <path d="M12.5 14C15 14 16.2 15.5 16 17" />
+    <path d="M11 15.5C11 18 9.2 19.2 7.5 19" />
+    <path d="M9.5 14C7 14 5.8 12.5 6 11" />
   </svg>
 );
+
+export const IconImpeller: React.FC<IconProps> = IconBlower;
 

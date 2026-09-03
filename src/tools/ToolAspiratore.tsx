@@ -2,9 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
 import {
-  Plus, Trash2, ChevronDown, ChevronUp,
+  Plus, Trash2, ChevronDown, ChevronUp, Copy,
   Wind, Zap, CheckCircle, ArrowRight, ArrowLeft,
-  Printer, GitFork, Gauge, Layers, Network
+  Printer, GitFork, Gauge, Layers, Network,
+  Info, HelpCircle, BookOpen, Lightbulb, Sliders, AlertTriangle
 } from 'lucide-react';
 import {
   FAN_ACCESSORIES,
@@ -15,7 +16,7 @@ import {
 } from '../data/fanAccessories';
 import { formatNumber } from '../utils/format';
 import { ItalianNumberInput, parseItalianNumber } from '../components/ItalianNumberInput';
-import { AeraulicTopologicalTree, AeraulicTreeNode } from '../components/AeraulicTopologicalTree';
+import { AeraulicTopologicalTree, AeraulicTreeNode, AeraulicChimneyNode } from '../components/AeraulicTopologicalTree';
 import { PrintReport, PrintSection } from '../components/print';
 
 interface ToolAspiratorProps {
@@ -42,6 +43,7 @@ export interface DuctAccessories {
 
 /** Tratto di condotta aeraulica nella rete ad albero */
 export interface AeraulicSegment {
+  uid?: string;           // Identificativo univoco interno stabile per React key
   id: string;             // Codice univoco breve (es. 'L1', 'L2', 'L10')
   name: string;           // Nome descrittivo (libero, es. 'Aspirazione Bottale 1')
   type: 'source' | 'junction'; // 'source' = bocchetta / ramo iniziale; 'junction' = confluenza / collettore a valle
@@ -82,6 +84,19 @@ export interface SpecialComponent {
   dp_concentrata_Pa: string; // Perdita concentrata fissa [Pa] da scheda tecnica
 }
 
+/** Camino di espulsione a valle del ventilatore (mandata verso l'atmosfera) */
+export interface FanChimneyData {
+  enabled: boolean;        // Se true, include la perdita del camino nella prevalenza totale
+  name: string;           // Nome identificativo (es. 'Camino E1')
+  D_mm: string;           // Diametro interno condotto [mm]
+  H_m: string;            // Altezza / Lunghezza condotto di mandata [m]
+  material: string;       // Materiale condotto camino
+  roughness_mm: string;   // Scabrezza parete ε [mm]
+  n_curve90: number;      // Numero curve a 90° sul condotto di espulsione
+  hasSbocco: boolean;     // Perdita allo sbocco terminale in atmosfera (cappello / tronco di cono, ξ = 1.0)
+  dp_manuale_Pa: string;  // Perdita di carico fissa alternativa [Pa]
+}
+
 /** Dati globali impianto */
 export interface FanGlobalData {
   T_aria_C: string;                // Temperatura aria [°C]
@@ -98,6 +113,7 @@ export interface FanToolData {
   global: FanGlobalData;
   segments: AeraulicSegment[];
   specials: SpecialComponent[];
+  chimney: FanChimneyData;
   activeTab: 'config' | 'rete' | 'risultati';
   showSpecials: boolean;
 }
@@ -117,7 +133,20 @@ export const defaultAccessories = (): DuctAccessories => ({
   n_uscita: 0,
 });
 
+export const defaultChimneyData = (): FanChimneyData => ({
+  enabled: true,
+  name: 'Camino di Espulsione E1',
+  D_mm: '',
+  H_m: '',
+  material: 'Acciaio inox',
+  roughness_mm: '0,050',
+  n_curve90: 1,
+  hasSbocco: true,
+  dp_manuale_Pa: '',
+});
+
 export const createNewSegment = (suggestedId: string, isFirst = false): AeraulicSegment => ({
+  uid: Math.random().toString(36).substring(2, 9),
   id: suggestedId,
   name: '',
   type: isFirst ? 'source' : 'source',
@@ -158,6 +187,7 @@ const defaultData: FanToolData = {
   },
   segments: [createNewSegment('L1', true)],
   specials: [],
+  chimney: defaultChimneyData(),
   activeTab: 'config',
   showSpecials: true,
 };
@@ -223,6 +253,7 @@ function normalizeFanData(loaded: any): FanToolData {
     }
 
     return {
+      uid: s.uid || Math.random().toString(36).substring(2, 9),
       id: currentId,
       name: s.name || '',
       type: segType,
@@ -254,6 +285,19 @@ function normalizeFanData(loaded: any): FanToolData {
     dp_concentrata_Pa: sp.dp_concentrata_Pa !== undefined ? String(sp.dp_concentrata_Pa).replace('.', ',') : '',
   }));
 
+  const rawChimney = loaded.chimney || {};
+  const migratedChimney: FanChimneyData = {
+    enabled: rawChimney.enabled !== undefined ? Boolean(rawChimney.enabled) : true,
+    name: rawChimney.name || 'Camino di Espulsione E1',
+    D_mm: rawChimney.D_mm !== undefined ? String(rawChimney.D_mm).replace('.', ',') : '',
+    H_m: rawChimney.H_m !== undefined ? String(rawChimney.H_m).replace('.', ',') : '',
+    material: rawChimney.material || 'Acciaio inox',
+    roughness_mm: rawChimney.roughness_mm !== undefined ? String(rawChimney.roughness_mm).replace('.', ',') : '0,050',
+    n_curve90: rawChimney.n_curve90 !== undefined ? Number(rawChimney.n_curve90) : 1,
+    hasSbocco: rawChimney.hasSbocco !== undefined ? Boolean(rawChimney.hasSbocco) : true,
+    dp_manuale_Pa: rawChimney.dp_manuale_Pa !== undefined ? String(rawChimney.dp_manuale_Pa).replace('.', ',') : '',
+  };
+
   // Risoluzione robusta activeTab: mappa vecchi valori ('tratti') e fallback su 'config'
   let validatedTab: FanToolData['activeTab'] = 'config';
   if (loaded.activeTab === 'config' || loaded.activeTab === 'rete' || loaded.activeTab === 'risultati') {
@@ -266,6 +310,7 @@ function normalizeFanData(loaded: any): FanToolData {
     global: migratedGlobal,
     segments: migratedSegments.length > 0 ? migratedSegments : [createNewSegment('L1', true)],
     specials: migratedSpecials,
+    chimney: migratedChimney,
     activeTab: validatedTab,
     showSpecials: loaded.showSpecials !== undefined ? loaded.showSpecials : true,
   };
@@ -410,15 +455,100 @@ function calcSpecialAeraulics(sp: SpecialComponent, Q_m3h: number, rho: number, 
   }
 }
 
+/** Calcolo perdite di carico per il Camino di Espulsione (Mandata post-ventilatore) [Pa] */
+function calcChimneyAeraulics(chim: FanChimneyData, Q_m3h: number, rho: number, nu: number) {
+  if (!chim.enabled || Q_m3h <= 0) {
+    return {
+      Q_m3h: 0,
+      v_ms: 0,
+      Re: 0,
+      lambda: 0,
+      dp_dist_Pa: 0,
+      dp_conc_Pa: 0,
+      dp_tot_Pa: 0,
+    };
+  }
+
+  // Perdita concentrata fissa manuale (se specificata dall'utente)
+  const dp_man = parseItalianNumber(chim.dp_manuale_Pa);
+  if (dp_man > 0) {
+    return {
+      Q_m3h,
+      v_ms: 0,
+      Re: 0,
+      lambda: 0,
+      dp_dist_Pa: 0,
+      dp_conc_Pa: dp_man,
+      dp_tot_Pa: dp_man,
+    };
+  }
+
+  const D_mm = parseItalianNumber(chim.D_mm);
+  const H_m = parseItalianNumber(chim.H_m);
+  const roughness_mm = parseItalianNumber(chim.roughness_mm) || 0.05;
+
+  if (D_mm <= 0) {
+    return {
+      Q_m3h,
+      v_ms: 0,
+      Re: 0,
+      lambda: 0,
+      dp_dist_Pa: 0,
+      dp_conc_Pa: 0,
+      dp_tot_Pa: 0,
+    };
+  }
+
+  const D_m = D_mm / 1000;
+  const A = Math.PI * D_m * D_m / 4;
+  const v = (Q_m3h / 3600) / A;
+  const Re = (v * D_m) / nu;
+  const lambda = calcLambda(Re, roughness_mm / 1000, D_m);
+
+  // Perdita distribuita lungo la canna del camino
+  const dp_dist = H_m > 0 ? lambda * (H_m / D_m) * (rho * v * v) / 2 : 0;
+
+  // Perdita concentrata: curve 90° (ξ ≈ 0.35 cad) + sbocco atmosfera / cappello (ξ = 1.0)
+  const xi_curve = (chim.n_curve90 || 0) * 0.35;
+  const xi_sbocco = chim.hasSbocco ? 1.0 : 0.0;
+  const dp_conc = (xi_curve + xi_sbocco) * (rho * v * v) / 2;
+
+  const dp_tot = dp_dist + dp_conc;
+
+  return {
+    Q_m3h,
+    v_ms: v,
+    Re,
+    lambda,
+    dp_dist_Pa: dp_dist,
+    dp_conc_Pa: dp_conc,
+    dp_tot_Pa: dp_tot,
+  };
+}
+
 // ── Componente Principale ───────────────────────────────────────────────────
 
 export function ToolAspiratore({ projectData, setProjectData, setAppMode }: ToolAspiratorProps) {
   const [data, setData] = useState<FanToolData>(() => defaultData);
-  const [openAccessoryId, setOpenAccessoryId] = useState<string | null>(null);
+  const [collapsedAccessoryIds, setCollapsedAccessoryIds] = useState<Record<string, boolean>>({});
   const [selectedTreeSegmentId, setSelectedTreeSegmentId] = useState<string | null>(null);
+
+  function toggleAccessoryCollapse(segId: string) {
+    setCollapsedAccessoryIds(prev => ({ ...prev, [segId]: !prev[segId] }));
+  }
 
   function updGlobal(field: keyof FanGlobalData, value: any) {
     setData(prev => ({ ...prev, global: { ...prev.global, [field]: value } }));
+  }
+
+  function updChimney(field: keyof FanChimneyData, value: any) {
+    setData(prev => {
+      const updated = { ...prev.chimney, [field]: value };
+      if (field === 'material' && typeof value === 'string' && FAN_ROUGHNESS[value] !== undefined) {
+        updated.roughness_mm = formatNumber(FAN_ROUGHNESS[value], 3);
+      }
+      return { ...prev, chimney: updated };
+    });
   }
 
   function addSegment() {
@@ -449,6 +579,27 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
     });
   }
 
+  function duplicateSegment(segId: string) {
+    setData(prev => {
+      const srcSeg = prev.segments.find(s => s.id === segId);
+      if (!srcSeg) return prev;
+      const nextNum = prev.segments.length + 1;
+      const newId = `L${nextNum}`;
+      const newSeg: AeraulicSegment = {
+        ...srcSeg,
+        uid: Math.random().toString(36).substring(2, 9),
+        id: newId,
+        name: srcSeg.name ? `${srcSeg.name} (Copia)` : '',
+        confluisceInId: srcSeg.confluisceInId,
+        accessories: { ...(srcSeg.accessories || defaultAccessories()) },
+      };
+      return {
+        ...prev,
+        segments: [...prev.segments, newSeg],
+      };
+    });
+  }
+
   function removeSegment(id: string) {
     setData(prev => ({
       ...prev,
@@ -470,6 +621,23 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
         }
         return updated;
       })
+    }));
+  }
+
+  function updSegmentId(oldId: string, newId: string) {
+    setData(prev => ({
+      ...prev,
+      segments: prev.segments.map(s => {
+        let updated = s;
+        if (s.id === oldId) {
+          updated = { ...updated, id: newId };
+        }
+        if (s.confluisceInId === oldId) {
+          updated = { ...updated, confluisceInId: newId };
+        }
+        return updated;
+      }),
+      specials: prev.specials.map(sp => sp.segmentId === oldId ? { ...sp, segmentId: newId } : sp)
     }));
   }
 
@@ -525,7 +693,9 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
     const dp_bocchetta_def = parseItalianNumber(g.dp_bocchetta_default_Pa) || 250;
     const eta_perc = parseItalianNumber(g.eta_ventilatore_perc) || 55;
     const eta = Math.max(0.1, Math.min(1.0, eta_perc / 100));
-    const margine_perc = parseItalianNumber(g.margine_motore_perc) || 20;
+
+    // Gestione esatta del margine: se l'utente ha inserito 0, il margine è 0%! Se vuoto, 0%
+    const margine_perc = hasMargine ? (parseItalianNumber(g.margine_motore_perc) || 0) : 0;
 
     const rho = calcRhoAria(T_C, quota);
     const nu = calcNuAria(T_C);
@@ -568,7 +738,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
     });
     const segResultsMap = new Map(segResults.map(r => [r.seg.id, r]));
 
-    // 3. Calcolo perdite per ciascun componente speciale
+    // 3. Calcolo perdite per ciascun componente speciale di trattamento
     const specResults = data.specials.map(sp => {
       let q = totalFlow_m3h;
       if (sp.position === 'segment' && sp.segmentId) {
@@ -582,7 +752,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
       .filter(r => r.sp.position === 'general')
       .reduce((s, r) => s + r.res.dp_tot_Pa, 0);
 
-    // 4. Tracciamento dei Percorsi da ogni Bocchetta (Source) verso Valle e identificazione Percorso Critico
+    // 4. Tracciamento dei Percorsi da ogni Bocchetta (Source) verso Valle e identificazione Percorso Più Sfavorevole
     interface PathTrace {
       sourceId: string;
       sourceName: string;
@@ -645,7 +815,13 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
       criticalPath = paths.reduce((max, p) => p.dp_tot_path > max.dp_tot_path ? p : max, paths[0]);
     }
 
-    const dp_tot_ventilatore = criticalPath ? criticalPath.dp_tot_path : 0;
+    const dp_sfavorevole_aspirazione = criticalPath ? criticalPath.dp_tot_path : 0;
+
+    // Calcolo perdite del Camino di Espulsione (Mandata a valle del ventilatore)
+    const chimneyRes = calcChimneyAeraulics(data.chimney, totalFlow_m3h, rho, nu);
+
+    // Prevalenza Totale Ventilatore = Depressione aspirazione ramo sfavorevole + Contropressione mandata camino
+    const dp_tot_ventilatore = dp_sfavorevole_aspirazione + chimneyRes.dp_tot_Pa;
     const dp_mmH2O = dp_tot_ventilatore / 9.80665;
 
     const criticalSegmentIds = new Set(criticalPath ? criticalPath.segmentIds : []);
@@ -681,6 +857,8 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
       segResults,
       specResults,
       dp_speciali_generali,
+      chimneyRes,
+      dp_sfavorevole_aspirazione,
       paths,
       criticalPath,
       criticalSegmentIds,
@@ -721,6 +899,18 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
       };
     });
   }, [data.segments, calc.segResults, calc.criticalSegmentIds]);
+
+  const chimneyNode: AeraulicChimneyNode | undefined = useMemo(() => {
+    if (!data.chimney?.enabled) return undefined;
+    return {
+      enabled: true,
+      name: data.chimney.name || 'Camino E1',
+      D_mm: data.chimney.D_mm,
+      H_m: data.chimney.H_m,
+      dp_Pa: calc.chimneyRes.dp_tot_Pa,
+      v_ms: calc.chimneyRes.v_ms,
+    };
+  }, [data.chimney, calc.chimneyRes]);
 
   // ── Cloud save/load & Normalizzazione ───────────────────────────────────────
   const getCloudSaveData = () => ({ aspiratore: data });
@@ -803,6 +993,54 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
          ══════════════════════════════════════════════════════════════════════ */}
       {currentTab === 'config' && (
         <div className="space-y-6">
+          {/* Box Informativo: Guida alla Compilazione dei Parametri di Progetto */}
+          <div className="bg-gradient-to-r from-sky-50 via-cyan-50 to-slate-50 border border-cyan-200/80 rounded-2xl p-4.5 text-xs text-slate-700 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-cyan-600 text-white rounded-xl flex-shrink-0 shadow-sm mt-0.5">
+                <Info className="w-4 h-4" />
+              </div>
+              <div className="space-y-2 flex-1">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h4 className="font-black text-slate-800 text-xs uppercase tracking-wide flex items-center gap-1.5">
+                    Guida alla Compilazione: Parametri Ambientali & Specifiche Ventilatore
+                  </h4>
+                  <span className="text-[10px] font-bold text-cyan-700 bg-cyan-100/70 px-2 py-0.5 rounded-md border border-cyan-200">
+                    Standard UNI EN ISO 5801 & ICAO
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  Questa prima fase definisce le condizioni termo-igrometriche dell'aria aspirata e le caratteristiche operative del gruppo di ventilazione. Le impostazioni determinano la densità effettiva del fluido e la potenza richiesta all'albero:
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+                  <div className="bg-white/95 p-3 rounded-xl border border-cyan-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-cyan-800 uppercase block mb-1">Temperatura & Quota:</span>
+                    <p className="text-[10px] text-slate-500 leading-snug">
+                      Calcolano la densità reale <span className="font-mono font-bold text-slate-700">ρ [kg/m³]</span>. Con aria calda o ad alta quota il fluido è più rarefatto: la portata volumetrica [m³/h] resta invariata, ma calano la prevalenza e la potenza assorbita.
+                    </p>
+                  </div>
+                  <div className="bg-white/95 p-3 rounded-xl border border-cyan-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-cyan-800 uppercase block mb-1">Depressione Bocchette:</span>
+                    <p className="text-[10px] text-slate-500 leading-snug">
+                      Depressione statica minima necessaria all'imbocco per creare la velocità di cattura dei fumi. <span className="font-semibold text-slate-700">150–250 Pa</span> per cappe aspiranti aperte; <span className="font-semibold text-slate-700">250–400 Pa</span> per bottali e macchinari chiusi.
+                    </p>
+                  </div>
+                  <div className="bg-white/95 p-3 rounded-xl border border-cyan-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-cyan-800 uppercase block mb-1">Rendimento Ventilatore η:</span>
+                    <p className="text-[10px] text-slate-500 leading-snug">
+                      Efficienza pneumatica complessiva. Ventilatori centrifughi a pale rovesce (rendimento elevato): <span className="font-semibold text-slate-700">60–75%</span>; ventilatori industriali standard a pale avanti o radiali: <span className="font-semibold text-slate-700">50–55%</span>.
+                    </p>
+                  </div>
+                  <div className="bg-white/95 p-3 rounded-xl border border-cyan-100 shadow-2xs">
+                    <span className="text-[10px] font-bold text-cyan-800 uppercase block mb-1">Margine Motore & Titolari:</span>
+                    <p className="text-[10px] text-slate-500 leading-snug">
+                      Ricarico di sicurezza (es. +15% o +20%) per sporcamento filtri o future estensioni. L'architettura N+R (titolari + riserva) assicura continuità di servizio in caso di avaria.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-sm font-black text-slate-800 mb-5 pb-3 border-b border-slate-100 flex items-center gap-2">
               <span className="p-1.5 bg-cyan-100 text-cyan-600 rounded-lg"><Wind className="w-4 h-4" /></span>
@@ -954,20 +1192,53 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
       {currentTab === 'rete' && (
         <div className="space-y-6">
 
-          {/* Banner Guida Ingegneristica Monte -> Valle */}
-          <div className="bg-gradient-to-r from-cyan-50 to-sky-50 border border-cyan-200 rounded-2xl p-4.5 text-slate-700">
+          {/* Box Informativo: Guida alla Progettazione della Rete Aeraulica & Criteri di Velocità */}
+          <div className="bg-gradient-to-r from-sky-50 via-cyan-50 to-slate-50 border border-cyan-200/80 rounded-2xl p-4.5 text-xs text-slate-700 shadow-sm">
             <div className="flex items-start gap-3">
-              <div className="p-2 bg-cyan-600 text-white rounded-xl flex-shrink-0 mt-0.5 shadow-sm">
-                <GitFork className="w-4 h-4" />
+              <div className="p-2 bg-cyan-600 text-white rounded-xl flex-shrink-0 shadow-sm mt-0.5">
+                <Network className="w-4 h-4" />
               </div>
-              <div>
-                <h4 className="text-xs font-black text-cyan-950 uppercase tracking-wide">
-                  Direzione di Compilazione: Da Monte (Bocchette) verso Valle (Ventilatore)
-                </h4>
-                <p className="text-[11px] text-cyan-900 mt-1 leading-relaxed">
-                  1. Inserisci prima le <strong>Bocchette di aspirazione</strong> (tratti di captazione sorgente con la propria portata d'aria).<br />
-                  2. Inserisci poi i <strong>Collettori di confluenza</strong> a valle: il tool calcolerà in automatico la portata complessiva sommando i rami affluenti e isolerà il <strong>percorso critico</strong> che determina la prevalenza del ventilatore.
+              <div className="space-y-2 flex-1">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <h4 className="font-black text-slate-800 text-xs uppercase tracking-wide flex items-center gap-1.5">
+                    Guida alla Progettazione: Rete ad Albero da Monte a Valle
+                  </h4>
+                  <span className="text-[10px] font-bold text-cyan-700 bg-cyan-100/70 px-2 py-0.5 rounded-md border border-cyan-200">
+                    Modellazione Topologica & Bilancio Prevalenze
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  L'impianto aeraulico è una rete ramificata convergente: ciascun ramo parte da una <strong>Bocchetta di Captazione</strong> e si unisce ai <strong>Collettori di Confluenza</strong> fino al ventilatore. Il software calcola in automatico le portate affluenti e isola il <strong>percorso più sfavorevole</strong> che impone la prevalenza totale:
                 </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
+                  <div className="bg-white/95 p-3 rounded-xl border border-emerald-200 shadow-2xs">
+                    <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-[10px] uppercase mb-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                      10 ÷ 18 m/s: Velocità Ottimale
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-snug">
+                      Range raccomandato per fumi e vapori industriali. Assicura il trascinamento continuo evitando depositi nelle tubazioni orizzontali, con perdite di carico e rumorosità contenute.
+                    </p>
+                  </div>
+                  <div className="bg-white/95 p-3 rounded-xl border border-amber-200 shadow-2xs">
+                    <div className="flex items-center gap-1.5 text-amber-800 font-bold text-[10px] uppercase mb-1">
+                      <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                      &lt; 10 m/s: Rischio Deposito / Condensa
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-snug">
+                      Condotta sovradimensionata: l'aria rallenta provocando potenziale sedimentazione di polveri, ristagni di condensa e maggiori costi di canalizzazione. Si suggerisce di ridurre il diametro Ø.
+                    </p>
+                  </div>
+                  <div className="bg-white/95 p-3 rounded-xl border border-red-200 shadow-2xs">
+                    <div className="flex items-center gap-1.5 text-red-800 font-bold text-[10px] uppercase mb-1">
+                      <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                      &gt; 20 m/s: Alta Perdita & Sibilo
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-snug">
+                      Condotta sottodimensionata: le perdite di carico aumentano quadraticamente con la velocità (ΔP ∝ v²), richiedendo motori molto più potenti e generando rumorosità molesta.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -997,6 +1268,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                   position: r.sp.position,
                   segmentId: r.sp.segmentId,
                 }))}
+                chimney={chimneyNode}
                 totalFlow_m3h={calc.totalFlow_m3h}
                 dp_tot_ventilatore={calc.dp_tot_ventilatore}
                 selectedSegmentId={selectedTreeSegmentId}
@@ -1042,7 +1314,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
 
                 return (
                   <div
-                    key={seg.id}
+                    key={seg.uid || seg.id}
                     id={`segment-card-${seg.id}`}
                     className={`border rounded-2xl p-5 transition-all ${
                       isSelectedInTree
@@ -1061,14 +1333,14 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                         {isCritical && (
                           <span className="px-2.5 py-1 bg-amber-100 text-amber-900 font-black text-[10px] rounded-lg border border-amber-300 flex items-center gap-1 shadow-sm">
                             <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
-                            PERCORSO CRITICO
+                            PIÙ SFAVOREVOLE
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         {segRes && segRes.flow_m3h > 0 && (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 mr-2">
                             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 ${
                               vOk ? 'bg-emerald-100 text-emerald-800' :
                               vWarn ? 'bg-amber-100 text-amber-800' :
@@ -1082,8 +1354,18 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                           </div>
                         )}
 
+                        <button
+                          type="button"
+                          onClick={() => duplicateSegment(seg.id)}
+                          title="Duplica questo tratto (clona geometria, accessori e confluenza)"
+                          className="w-7 h-7 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-700 flex items-center justify-center transition-colors cursor-pointer"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+
                         {data.segments.length > 1 && (
                           <button
+                            type="button"
                             onClick={() => removeSegment(seg.id)}
                             title="Elimina questo tratto"
                             className="w-7 h-7 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center transition-colors cursor-pointer"
@@ -1154,7 +1436,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                         <input
                           type="text"
                           value={seg.id}
-                          onChange={e => updSegment(seg.id, 'id', e.target.value)}
+                          onChange={e => updSegmentId(seg.id, e.target.value)}
                           placeholder="es. L1"
                           className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-cyan-500"
                         />
@@ -1259,25 +1541,30 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                       </div>
                     </div>
 
-                    {/* Accordion Accessori (Pezzi speciali con Leq) */}
-                    <div className="mt-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setOpenAccessoryId(openAccessoryId === seg.id ? null : seg.id)}
-                        className="flex items-center gap-1.5 text-xs font-bold text-cyan-700 hover:text-cyan-800 cursor-pointer select-none"
-                      >
-                        {openAccessoryId === seg.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                        <span>Accessori & Pezzi Speciali (Gomiti, Biforcazioni, Valvole...)</span>
-                        {segRes && segRes.res.L_eq_tot_m > 0 && (
-                          <span className="text-[10px] font-normal text-slate-500 ml-1">
-                            (Leq tot = {formatNumber(segRes.res.L_eq_tot_m, 1)} m)
-                          </span>
-                        )}
-                      </button>
+                    {/* Accessori e Pezzi Speciali (Sempre visibili di default con toggle) */}
+                    <div className="mt-3 pt-2 border-t border-slate-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleAccessoryCollapse(seg.id)}
+                          className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-cyan-700 cursor-pointer select-none"
+                        >
+                          {collapsedAccessoryIds[seg.id] ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronUp className="w-3.5 h-3.5 text-cyan-600" />}
+                          <span>Accessori & Raccordi di Linea (Gomiti, Biforcazioni, Riduzioni...)</span>
+                        </button>
 
-                      {openAccessoryId === seg.id && (
-                        <div className="mt-2.5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl animate-fadeIn">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-2">Numero pezzi installati:</p>
+                        {segRes && segRes.res.L_eq_tot_m > 0 ? (
+                          <span className="text-[10px] font-bold text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-md border border-cyan-200">
+                            Leq tot = {formatNumber(segRes.res.L_eq_tot_m, 1)} m (ΔP = {formatNumber(segRes.res.dp_conc_Pa, 1)} Pa)
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">Nessun accessorio (Leq = 0 m)</span>
+                        )}
+                      </div>
+
+                      {!collapsedAccessoryIds[seg.id] && (
+                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Quantità pezzi speciali montati:</p>
                           <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2">
                             {[
                               { field: 'n_gomiti90_R15' as const, label: 'Gomito 90° R1.5' },
@@ -1502,6 +1789,192 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
             </div>
           </div>
 
+          {/* ═══════════════════════════════════════════════════════════════════
+              CAMINO DI ESPULSIONE (MANDATA POST-VENTILATORE IN ATMOSFERA)
+             ═══════════════════════════════════════════════════════════════════ */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-6">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 flex-wrap gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-100 rounded-xl text-emerald-700">
+                    <Wind className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                      <span>Camino di Espulsione / Mandata</span>
+                      <span className="text-[10px] px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded-full border border-emerald-300">
+                        Post-Ventilatore
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Condotta a valle del ventilatore verso lo sbocco in atmosfera (portata totale: {formatNumber(calc.totalFlow_m3h, 0)} m³/h)
+                    </p>
+                  </div>
+                </div>
+
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl hover:bg-slate-100 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={data.chimney.enabled}
+                    onChange={e => updChimney('enabled', e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span>Includi Perdite Camino nel Ventilatore</span>
+                </label>
+              </div>
+
+              {data.chimney.enabled ? (
+                <div className="mt-5 space-y-4">
+                  {/* Box Informativo Camino */}
+                  <div className="p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl text-xs text-slate-700 flex items-start gap-2.5">
+                    <Info className="w-4 h-4 text-emerald-700 mt-0.5 flex-shrink-0" />
+                    <div className="space-y-1">
+                      <p className="font-bold text-emerald-950 text-[11px]">
+                        Perché calcolare la contropressione del camino post-ventilatore?
+                      </p>
+                      <p className="text-[10px] text-slate-600 leading-relaxed">
+                        Il ventilatore non lavora a scarico libero: deve vincere sia la depressione a monte (aspirazione delle bocchette e perdite dei filtri) sia la <strong>contropressione positiva di mandata a valle</strong> dovuta all'attrito lungo la canna del camino e all'energia cinetica dissipata allo sbocco terminale in atmosfera (cappello antivento o tronco di cono, con perdita cinetica standard <span className="font-mono font-bold text-slate-700">ξ = 1,0</span>).
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-emerald-50/30 border border-emerald-200/80 rounded-2xl">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+                      {/* Nome Camino */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Sigla / Nome</label>
+                        <input
+                          type="text"
+                          value={data.chimney.name}
+                          onChange={e => updChimney('name', e.target.value)}
+                          placeholder="es. Camino E1"
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+
+                      {/* Diametro interno */}
+                      <div>
+                        <ItalianNumberInput
+                          label="Diametro interno Ø"
+                          value={data.chimney.D_mm}
+                          onChange={raw => updChimney('D_mm', raw)}
+                          placeholder="es. 350"
+                          unit="mm"
+                        />
+                      </div>
+
+                      {/* Altezza / Lunghezza */}
+                      <div>
+                        <ItalianNumberInput
+                          label="Altezza / Sviluppo H"
+                          value={data.chimney.H_m}
+                          onChange={raw => updChimney('H_m', raw)}
+                          placeholder="es. 12"
+                          unit="m"
+                        />
+                      </div>
+
+                      {/* Materiale */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Materiale</label>
+                        <select
+                          value={data.chimney.material}
+                          onChange={e => updChimney('material', e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-500"
+                        >
+                          {Object.keys(FAN_ROUGHNESS).map(mat => (
+                            <option key={mat} value={mat}>{mat}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Scabrezza */}
+                      <div>
+                        <ItalianNumberInput
+                          label="Scabrezza ε"
+                          value={data.chimney.roughness_mm}
+                          onChange={raw => updChimney('roughness_mm', raw)}
+                          placeholder="es. 0,050"
+                          unit="mm"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Raccordi e perdite concentrate del camino */}
+                    <div className="mt-4 pt-3 border-t border-emerald-100 grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                          Curve a 90° su espulsione
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={data.chimney.n_curve90 || ''}
+                          onChange={e => updChimney('n_curve90', parseInt(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none mt-4">
+                          <input
+                            type="checkbox"
+                            checked={data.chimney.hasSbocco}
+                            onChange={e => updChimney('hasSbocco', e.target.checked)}
+                            className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                          />
+                          <span>Sbocco terminale in atmosfera (ξ = 1.0)</span>
+                        </label>
+                        <p className="text-[10px] text-slate-400 ml-6">Perdita cinetica allo sbocco o cappello antivento</p>
+                      </div>
+
+                      <div>
+                        <ItalianNumberInput
+                          label="Oppure ΔP fissa manuale"
+                          value={data.chimney.dp_manuale_Pa}
+                          onChange={raw => updChimney('dp_manuale_Pa', raw)}
+                          placeholder="es. 120"
+                          unit="Pa"
+                        />
+                        <p className="text-[10px] text-slate-400 mt-0.5">Se impostata, sovrascrive il calcolo continuo</p>
+                      </div>
+                    </div>
+
+                    {/* Riepilogo Fluidodinamico Camino */}
+                    {calc.chimneyRes.dp_tot_Pa > 0 && (
+                      <div className="mt-4 pt-3 border-t border-emerald-200/80 flex items-center justify-between flex-wrap gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg ${
+                            calc.chimneyRes.v_ms >= 8 && calc.chimneyRes.v_ms <= 16
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-amber-100 text-amber-800'
+                          }`}>
+                            Velocità fumi: {formatNumber(calc.chimneyRes.v_ms, 2)} m/s
+                          </span>
+                          <span className="text-[11px] text-slate-500 font-medium">
+                            {calc.chimneyRes.dp_dist_Pa > 0 && `(Distribuita: ${formatNumber(calc.chimneyRes.dp_dist_Pa, 1)} Pa + Concentrata: ${formatNumber(calc.chimneyRes.dp_conc_Pa, 1)} Pa)`}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[11px] font-bold text-slate-500 mr-2">Contropressione Mandata Camino:</span>
+                          <span className="text-sm font-black text-emerald-700 bg-emerald-100 px-3 py-1 rounded-lg border border-emerald-300">
+                            ΔP = {formatNumber(calc.chimneyRes.dp_tot_Pa, 1)} Pa ({formatNumber(calc.chimneyRes.dp_tot_Pa / 9.80665, 2)} mmH₂O)
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="py-6 text-center text-slate-400">
+                  <p className="text-xs">Camino disattivato: la mandata del ventilatore è considerata a scarico libero senza contropressione.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Barra di Navigazione inferiore Tab 2 */}
           <div className="flex items-center justify-between pt-2">
             <button
@@ -1534,7 +2007,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
               <Wind className="w-12 h-12 text-slate-300 mx-auto mb-3 animate-pulse" />
               <h4 className="text-sm font-black text-slate-700 mb-1">Nessuna portata rilevata</h4>
               <p className="text-xs text-slate-400 max-w-md mx-auto">
-                Inserisci almeno una bocchetta sorgente con portata d'aria nella scheda "Rete Aeraulica" per calcolare il percorso critico e dimensionare il ventilatore.
+                Inserisci almeno una bocchetta sorgente con portata d'aria nella scheda "Rete Aeraulica" per calcolare il percorso più sfavorevole e dimensionare il ventilatore.
               </p>
               <button
                 onClick={() => setData(prev => ({ ...prev, activeTab: 'rete' }))}
@@ -1545,7 +2018,50 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
             </div>
           ) : (
             <>
-              {/* Highlight Principale: Portata Totale, Prevalenza e Ramo Critico */}
+              {/* Box Informativo: Come Interpretare i Risultati & Criteri di Dimensionamento */}
+              <div className="bg-gradient-to-r from-sky-50 via-cyan-50 to-slate-50 border border-cyan-200/80 rounded-2xl p-4.5 text-xs text-slate-700 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-cyan-600 text-white rounded-xl flex-shrink-0 shadow-sm mt-0.5">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-2 flex-1">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <h4 className="font-black text-slate-800 text-xs uppercase tracking-wide flex items-center gap-1.5">
+                        Guida ai Risultati: Principio del Ramo Più Sfavorevole & Bilancio di Pressione
+                      </h4>
+                      <span className="text-[10px] font-bold text-cyan-700 bg-cyan-100/70 px-2 py-0.5 rounded-md border border-cyan-200">
+                        Fisica dei Sistemi Aeraulici
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      In una rete aeraulica le condotte operano in parallelo unendosi nei collettori. Pertanto, la <strong>Prevalenza Totale richiesta al Ventilatore</strong> non è la somma di tutte le perdite della rete, ma è determinata esclusivamente dal percorso con la resistenza fluidodinamica maggiore (ramo sfavorito):
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
+                      <div className="bg-white/95 p-3 rounded-xl border border-cyan-100 shadow-2xs">
+                        <span className="text-[10px] font-bold text-cyan-800 uppercase block mb-1">Ramo Più Sfavorevole:</span>
+                        <p className="text-[10px] text-slate-500 leading-snug">
+                          È il cammino continuo (dalla bocchetta d'inizio al ventilatore) che cumula la perdita di carico più elevata. Tutti gli altri rami hanno perdite inferiori.
+                        </p>
+                      </div>
+                      <div className="bg-white/95 p-3 rounded-xl border border-cyan-100 shadow-2xs">
+                        <span className="text-[10px] font-bold text-cyan-800 uppercase block mb-1">Formula Prevalenza Totale:</span>
+                        <p className="text-[10px] text-slate-500 leading-snug font-mono">
+                          <b>ΔP_tot = ΔP_sfavorevole + ΔP_speciali + ΔP_camino</b><br />
+                          <span className="font-sans text-slate-400">Somma depressione di captazione, perdite nei condotti, scrubber/filtri e contropressione di mandata.</span>
+                        </p>
+                      </div>
+                      <div className="bg-white/95 p-3 rounded-xl border border-cyan-100 shadow-2xs">
+                        <span className="text-[10px] font-bold text-cyan-800 uppercase block mb-1">Unità di Misura (Pa vs mmH₂O):</span>
+                        <p className="text-[10px] text-slate-500 leading-snug">
+                          1 mmH₂O ≈ 9,81 Pa. I valori sono convertiti in automatico per agevolare il confronto con i diagrammi caratteristici (Q-H) dei cataloghi costruttori.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Highlight Principale: Portata Totale, Prevalenza e Ramo Più Sfavorevole */}
               <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-cyan-950 text-white rounded-3xl p-6 shadow-xl relative overflow-hidden">
                 <div className="absolute right-0 top-0 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
@@ -1564,7 +2080,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                     <div className="flex items-center gap-2 bg-amber-400/20 border border-amber-400/40 px-3 py-1.5 rounded-xl">
                       <Zap className="w-4 h-4 text-amber-400 fill-amber-400" />
                       <span className="text-xs font-bold text-amber-200">
-                        Ramo Critico: <strong>{calc.criticalPath.sourceName}</strong> (ΔP max = {formatNumber(calc.criticalPath.dp_tot_path, 1)} Pa)
+                        Ramo Più Sfavorevole: <strong>{calc.criticalPath.sourceName}</strong> (ΔP max = {formatNumber(calc.criticalPath.dp_tot_path, 1)} Pa)
                       </span>
                     </div>
                   )}
@@ -1590,28 +2106,26 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                   <div>
                     <p className="text-[10px] font-bold text-white/60 uppercase tracking-wider">Potenza Teorica Aria</p>
                     <p className="text-2xl sm:text-3xl font-black text-white mt-0.5">
-                      {formatNumber(calc.P_aria_kW, 3)} <span className="text-xs font-bold text-white/80">kW</span>
+                      {formatNumber(calc.P_aria_kW, 2)} <span className="text-xs font-bold text-cyan-400">kW</span>
                     </p>
-                    <p className="text-[10px] text-white/50">
-                      all'albero ({calc.hasEta ? `η = ${formatNumber(calc.eta * 100, 0)}%` : `η = ${formatNumber(calc.eta * 100, 0)}% stima`})
-                    </p>
+                    <p className="text-[10px] text-white/50">all'albero (η = {Math.round(calc.eta * 100)}%)</p>
                   </div>
 
                   <div>
-                    <p className="text-[10px] font-bold text-white/60 uppercase tracking-wider">Potenza con Margine (+{calc.margine_perc}%)</p>
+                    <p className="text-[10px] font-bold text-white/60 uppercase tracking-wider">Motore Elettrico Adottato</p>
                     <p className="text-2xl sm:text-3xl font-black text-emerald-400 mt-0.5">
-                      {formatNumber(calc.P_prog_tot_kW, 3)} <span className="text-xs font-bold text-white/80">kW</span>
+                      {calc.taglia_IEC_effettiva} <span className="text-xs font-bold text-white/80">kW</span>
                     </p>
-                    <p className="text-[10px] text-emerald-300/70">potenza minima di progetto</p>
+                    <p className="text-[10px] text-white/50">Taglia commerciale IEC</p>
                   </div>
                 </div>
               </div>
 
-              {/* Schema Topologico della Rete nella schermata Risultati */}
+              {/* Schema Topologico a video in Fase 3 */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <h3 className="text-sm font-black text-slate-800 mb-4 pb-3 border-b border-slate-100 flex items-center gap-2">
                   <span className="p-1.5 bg-cyan-100 text-cyan-600 rounded-lg"><Network className="w-4 h-4" /></span>
-                  Mappa Topologica della Rete Aeraulica e Percorso Critico
+                  Mappa Topologica della Rete Aeraulica e Percorso Più Sfavorevole
                 </h3>
                 <AeraulicTopologicalTree
                   segments={treeNodes}
@@ -1623,19 +2137,20 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                     position: r.sp.position,
                     segmentId: r.sp.segmentId,
                   }))}
+                  chimney={chimneyNode}
                   totalFlow_m3h={calc.totalFlow_m3h}
                   dp_tot_ventilatore={calc.dp_tot_ventilatore}
                   fanPower_kW={calc.taglia_IEC_effettiva}
                 />
               </div>
 
-              {/* Bilancio Analitico del Percorso Critico */}
+              {/* Bilancio Analitico del Percorso Più Sfavorevole */}
               {calc.criticalPath && (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                   <h3 className="text-sm font-black text-slate-800 mb-4 pb-3 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
                     <span className="flex items-center gap-2">
                       <Zap className="w-4 h-4 text-amber-500" />
-                      Bilancio Perdite del Percorso Critico ({calc.criticalPath.sourceName})
+                      Bilancio Perdite del Percorso Più Sfavorevole ({calc.criticalPath.sourceName})
                     </span>
                     <span className="text-[11px] font-bold text-slate-500">
                       Questo ramo determina la prevalenza del ventilatore
@@ -1719,8 +2234,26 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                             </tr>
                           ))}
 
+                        {/* Riga Camino di Espulsione a valle del ventilatore */}
+                        {data.chimney?.enabled && calc.chimneyRes.dp_tot_Pa > 0 && (
+                          <tr className="bg-emerald-50/70 font-semibold text-emerald-950">
+                            <td className="py-2.5 px-3">
+                              {data.chimney.name || 'Camino di Espulsione E1'}
+                            </td>
+                            <td className="py-2.5 px-3 text-emerald-700 font-normal">
+                              Mandata atmosferica Ø {data.chimney.D_mm || '—'} mm (H = {data.chimney.H_m || '—'} m)
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-slate-700">{formatNumber(calc.totalFlow_m3h, 0)}</td>
+                            <td className="py-2.5 px-3 text-right font-bold text-emerald-900">{formatNumber(calc.chimneyRes.dp_tot_Pa, 1)}</td>
+                            <td className="py-2.5 px-3 text-right text-slate-500">{formatNumber(calc.chimneyRes.dp_tot_Pa / 9.80665, 2)}</td>
+                            <td className="py-2.5 px-3 text-right text-slate-500">
+                              {formatNumber((calc.chimneyRes.dp_tot_Pa / calc.dp_tot_ventilatore) * 100, 1)}%
+                            </td>
+                          </tr>
+                        )}
+
                         <tr className="bg-cyan-600 text-white font-black text-xs">
-                          <td className="py-3 px-3" colSpan={3}>Pressione Totale Ventilatore Richiesta</td>
+                          <td className="py-3 px-3" colSpan={3}>Prevalenza Totale Ventilatore Richiesta</td>
                           <td className="py-3 px-3 text-right text-sm">{formatNumber(calc.dp_tot_ventilatore, 1)}</td>
                           <td className="py-3 px-3 text-right text-sm">{formatNumber(calc.dp_mmH2O, 2)}</td>
                           <td className="py-3 px-3 text-right">100%</td>
@@ -1738,9 +2271,20 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                     <GitFork className="w-4 h-4 text-cyan-600" />
                     Bilanciamento Rami di Aspirazione (Taratura Serrande)
                   </h3>
-                  <p className="text-[11px] text-slate-500 mb-4">
-                    I rami con perdita inferiore a quella del percorso critico richiederanno una regolazione con serranda di taratura (ΔP da dissipare) per garantire la corretta ripartizione della portata.
-                  </p>
+
+                  {/* Box Informativo Taratura Serrande */}
+                  <div className="mb-4 p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-950 flex items-start gap-2.5">
+                    <Sliders className="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" />
+                    <div className="space-y-1">
+                      <p className="font-bold text-amber-950 text-[11px]">
+                        Perché e come si effettua la taratura delle serrande di regolazione?
+                      </p>
+                      <p className="text-[10px] text-amber-900 leading-relaxed">
+                        L'aria segue naturalmente la via di minor resistenza: i rami più vicini al ventilatore o a diametro generoso tenderebbero ad aspirare portate eccessive, "rubando" aria e lasciando scoperte le bocchette più lontane. 
+                        La colonna <strong>"ΔP Serranda da Tarare"</strong> quantifica la caduta di pressione che la serranda a iride o a farfalla deve dissipare chiudendosi parzialmente, pareggiando la resistenza del ramo più sfavorevole e garantendo le portate esatte di progetto su tutti i punti di cattura.
+                      </p>
+                    </div>
+                  </div>
 
                   <div className="rounded-xl border border-slate-200 overflow-hidden">
                     <table className="w-full text-xs">
@@ -1756,7 +2300,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                       <tbody className="divide-y divide-slate-100">
                         {calc.paths.map(p => {
                           const isCrit = p.sourceId === calc.criticalPath?.sourceId;
-                          const sbilancio = calc.dp_tot_ventilatore - p.dp_tot_path;
+                          const sbilancio = (calc.criticalPath?.dp_tot_path || 0) - p.dp_tot_path;
 
                           return (
                             <tr key={p.sourceId} className={isCrit ? 'bg-amber-50/60 font-bold' : ''}>
@@ -1764,7 +2308,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                               <td className="py-2.5 px-3 text-slate-500 font-mono text-[11px]">{p.segmentIds.join(' ➔ ')}</td>
                               <td className="py-2.5 px-3 text-right font-bold text-slate-800">{formatNumber(p.dp_tot_path, 1)}</td>
                               <td className="py-2.5 px-3 text-right font-bold text-indigo-700">
-                                {isCrit ? '0 (Critico)' : formatNumber(sbilancio, 1)}
+                                {isCrit ? '0 (Sfavorito)' : formatNumber(sbilancio, 1)}
                               </td>
                               <td className="py-2.5 px-3 text-center">
                                 {isCrit ? (
@@ -1788,7 +2332,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
 
               {/* Box Motore Elettrico IEC & Selezione Taglia Commerciale */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <h3 className="text-sm font-black text-slate-800 mb-5 pb-3 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
+                <h3 className="text-sm font-black text-slate-800 mb-4 pb-3 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
                   <span className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-emerald-600" />
                     Selezione Motore Elettrico Commerciale IEC
@@ -1797,6 +2341,20 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                     Standard Unificato IEC (Norma EN 60034-30)
                   </span>
                 </h3>
+
+                {/* Box Informativo Scelta Motore IEC */}
+                <div className="mb-5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 flex items-start gap-2.5">
+                  <Lightbulb className="w-4 h-4 text-cyan-700 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1">
+                    <p className="font-bold text-slate-900 text-[11px]">
+                      Criterio di Calcolo e Scelta della Taglia Motore Normalizzata IEC
+                    </p>
+                    <p className="text-[10px] text-slate-600 leading-relaxed">
+                      La potenza teorica assorbita all'albero è espressa da <span className="font-mono font-bold text-slate-800">P_aria = (Q × ΔP) / (3600 × 1000 × η) [kW]</span>. 
+                      Applicando il margine di sicurezza impostato (+{calc.margine_perc}%) si ricava la potenza minima di progetto, in base alla quale il software seleziona automaticamente la taglia commerciale normalizzata IEC immediatamente superiore (es. 0.75, 1.1, 1.5, 2.2, 3, 4, 5.5, 7.5, 11, 15 kW...). È sempre possibile forzare manualmente una taglia diversa tramite il selettore sottostante.
+                    </p>
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Card Taglia IEC Raccomandata */}
@@ -1944,7 +2502,9 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
               </div>
               <div>
                 <p className="text-[9px] font-bold text-slate-400 uppercase">Margine Sicurezza</p>
-                <p className="font-bold text-slate-800 text-sm">+{calc.margine_perc} %</p>
+                <p className="font-bold text-slate-800 text-sm">
+                  {calc.margine_perc > 0 ? `+${calc.margine_perc} %` : '0 % (Nessun margine)'}
+                </p>
               </div>
               <div>
                 <p className="text-[9px] font-bold text-slate-400 uppercase">Configurazione Ventilatori</p>
@@ -1954,7 +2514,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
           </PrintSection>
 
           {/* Sezione 2: Schema Topologico Vettoriale */}
-          <PrintSection title="2. Schema Topologico Rete Aeraulica (Percorso Critico Evidenziato)">
+          <PrintSection title="2. Schema Topologico Rete Aeraulica (Ramo Più Sfavorevole Evidenziato)">
             <div className="border border-slate-300 rounded-xl overflow-hidden p-2 bg-white">
               <AeraulicTopologicalTree
                 segments={treeNodes}
@@ -1966,6 +2526,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                   position: r.sp.position,
                   segmentId: r.sp.segmentId,
                 }))}
+                chimney={chimneyNode}
                 totalFlow_m3h={calc.totalFlow_m3h}
                 dp_tot_ventilatore={calc.dp_tot_ventilatore}
                 fanPower_kW={calc.taglia_IEC_effettiva}
@@ -1988,7 +2549,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                   <th className="py-1.5 px-2 text-right font-bold">ΔP distr. [Pa]</th>
                   <th className="py-1.5 px-2 text-right font-bold">ΔP conc. [Pa]</th>
                   <th className="py-1.5 px-2 text-right font-bold">ΔP tot [Pa]</th>
-                  <th className="py-1.5 px-2 text-center font-bold">Critico</th>
+                  <th className="py-1.5 px-2 text-center font-bold">Sfavorito</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -2050,8 +2611,8 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
             </PrintSection>
           )}
 
-          {/* Sezione: Bilancio Percorso Critico (a tutta larghezza) */}
-          <PrintSection title={`${calc.specResults.length > 0 ? '5.' : '4.'} Bilancio Percorso Critico`}>
+          {/* Sezione: Bilancio Percorso Più Sfavorevole (a tutta larghezza) */}
+          <PrintSection title={`${calc.specResults.length > 0 ? '5.' : '4.'} Bilancio Percorso Più Sfavorevole`}>
             <table className="w-full text-[11px] border-collapse">
               <tbody>
                 <tr className="border-b border-slate-200">
@@ -2080,6 +2641,16 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                     {formatNumber(calc.dp_speciali_generali, 1)} Pa
                   </td>
                 </tr>
+                {data.chimney?.enabled && calc.chimneyRes.dp_tot_Pa > 0 && (
+                  <tr className="border-b border-slate-200 bg-emerald-50/50">
+                    <td className="py-1.5 text-slate-700 font-medium">
+                      {data.chimney.name || 'Camino di Espulsione E1'} (Mandata Atmosferica)
+                    </td>
+                    <td className="py-1.5 text-right font-bold text-emerald-800">
+                      {formatNumber(calc.chimneyRes.dp_tot_Pa, 1)} Pa
+                    </td>
+                  </tr>
+                )}
                 <tr className="bg-slate-100 font-bold">
                   <td className="py-2 text-slate-900">Prevalenza Totale Ventilatore Richiesta</td>
                   <td className="py-2 text-right text-slate-900 text-sm">
@@ -2107,7 +2678,9 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                   <td className="py-1.5 text-right font-bold">{formatNumber(calc.P_aria_kW, 3)} kW</td>
                 </tr>
                 <tr className="border-b border-slate-200">
-                  <td className="py-1.5 text-slate-600">Potenza di Progetto (+{calc.margine_perc}%)</td>
+                  <td className="py-1.5 text-slate-600">
+                    Potenza di Progetto ({calc.margine_perc > 0 ? `+${calc.margine_perc}%` : 'Margine 0%'})
+                  </td>
                   <td className="py-1.5 text-right font-bold">{formatNumber(calc.P_prog_tot_kW, 3)} kW</td>
                 </tr>
                 <tr className="border-b border-slate-200">

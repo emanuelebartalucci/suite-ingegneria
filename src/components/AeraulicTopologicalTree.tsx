@@ -23,9 +23,19 @@ export interface AeraulicSpecialNode {
   segmentId: string;
 }
 
+export interface AeraulicChimneyNode {
+  enabled: boolean;
+  name?: string;
+  D_mm: number | string;
+  H_m: number | string;
+  dp_Pa: number;
+  v_ms: number;
+}
+
 export interface AeraulicTopologicalTreeProps {
   segments: AeraulicTreeNode[];
   specials?: AeraulicSpecialNode[];
+  chimney?: AeraulicChimneyNode;
   totalFlow_m3h: number;
   dp_tot_ventilatore: number;
   selectedSegmentId?: string | null;
@@ -37,6 +47,7 @@ export interface AeraulicTopologicalTreeProps {
 export const AeraulicTopologicalTree: React.FC<AeraulicTopologicalTreeProps> = ({
   segments,
   specials = [],
+  chimney,
   totalFlow_m3h,
   dp_tot_ventilatore,
   selectedSegmentId,
@@ -265,6 +276,42 @@ export const AeraulicTopologicalTree: React.FC<AeraulicTopologicalTreeProps> = (
         targetCenterY = targetNode.inY;
       }
 
+      // CASO 1: UN SOLO TRATTO SORGENTE (nessuna confluenza reale tra più rami)
+      if (sources.length === 1) {
+        const src = sources[0];
+        // Se si trovano alla stessa quota verticale (es. ultimo tratto orizzontale verso trattamento o ventilatore)
+        if (Math.abs(src.outY - targetCenterY) < 1) {
+          entryPipes.push({
+            x1: src.outX,
+            y1: src.outY,
+            x2: targetInX,
+            y2: targetCenterY,
+          });
+        } else {
+          // Se sono a quote diverse: raccordo ortogonale pulito SENZA pallino di confluenza
+          const midX = (src.outX + targetInX) / 2;
+          branchLines.push({
+            x1: src.outX,
+            y1: src.outY,
+            x2: midX,
+            y2: src.outY,
+          });
+          busPipes.push({
+            busX: midX,
+            yMin: Math.min(src.outY, targetCenterY),
+            yMax: Math.max(src.outY, targetCenterY),
+          });
+          entryPipes.push({
+            x1: midX,
+            y1: targetCenterY,
+            x2: targetInX,
+            y2: targetCenterY,
+          });
+        }
+        return;
+      }
+
+      // CASO 2: CONFLUENZA REALE DI 2 O PIÙ RAMI (sources.length > 1)
       // X massima tra le uscite dei tratti sorgenti
       const maxSourceOutX = Math.max(...sources.map(s => s.outX));
       // Calcolo del bus di confluenza verticale a metà strada
@@ -280,7 +327,7 @@ export const AeraulicTopologicalTree: React.FC<AeraulicTopologicalTreeProps> = (
         });
       });
 
-      // 2. Pettine verticale se i rami arrivano da quote diverse da targetCenterY
+      // 2. Pettine verticale che unisce tutti i rami confluenti
       const allYs = [...sources.map(s => s.outY), targetCenterY];
       const yMin = Math.min(...allYs);
       const yMax = Math.max(...allYs);
@@ -293,7 +340,7 @@ export const AeraulicTopologicalTree: React.FC<AeraulicTopologicalTreeProps> = (
         });
       }
 
-      // 3. Nodo di confluenza centrale ben visibile (pallino sul punto d'unione)
+      // 3. Nodo di confluenza centrale (pallino) inserito SOLO quando 2 o più rami convergono
       junctionNodes.push({
         x: busX,
         y: targetCenterY,
@@ -323,7 +370,42 @@ export const AeraulicTopologicalTree: React.FC<AeraulicTopologicalTreeProps> = (
       });
     }
 
-    const totalWidth = fanX + fanW + PADDING_LEFT + 25;
+    // Blocco Camino a valle del Ventilatore (se presente/abilitato)
+    let chimneyBlock: any = null;
+    let totalWidth = fanX + fanW + PADDING_LEFT + 25;
+
+    if (chimney && chimney.enabled) {
+      const chimX = fanX + fanW + 45;
+      const chimY = fanY;
+      const chimW = 155;
+      const chimH = fanH;
+
+      chimneyBlock = {
+        x: chimX,
+        y: chimY,
+        w: chimW,
+        h: chimH,
+        inX: chimX,
+        inY: chimY + chimH / 2,
+        outX: chimX + chimW,
+        outY: chimY + chimH / 2,
+        name: chimney.name || 'Camino E1',
+        D_mm: chimney.D_mm,
+        H_m: chimney.H_m,
+        dp_Pa: chimney.dp_Pa,
+        v_ms: chimney.v_ms,
+      };
+
+      entryPipes.push({
+        x1: fanBlock.outX,
+        y1: fanBlock.outY,
+        x2: chimneyBlock.inX,
+        y2: chimneyBlock.inY,
+      });
+
+      totalWidth = chimX + chimW + PADDING_LEFT + 40;
+    }
+
     const totalHeight = contentHeight + PADDING_TOP * 2;
 
     return {
@@ -334,10 +416,11 @@ export const AeraulicTopologicalTree: React.FC<AeraulicTopologicalTreeProps> = (
       entryPipes,
       specialBlocks,
       fanBlock,
-      width: Math.max(totalWidth, 750),
+      chimneyBlock,
+      width: Math.max(totalWidth, 780),
       height: Math.max(totalHeight, 280),
     };
-  }, [segments, specials, totalFlow_m3h, dp_tot_ventilatore, fanPower_kW]);
+  }, [segments, specials, chimney, totalFlow_m3h, dp_tot_ventilatore, fanPower_kW]);
 
   if (!segments || segments.length === 0) {
     return (
@@ -358,20 +441,30 @@ export const AeraulicTopologicalTree: React.FC<AeraulicTopologicalTreeProps> = (
           </span>
         </div>
 
-        <div className="flex items-center gap-5 text-[11px]">
+        <div className="flex items-center gap-4 text-[11px] flex-wrap">
           <div className="flex items-center gap-1.5">
-            <span className="w-3.5 h-1.5 bg-cyan-600 rounded-full"></span>
-            <span className="text-slate-700 font-semibold">Linea Condotta / Flusso Aria</span>
-          </div>
-          {/* Nodo Confluenza perfettamente coordinato con i nodi dello schema */}
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-600 border border-cyan-800"></span>
-            <span className="text-slate-700 font-semibold">Nodo di Confluenza</span>
+            <span className="w-5 h-[2px] bg-[#0284c7] rounded-full"></span>
+            <span className="text-slate-700 font-semibold">Condotta Rete</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded bg-indigo-100 border border-indigo-300"></span>
-            <span className="text-slate-600 font-medium">Trattamento & Ventilatore</span>
+            <span className="w-2.5 h-2.5 rounded bg-amber-100 border border-amber-400"></span>
+            <span className="text-slate-700 font-semibold">Ramo Più Sfavorevole</span>
           </div>
+          {/* Nodo Confluenza */}
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#0284c7] border border-[#075985]"></span>
+            <span className="text-slate-700 font-semibold">Confluenza</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded bg-sky-100 border border-sky-400"></span>
+            <span className="text-slate-700 font-semibold">Ventilatore (V1)</span>
+          </div>
+          {chimney && chimney.enabled && (
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded bg-emerald-100 border border-emerald-400"></span>
+              <span className="text-slate-700 font-semibold">Camino (E1)</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -511,20 +604,19 @@ export const AeraulicTopologicalTree: React.FC<AeraulicTopologicalTreeProps> = (
                     ? (n.seg.name.length > 13 ? `${n.seg.name.slice(0, 13)}…` : n.seg.name)
                     : (isSource ? 'Bocchetta' : 'Collettore')}
                 </text>
-
-                {/* Badge CRITICO (Solo scritta arancione sul box) */}
+                {/* Badge SFAVORITO (Evidenziazione ramo a maggior resistenza) */}
                 {isCrit && (
-                  <g transform={`translate(${n.w - 52}, 6)`}>
-                    <rect width="46" height="15" rx="3" fill="#fef3c7" stroke="#f59e0b" strokeWidth="0.8" />
+                  <g transform={`translate(${n.w - 62}, 6)`}>
+                    <rect width="56" height="15" rx="3" fill="#fef3c7" stroke="#f59e0b" strokeWidth="0.8" />
                     <text
-                      x="23"
+                      x="28"
                       y="11"
                       textAnchor="middle"
                       fill="#b45309"
                       fontSize="7.5"
                       fontWeight="900"
                     >
-                      CRITICO
+                      SFAVORITO
                     </text>
                   </g>
                 )}
@@ -543,8 +635,11 @@ export const AeraulicTopologicalTree: React.FC<AeraulicTopologicalTreeProps> = (
                     fontWeight="700"
                   >
                     {formatNumber(n.seg.v_ms, 1)} m/s
-                  </tspan>{' '}
-                  • ΔP: {formatNumber(n.seg.dp_Pa, 0)} Pa
+                  </tspan>
+                  {' • ΔP: '}
+                  <tspan fill="#ea580c" fontWeight="700">
+                    {formatNumber(n.seg.dp_Pa, 1)} Pa
+                  </tspan>
                 </text>
               </g>
             );
@@ -611,6 +706,54 @@ export const AeraulicTopologicalTree: React.FC<AeraulicTopologicalTreeProps> = (
               <text x={layout.fanBlock.w - 12} y="72" textAnchor="end" fill="#0284c7" fontSize="9" fontWeight="700">
                 {layout.fanBlock.fanPower_kW ? `${layout.fanBlock.fanPower_kW} kW` : ''}
               </text>
+            </g>
+          )}
+
+          {/* 8. Blocco Camino / Mandata verso Atmosfera (E1) */}
+          {layout.chimneyBlock && (
+            <g transform={`translate(${layout.chimneyBlock.x}, ${layout.chimneyBlock.y})`}>
+              <rect
+                width={layout.chimneyBlock.w}
+                height={layout.chimneyBlock.h}
+                rx="10"
+                ry="10"
+                fill="#ffffff"
+                stroke="#059669"
+                strokeWidth="2"
+                filter="drop-shadow(0 3px 6px rgba(5,150,105,0.15))"
+              />
+              <circle cx="24" cy="24" r="12" fill="#ecfdf5" stroke="#059669" strokeWidth="1.5" />
+              <text x="24" y="28" textAnchor="middle" fill="#059669" fontSize="11" fontWeight="900">
+                E1
+              </text>
+
+              <text x="44" y="23" fill="#065f46" fontSize="11" fontWeight="900">
+                CAMINO
+              </text>
+              <text x="44" y="35" fill="#64748b" fontSize="8.5" fontWeight="600">
+                Mandata Atmosfera
+              </text>
+
+              <line x1="12" y1="44" x2={layout.chimneyBlock.w - 12} y2="44" stroke="#e2e8f0" strokeWidth="1" />
+
+              <text x="12" y="58" fill="#0f172a" fontSize="9" fontWeight="700">
+                {layout.chimneyBlock.D_mm ? `Ø ${layout.chimneyBlock.D_mm} mm` : 'Ø —'}
+                {layout.chimneyBlock.H_m ? ` • H ${layout.chimneyBlock.H_m} m` : ''}
+              </text>
+              <text x="12" y="72" fill="#059669" fontSize="9.5" fontWeight="800">
+                ΔP: {formatNumber(layout.chimneyBlock.dp_Pa, 1)} Pa
+              </text>
+              {layout.chimneyBlock.v_ms > 0 && (
+                <text x={layout.chimneyBlock.w - 12} y="72" textAnchor="end" fill="#64748b" fontSize="8.5" fontWeight="600">
+                  {formatNumber(layout.chimneyBlock.v_ms, 1)} m/s
+                </text>
+              )}
+
+              {/* Indicatore visivo di emissione libera in atmosfera verso l'alto */}
+              <g transform={`translate(${layout.chimneyBlock.w - 22}, 14)`}>
+                <circle cx="6" cy="6" r="8" fill="#ecfdf5" stroke="#059669" strokeWidth="1" />
+                <path d="M 6 10 L 6 3 M 3.5 5.5 L 6 2.5 L 8.5 5.5" fill="none" stroke="#059669" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+              </g>
             </g>
           )}
         </svg>

@@ -33,7 +33,7 @@ import { EquivalentLengthPiece } from './data/equivalentLengths';
 import { ProvinceClimateData } from './data/climateData';
 import { seedElectricalCatalog, fetchElectricalCables, fetchElectricalContainers } from './utils/electricalDbHelper';
 import { CableProduct, ContainerFamily } from './data/electricalDatabase';
-import { IconWaves, IconFlame, IconThermometer, IconArrowUp, IconWind, IconPump, IconImpeller } from './components/Icons';
+import { IconWaves, IconFlame, IconThermometer, IconArrowUp, IconWind, IconPump, IconImpeller, IconBlower } from './components/Icons';
 import { Shield, Users, Plus, Trash2, Settings, UserCheck, Star, Zap, Scale, Fan, Layers, Grid, Ruler, ThermometerSun, ShieldCheck, FlaskConical } from 'lucide-react';
 
 import logoImg from './assets/Logo.png';
@@ -827,14 +827,14 @@ export default function App() {
 
                                     {/* 7. Pompe di Sollevamento Fognario */}
                                     <button onClick={() => setAppMode('pompe_fognarie')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-teal-500 hover:bg-teal-50 transition-all text-left cursor-pointer w-full">
-                                        <div className="w-14 h-14 bg-teal-100 text-teal-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><IconPump /></div>
+                                        <div className="w-14 h-14 bg-teal-100 text-teal-600 p-2.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><IconPump className="w-9 h-9" /></div>
                                         <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Pompe di Sollevamento Fognario</h2>
                                         <p className="text-[11px] text-slate-500 text-center leading-relaxed">Dimensionamento pompe, prevalenza manometrica, taglia motore e vasca di accumulo.</p>
                                     </button>
 
                                     {/* 8. Aspiratore / Ventilatore Industriale */}
                                     <button onClick={() => setAppMode('aspiratore')} className="group flex flex-col items-center p-5 bg-slate-50 border-2 border-slate-200 rounded-2xl hover:border-cyan-500 hover:bg-cyan-50 transition-all text-left cursor-pointer w-full">
-                                        <div className="w-14 h-14 bg-cyan-100 text-cyan-600 p-3.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><IconImpeller /></div>
+                                        <div className="w-14 h-14 bg-cyan-100 text-cyan-600 p-2.5 rounded-full mb-4 group-hover:scale-110 transition-transform flex items-center justify-center"><IconBlower className="w-9 h-9" /></div>
                                         <h2 className="text-sm font-bold text-slate-800 mb-1.5 text-center w-full">Aspiratore / Ventilatore</h2>
                                         <p className="text-[11px] text-slate-500 text-center leading-relaxed">Perdite di carico aerauliche, scrubber, dimensionamento ventilatore industriale.</p>
                                     </button>
