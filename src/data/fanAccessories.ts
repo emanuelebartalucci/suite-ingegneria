@@ -96,10 +96,11 @@ export const FAN_ROUGHNESS: Record<string, number> = {
   'Manuale': 0.046,
 };
 
-/** Taglie motori commerciali IEC [kW] */
+/** Taglie motori commerciali IEC [kW] (Norma IEC 60072-1 / CEI EN 60034-30-1) */
 export const TAGLIE_MOTORI_IEC = [
-  0.25, 0.37, 0.55, 0.75, 1.1, 1.5, 2.2, 3.0, 4.0, 5.5,
+  0.09, 0.12, 0.18, 0.25, 0.37, 0.55, 0.75, 1.1, 1.5, 2.2, 3.0, 4.0, 5.5,
   7.5, 11, 15, 18.5, 22, 30, 37, 45, 55, 75, 90, 110, 132, 160, 200, 250, 315,
+  355, 400, 450, 500,
 ];
 
 export function getTagliaIEC(kW: number): number {

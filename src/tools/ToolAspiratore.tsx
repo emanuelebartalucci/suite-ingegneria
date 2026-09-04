@@ -3,8 +3,8 @@ import { ProjectHeader, ProjectData } from '../components/ProjectHeader';
 import ProjectStorage from '../components/ProjectStorage';
 import {
   Plus, Trash2, ChevronDown, ChevronUp, Copy,
-  Wind, Zap, CheckCircle, ArrowRight, ArrowLeft,
-  Printer, GitFork, Gauge, Layers, Network,
+  Wind, Zap, CheckCircle, ArrowRight, ArrowLeft, ArrowUp, ArrowDown,
+  Printer, GitFork, Gauge, Layers, Network, GripVertical,
   Info, HelpCircle, BookOpen, Lightbulb, Sliders, AlertTriangle
 } from 'lucide-react';
 import {
@@ -104,7 +104,9 @@ export interface FanGlobalData {
   dp_bocchetta_default_Pa: string; // Depressione standard bocchette [Pa]
   eta_ventilatore_perc: string;    // Rendimento ventilatore in % (es. 55 per 55%)
   margine_motore_perc: string;     // Margine di sicurezza potenza motore in % (es. 20%)
+  motore_tipo_scelta?: 'standard' | 'custom'; // Tipo scelta motore: standard IEC o personalizzato da targa
   taglia_IEC_installata: number | null; // Taglia motore commerciale scelta a mano [kW]
+  motore_custom_kW?: string;       // Potenza motore personalizzata da targa [kW] (es. 3,7 o 0,18)
   n_titolari: number;              // Numero ventilatori titolari
   n_riserva: number;               // Numero ventilatori di riserva
 }
@@ -146,7 +148,7 @@ export const defaultChimneyData = (): FanChimneyData => ({
 });
 
 export const createNewSegment = (suggestedId: string, isFirst = false): AeraulicSegment => ({
-  uid: Math.random().toString(36).substring(2, 9),
+  uid: `seg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
   id: suggestedId,
   name: '',
   type: isFirst ? 'source' : 'source',
@@ -174,6 +176,61 @@ export const createNewSpecial = (count: number): SpecialComponent => ({
   dp_concentrata_Pa: '',
 });
 
+/**
+ * Calcola in modo intelligente il prossimo ID disponibile per un nuovo tratto (es. 'L8', 'L9', 'L34'),
+ * analizzando tutti i codici esistenti per evitare categoricamente collisioni o duplicati.
+ */
+export function getNextAvailableSegmentId(segments: AeraulicSegment[], prefix = 'L'): string {
+  const existingUpper = new Set(segments.map(s => s.id.trim().toUpperCase()));
+  let maxNum = 0;
+  segments.forEach(s => {
+    const match = s.id.match(/^([A-Za-z]+)(\d+)$/);
+    if (match) {
+      const n = parseInt(match[2], 10);
+      if (!isNaN(n) && n > maxNum) {
+        maxNum = n;
+      }
+    }
+  });
+
+  let nextCandidate = maxNum + 1;
+  while (existingUpper.has(`${prefix}${nextCandidate}`.toUpperCase())) {
+    nextCandidate++;
+  }
+  return `${prefix}${nextCandidate}`;
+}
+
+/**
+ * Verifica se l'assegnazione di candidateTargetRef come confluenza di sourceRef
+ * creerebbe un ciclo infinito nella rete aeraulica.
+ */
+export function wouldCreateCycle(sourceRef: string, candidateTargetRef: string, segments: AeraulicSegment[]): boolean {
+  if (!sourceRef || !candidateTargetRef) return false;
+  if (sourceRef === candidateTargetRef) return true;
+
+  const segByRef = new Map<string, AeraulicSegment>();
+  segments.forEach(s => {
+    if (s.uid) segByRef.set(s.uid, s);
+    if (s.id) segByRef.set(s.id, s);
+  });
+
+  const sourceSeg = segByRef.get(sourceRef);
+  const candidateSeg = segByRef.get(candidateTargetRef);
+  if (!sourceSeg || !candidateSeg) return false;
+  if (sourceSeg.uid && candidateSeg.uid && sourceSeg.uid === candidateSeg.uid) return true;
+
+  let curr: AeraulicSegment | undefined = candidateSeg;
+  const visited = new Set<string>();
+  while (curr && curr.confluisceInId) {
+    if ((sourceSeg.uid && curr.confluisceInId === sourceSeg.uid) || curr.confluisceInId === sourceSeg.id) return true;
+    const currKey = curr.uid || curr.id;
+    if (visited.has(currKey)) break;
+    visited.add(currKey);
+    curr = segByRef.get(curr.confluisceInId);
+  }
+  return false;
+}
+
 const defaultData: FanToolData = {
   global: {
     T_aria_C: '',
@@ -181,7 +238,9 @@ const defaultData: FanToolData = {
     dp_bocchetta_default_Pa: '',
     eta_ventilatore_perc: '',
     margine_motore_perc: '',
+    motore_tipo_scelta: 'standard',
     taglia_IEC_installata: null,
+    motore_custom_kW: '',
     n_titolari: 1,
     n_riserva: 0,
   },
@@ -209,7 +268,9 @@ function normalizeFanData(loaded: any): FanToolData {
       ? String(g.eta_ventilatore_perc).replace('.', ',')
       : (g.eta_ventilatore !== undefined ? String(Math.round(g.eta_ventilatore * 100)).replace('.', ',') : ''),
     margine_motore_perc: g.margine_motore_perc !== undefined ? String(g.margine_motore_perc).replace('.', ',') : '',
+    motore_tipo_scelta: g.motore_tipo_scelta === 'custom' ? 'custom' : 'standard',
     taglia_IEC_installata: g.taglia_IEC_installata !== undefined ? g.taglia_IEC_installata : null,
+    motore_custom_kW: g.motore_custom_kW !== undefined ? String(g.motore_custom_kW).replace('.', ',') : '',
     n_titolari: g.n_titolari || 1,
     n_riserva: g.n_riserva || 0,
   };
@@ -253,7 +314,7 @@ function normalizeFanData(loaded: any): FanToolData {
     }
 
     return {
-      uid: s.uid || Math.random().toString(36).substring(2, 9),
+      uid: s.uid || `seg_${Date.now()}_${idx}_${Math.random().toString(36).substring(2, 7)}`,
       id: currentId,
       name: s.name || '',
       type: segType,
@@ -270,20 +331,42 @@ function normalizeFanData(loaded: any): FanToolData {
     };
   });
 
+  // Migrazione trasparente di confluisceInId e segmentId da ID testuale a UID immutabile
+  const idToUidMap = new Map<string, string>();
+  migratedSegments.forEach(s => {
+    if (s.id && s.uid) {
+      idToUidMap.set(s.id.trim(), s.uid);
+      idToUidMap.set(s.id.trim().toUpperCase(), s.uid);
+    }
+  });
+
+  migratedSegments.forEach(s => {
+    if (s.confluisceInId) {
+      const targetUid = idToUidMap.get(s.confluisceInId.trim()) || idToUidMap.get(s.confluisceInId.trim().toUpperCase());
+      if (targetUid) {
+        s.confluisceInId = targetUid;
+      }
+    }
+  });
+
   const rawSpecials = Array.isArray(loaded.specials) ? loaded.specials : [];
-  const migratedSpecials: SpecialComponent[] = rawSpecials.map((sp: any, idx: number) => ({
-    id: sp.id ? String(sp.id) : `SP${idx + 1}`,
-    name: sp.name || '',
-    type: sp.type || 'Scrubber',
-    position: sp.position === 'segment' ? 'segment' : 'general',
-    segmentId: sp.segmentId ? String(sp.segmentId) : '',
-    D_interno_mm: sp.D_interno_mm !== undefined ? String(sp.D_interno_mm).replace('.', ',') : '',
-    H_corpo_m: sp.H_corpo_m !== undefined ? String(sp.H_corpo_m).replace('.', ',') : '',
-    H_riempimento_m: sp.H_riempimento_m !== undefined ? String(sp.H_riempimento_m).replace('.', ',') : '',
-    dp_riempimento_Pa_m: sp.dp_riempimento_Pa_m !== undefined ? String(sp.dp_riempimento_Pa_m).replace('.', ',') : '',
-    dp_extra_Pa: sp.dp_extra_Pa !== undefined ? String(sp.dp_extra_Pa).replace('.', ',') : '',
-    dp_concentrata_Pa: sp.dp_concentrata_Pa !== undefined ? String(sp.dp_concentrata_Pa).replace('.', ',') : '',
-  }));
+  const migratedSpecials: SpecialComponent[] = rawSpecials.map((sp: any, idx: number) => {
+    const origSegId = sp.segmentId ? String(sp.segmentId).trim() : '';
+    const targetUid = origSegId ? (idToUidMap.get(origSegId) || idToUidMap.get(origSegId.toUpperCase()) || origSegId) : '';
+    return {
+      id: sp.id ? String(sp.id) : `SP${idx + 1}`,
+      name: sp.name || '',
+      type: sp.type || 'Scrubber',
+      position: sp.position === 'segment' ? 'segment' : 'general',
+      segmentId: targetUid,
+      D_interno_mm: sp.D_interno_mm !== undefined ? String(sp.D_interno_mm).replace('.', ',') : '',
+      H_corpo_m: sp.H_corpo_m !== undefined ? String(sp.H_corpo_m).replace('.', ',') : '',
+      H_riempimento_m: sp.H_riempimento_m !== undefined ? String(sp.H_riempimento_m).replace('.', ',') : '',
+      dp_riempimento_Pa_m: sp.dp_riempimento_Pa_m !== undefined ? String(sp.dp_riempimento_Pa_m).replace('.', ',') : '',
+      dp_extra_Pa: sp.dp_extra_Pa !== undefined ? String(sp.dp_extra_Pa).replace('.', ',') : '',
+      dp_concentrata_Pa: sp.dp_concentrata_Pa !== undefined ? String(sp.dp_concentrata_Pa).replace('.', ',') : '',
+    };
+  });
 
   const rawChimney = loaded.chimney || {};
   const migratedChimney: FanChimneyData = {
@@ -531,7 +614,55 @@ function calcChimneyAeraulics(chim: FanChimneyData, Q_m3h: number, rho: number, 
 export function ToolAspiratore({ projectData, setProjectData, setAppMode }: ToolAspiratorProps) {
   const [data, setData] = useState<FanToolData>(() => defaultData);
   const [collapsedAccessoryIds, setCollapsedAccessoryIds] = useState<Record<string, boolean>>({});
-  const [selectedTreeSegmentId, setSelectedTreeSegmentId] = useState<string | null>(null);
+  const [selectedSegmentUid, setSelectedSegmentUid] = useState<string | null>(null);
+  const [segmentsViewMode, setSegmentsViewMode] = useState<'focused' | 'all'>('focused');
+  const [showOverviewTable, setShowOverviewTable] = useState<boolean>(false);
+
+  const [draggedSegmentIndex, setDraggedSegmentIndex] = useState<number | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ index: number; position: 'before' | 'after' } | null>(null);
+
+  /**
+   * Calcola la posizione di atterraggio (before o after) in modo naturale ed ergonomico.
+   * - Se l'utente trascina verso il vicino destro immediato (targetIdx === sourceIdx + 1),
+   *   l'unica intenzione possibile è posizionarlo DOPO quel vicino (scambio di 1 posto a destra).
+   * - Se trascina verso il vicino sinistro immediato (targetIdx === sourceIdx - 1),
+   *   l'unica intenzione possibile è posizionarlo PRIMA di quel vicino (scambio di 1 posto a sinistra).
+   * - Per salti ampi (2 o più posizioni), la prima metà (sinistra/alto) assegna 'before', la seconda 'after'.
+   */
+  function computeDropTarget(
+    sourceIdx: number,
+    targetIdx: number,
+    isFirstHalf: boolean
+  ): { index: number; position: 'before' | 'after' } | null {
+    if (sourceIdx === targetIdx || sourceIdx < 0 || targetIdx < 0) return null;
+    if (targetIdx === sourceIdx + 1) {
+      return { index: targetIdx, position: 'after' };
+    }
+    if (targetIdx === sourceIdx - 1) {
+      return { index: targetIdx, position: 'before' };
+    }
+    return { index: targetIdx, position: isFirstHalf ? 'before' : 'after' };
+  }
+
+  function dropSegmentAt(sourceIdx: number, targetIdx: number, position: 'before' | 'after') {
+    if (sourceIdx === targetIdx || sourceIdx < 0 || targetIdx < 0) return;
+    setData(prev => {
+      if (sourceIdx >= prev.segments.length || targetIdx >= prev.segments.length) return prev;
+      const list = [...prev.segments];
+      const targetKey = prev.segments[targetIdx]?.uid || prev.segments[targetIdx]?.id;
+      const [moved] = list.splice(sourceIdx, 1);
+      if (!moved) return prev;
+
+      const newTargetIdx = list.findIndex(s => (s.uid && s.uid === targetKey) || s.id === targetKey);
+      if (newTargetIdx === -1) {
+        list.push(moved);
+      } else {
+        const insertIdx = position === 'before' ? newTargetIdx : newTargetIdx + 1;
+        list.splice(insertIdx, 0, moved);
+      }
+      return { ...prev, segments: list };
+    });
+  }
 
   function toggleAccessoryCollapse(segId: string) {
     setCollapsedAccessoryIds(prev => ({ ...prev, [segId]: !prev[segId] }));
@@ -552,22 +683,20 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
   }
 
   function addSegment() {
-    setData(prev => {
-      const nextNum = prev.segments.length + 1;
-      const newId = `L${nextNum}`;
-      const lastSeg = prev.segments.length > 0 ? prev.segments[prev.segments.length - 1] : null;
+    const newId = getNextAvailableSegmentId(data.segments);
+    const newSeg = createNewSegment(newId, false);
+    newSeg.confluisceInId = ''; // Verso il Ventilatore
 
-      // Il nuovo tratto creato diventa il tratto finale che confluisce verso il ventilatore
-      const newSeg = createNewSegment(newId, false);
-      newSeg.confluisceInId = ''; // Verso il Ventilatore
+    setData(prev => {
+      const lastSeg = prev.segments.length > 0 ? prev.segments[prev.segments.length - 1] : null;
       if (lastSeg) {
         newSeg.type = 'junction'; // Raccoglie l'aria a monte dal tratto precedente
       }
 
-      // Il tratto precedente ora confluisce nel nuovo tratto appena aggiunto
+      // Il tratto precedente ora confluisce nel nuovo tratto appena aggiunto (tramite UID stabile)
       const updatedSegments = prev.segments.map((s, idx) => {
         if (idx === prev.segments.length - 1) {
-          return { ...s, confluisceInId: newId };
+          return { ...s, confluisceInId: newSeg.uid };
         }
         return s;
       });
@@ -577,44 +706,92 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
         segments: [...updatedSegments, newSeg]
       };
     });
+    setSelectedSegmentUid(newSeg.uid);
   }
 
-  function duplicateSegment(segId: string) {
+  function addBranchToCollector(collectorRef: string) {
+    const targetCol = data.segments.find(s => (s.uid && s.uid === collectorRef) || s.id === collectorRef);
+    if (!targetCol) return;
+    const newId = getNextAvailableSegmentId(data.segments);
+    const newSeg = createNewSegment(newId, false);
+    newSeg.type = 'source';
+    newSeg.confluisceInId = targetCol.uid; // Collega stabilmente all'UID del collettore!
+    setData(prev => ({
+      ...prev,
+      segments: [...prev.segments, newSeg]
+    }));
+    setSelectedSegmentUid(newSeg.uid);
+  }
+
+  function duplicateSegment(segUid: string) {
+    const srcSeg = data.segments.find(s => (s.uid && s.uid === segUid) || s.id === segUid);
+    if (!srcSeg) return;
+    const newId = getNextAvailableSegmentId(data.segments);
+    const newSeg: AeraulicSegment = {
+      ...srcSeg,
+      uid: `seg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      id: newId,
+      name: srcSeg.name ? `${srcSeg.name} (Copia)` : '',
+      confluisceInId: srcSeg.confluisceInId,
+      accessories: { ...(srcSeg.accessories || defaultAccessories()) },
+    };
+    setData(prev => ({
+      ...prev,
+      segments: [...prev.segments, newSeg],
+    }));
+    setSelectedSegmentUid(newSeg.uid);
+  }
+
+  function removeSegment(segUid: string) {
+    const targetSeg = data.segments.find(s => (s.uid && s.uid === segUid) || s.id === segUid);
+    if (!targetSeg) return;
+    const targetId = targetSeg.id;
+    const targetUid = targetSeg.uid;
+
     setData(prev => {
-      const srcSeg = prev.segments.find(s => s.id === segId);
-      if (!srcSeg) return prev;
-      const nextNum = prev.segments.length + 1;
-      const newId = `L${nextNum}`;
-      const newSeg: AeraulicSegment = {
-        ...srcSeg,
-        uid: Math.random().toString(36).substring(2, 9),
-        id: newId,
-        name: srcSeg.name ? `${srcSeg.name} (Copia)` : '',
-        confluisceInId: srcSeg.confluisceInId,
-        accessories: { ...(srcSeg.accessories || defaultAccessories()) },
-      };
+      const remaining = prev.segments.filter(s => (s.uid && s.uid !== targetUid) && s.id !== segUid);
       return {
         ...prev,
-        segments: [...prev.segments, newSeg],
+        segments: remaining.map(s => {
+          if (s.confluisceInId === targetUid || s.confluisceInId === targetId) {
+            return { ...s, confluisceInId: '' };
+          }
+          return s;
+        }),
+        specials: prev.specials.map(sp => {
+          if (sp.segmentId === targetUid || sp.segmentId === targetId) {
+            return { ...sp, segmentId: '', position: 'general' };
+          }
+          return sp;
+        })
       };
+    });
+
+    const remaining = data.segments.filter(s => (s.uid && s.uid !== targetUid) && s.id !== segUid);
+    if (remaining.length > 0) {
+      setSelectedSegmentUid(remaining[0].uid);
+    } else {
+      setSelectedSegmentUid(null);
+    }
+  }
+
+  function moveSpecial(index: number, direction: 'up' | 'down') {
+    setData(prev => {
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= prev.specials.length) return prev;
+      const updated = [...prev.specials];
+      const temp = updated[index];
+      updated[index] = updated[targetIndex];
+      updated[targetIndex] = temp;
+      return { ...prev, specials: updated };
     });
   }
 
-  function removeSegment(id: string) {
-    setData(prev => ({
-      ...prev,
-      segments: prev.segments
-        .filter(s => s.id !== id)
-        .map(s => s.confluisceInId === id ? { ...s, confluisceInId: '' } : s),
-      specials: prev.specials.map(sp => sp.segmentId === id ? { ...sp, segmentId: '', position: 'general' } : sp)
-    }));
-  }
-
-  function updSegment(id: string, field: keyof AeraulicSegment, value: any) {
+  function updSegment(segUid: string, field: keyof AeraulicSegment, value: any) {
     setData(prev => ({
       ...prev,
       segments: prev.segments.map(s => {
-        if (s.id !== id) return s;
+        if ((s.uid && s.uid !== segUid) || (!s.uid && s.id !== segUid)) return s;
         const updated = { ...s, [field]: value };
         if (field === 'material' && typeof value === 'string' && FAN_ROUGHNESS[value] !== undefined) {
           updated.roughness_mm = formatNumber(FAN_ROUGHNESS[value], 3);
@@ -624,28 +801,23 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
     }));
   }
 
-  function updSegmentId(oldId: string, newId: string) {
+  function updSegmentId(segUid: string, newId: string) {
     setData(prev => ({
       ...prev,
       segments: prev.segments.map(s => {
-        let updated = s;
-        if (s.id === oldId) {
-          updated = { ...updated, id: newId };
+        if ((s.uid && s.uid === segUid) || (!s.uid && s.id === segUid)) {
+          return { ...s, id: newId };
         }
-        if (s.confluisceInId === oldId) {
-          updated = { ...updated, confluisceInId: newId };
-        }
-        return updated;
-      }),
-      specials: prev.specials.map(sp => sp.segmentId === oldId ? { ...sp, segmentId: newId } : sp)
+        return s;
+      })
     }));
   }
 
-  function updSegmentAccessory(segId: string, accField: string, count: number) {
+  function updSegmentAccessory(segUid: string, accField: string, count: number) {
     setData(prev => ({
       ...prev,
       segments: prev.segments.map(s => {
-        if (s.id !== segId) return s;
+        if ((s.uid && s.uid !== segUid) || (!s.uid && s.id !== segUid)) return s;
         const currentAcc = s.accessories || defaultAccessories();
         return {
           ...s,
@@ -702,29 +874,41 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
 
     // 1. Risoluzione Portate per ciascun Tratto nella Rete ad Albero
     const flowMap: Record<string, number> = {};
-    const segmentsMap = new Map(data.segments.map(s => [s.id, s]));
+    const segByRef = new Map<string, AeraulicSegment>();
+    data.segments.forEach(s => {
+      if (s.uid) segByRef.set(s.uid, s);
+      if (s.id) segByRef.set(s.id, s);
+    });
 
-    function resolveFlow(segId: string, visited = new Set<string>()): number {
-      if (flowMap[segId] !== undefined) return flowMap[segId];
-      if (visited.has(segId)) return 0;
-      visited.add(segId);
-
-      const seg = segmentsMap.get(segId);
+    function resolveFlow(segRef: string, visited = new Set<string>()): number {
+      if (!segRef) return 0;
+      const seg = segByRef.get(segRef);
       if (!seg) return 0;
+      const primaryKey = seg.uid || seg.id;
+
+      if (flowMap[primaryKey] !== undefined) return flowMap[primaryKey];
+      if (visited.has(primaryKey)) return 0;
+      visited.add(primaryKey);
 
       if (seg.type === 'source') {
         const q = parseItalianNumber(seg.Q_custom_m3h);
-        flowMap[segId] = q;
+        flowMap[primaryKey] = q;
+        if (seg.id) flowMap[seg.id] = q;
         return q;
       }
 
-      const incoming = data.segments.filter(s => s.confluisceInId === segId);
-      const totalIn = incoming.reduce((sum, inc) => sum + resolveFlow(inc.id, new Set(visited)), 0);
-      flowMap[segId] = totalIn;
+      const incoming = data.segments.filter(s => {
+        if (!s.confluisceInId) return false;
+        return (seg.uid && s.confluisceInId === seg.uid) || s.confluisceInId === seg.id;
+      });
+
+      const totalIn = incoming.reduce((sum, inc) => sum + resolveFlow(inc.uid || inc.id, new Set(visited)), 0);
+      flowMap[primaryKey] = totalIn;
+      if (seg.id) flowMap[seg.id] = totalIn;
       return totalIn;
     }
 
-    data.segments.forEach(s => resolveFlow(s.id));
+    data.segments.forEach(s => resolveFlow(s.uid || s.id));
 
     const totalFlow_m3h = data.segments
       .filter(s => s.type === 'source')
@@ -732,17 +916,24 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
 
     // 2. Calcolo perdite di carico per ogni tratto
     const segResults = data.segments.map(seg => {
-      const q = flowMap[seg.id] || 0;
+      const q = flowMap[seg.uid || seg.id] || (seg.id ? flowMap[seg.id] : 0) || 0;
       const res = calcSegmentAeraulics(seg, q, rho, nu);
       return { seg, flow_m3h: q, res };
     });
-    const segResultsMap = new Map(segResults.map(r => [r.seg.id, r]));
+    const segResultsMap = new Map<string, typeof segResults[0]>();
+    segResults.forEach(r => {
+      if (r.seg.uid) segResultsMap.set(r.seg.uid, r);
+      if (r.seg.id) segResultsMap.set(r.seg.id, r);
+    });
 
     // 3. Calcolo perdite per ciascun componente speciale di trattamento
     const specResults = data.specials.map(sp => {
       let q = totalFlow_m3h;
       if (sp.position === 'segment' && sp.segmentId) {
-        q = flowMap[sp.segmentId] || 0;
+        const targetSeg = segByRef.get(sp.segmentId);
+        if (targetSeg) {
+          q = flowMap[targetSeg.uid || targetSeg.id] || (targetSeg.id ? flowMap[targetSeg.id] : 0) || 0;
+        }
       }
       const res = calcSpecialAeraulics(sp, q, rho, nu);
       return { sp, flow_m3h: q, res };
@@ -758,6 +949,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
       sourceName: string;
       sourceFlow_m3h: number;
       segmentIds: string[];
+      segmentUids: string[];
       dp_bocchetta: number;
       dp_tratti: number;
       dp_speciali_locali: number;
@@ -769,29 +961,32 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
 
     sourceSegments.forEach(src => {
       const pathSegIds: string[] = [];
-      let currId: string | undefined = src.id;
+      const pathSegUids: string[] = [];
+      let currSeg: AeraulicSegment | null = src;
       const visited = new Set<string>();
 
-      while (currId && !visited.has(currId)) {
-        visited.add(currId);
-        pathSegIds.push(currId);
-        const segObj = segmentsMap.get(currId);
-        if (!segObj || !segObj.confluisceInId) {
-          break;
-        }
-        currId = segObj.confluisceInId;
+      while (currSeg && !visited.has(currSeg.uid || currSeg.id)) {
+        visited.add(currSeg.uid || currSeg.id);
+        pathSegIds.push(currSeg.id);
+        pathSegUids.push(currSeg.uid || currSeg.id);
+        if (!currSeg.confluisceInId) break;
+        currSeg = segByRef.get(currSeg.confluisceInId) || null;
       }
 
       let dp_tratti_path = 0;
-      pathSegIds.forEach(sid => {
-        const sr = segResultsMap.get(sid);
+      pathSegUids.forEach(ref => {
+        const sr = segResultsMap.get(ref);
         if (sr) dp_tratti_path += sr.res.dp_tot_Pa;
       });
 
       let dp_spec_locali = 0;
       specResults.forEach(sr => {
-        if (sr.sp.position === 'segment' && pathSegIds.includes(sr.sp.segmentId)) {
-          dp_spec_locali += sr.res.dp_tot_Pa;
+        if (sr.sp.position === 'segment' && sr.sp.segmentId) {
+          const targetSeg = segByRef.get(sr.sp.segmentId);
+          const targetKey = targetSeg ? (targetSeg.uid || targetSeg.id) : sr.sp.segmentId;
+          if (pathSegUids.includes(targetKey)) {
+            dp_spec_locali += sr.res.dp_tot_Pa;
+          }
         }
       });
 
@@ -803,6 +998,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
         sourceName: src.name || src.id,
         sourceFlow_m3h: parseItalianNumber(src.Q_custom_m3h) || 0,
         segmentIds: pathSegIds,
+        segmentUids: pathSegUids,
         dp_bocchetta: dp_bocch,
         dp_tratti: dp_tratti_path,
         dp_speciali_locali: dp_spec_locali,
@@ -824,7 +1020,11 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
     const dp_tot_ventilatore = dp_sfavorevole_aspirazione + chimneyRes.dp_tot_Pa;
     const dp_mmH2O = dp_tot_ventilatore / 9.80665;
 
-    const criticalSegmentIds = new Set(criticalPath ? criticalPath.segmentIds : []);
+    const criticalSegmentIds = new Set<string>();
+    if (criticalPath) {
+      criticalPath.segmentIds.forEach(id => criticalSegmentIds.add(id));
+      criticalPath.segmentUids.forEach(uid => criticalSegmentIds.add(uid));
+    }
 
     // 5. Dimensionamento Potenza Ventilatore & Motore Elettrico
     const Q_m3s = totalFlow_m3h / 3600;
@@ -840,9 +1040,20 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
 
     const taglia_IEC_consigliata = getTagliaIEC(P_singolo_prog_kW);
 
-    const taglia_IEC_effettiva = g.taglia_IEC_installata !== null && g.taglia_IEC_installata > 0
-      ? g.taglia_IEC_installata
-      : taglia_IEC_consigliata;
+    const isCustomMotor = g.motore_tipo_scelta === 'custom';
+    const parsedCustomkW = isCustomMotor ? parseItalianNumber(g.motore_custom_kW || '') : 0;
+
+    let taglia_IEC_effettiva: number;
+    let isCustomEffettivo = false;
+
+    if (isCustomMotor && parsedCustomkW > 0) {
+      taglia_IEC_effettiva = parsedCustomkW;
+      isCustomEffettivo = true;
+    } else if (g.taglia_IEC_installata !== null && g.taglia_IEC_installata > 0) {
+      taglia_IEC_effettiva = g.taglia_IEC_installata;
+    } else {
+      taglia_IEC_effettiva = taglia_IEC_consigliata;
+    }
 
     const P_tot_installata_kW = taglia_IEC_effettiva * (n_tit + n_ris);
     const coeff_sicurezza_effettivo = P_singolo_teorica_kW > 0
@@ -870,6 +1081,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
       P_singolo_prog_kW,
       taglia_IEC_consigliata,
       taglia_IEC_effettiva,
+      isCustomMotor: isCustomEffettivo,
       P_tot_installata_kW,
       coeff_sicurezza_effettivo,
       eta,
@@ -884,8 +1096,9 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
   // Nodi formattati per lo Schema Topologico
   const treeNodes: AeraulicTreeNode[] = useMemo(() => {
     return data.segments.map(seg => {
-      const segRes = calc.segResults.find(r => r.seg.id === seg.id);
+      const segRes = calc.segResults.find(r => (r.seg.uid && seg.uid) ? r.seg.uid === seg.uid : r.seg.id === seg.id);
       return {
+        uid: seg.uid,
         id: seg.id,
         name: seg.name,
         type: seg.type,
@@ -895,7 +1108,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
         D_mm: seg.D_mm,
         L_m: seg.L_m,
         confluisceInId: seg.confluisceInId,
-        isCritical: calc.criticalSegmentIds.has(seg.id),
+        isCritical: (seg.uid && calc.criticalSegmentIds.has(seg.uid)) || calc.criticalSegmentIds.has(seg.id),
       };
     });
   }, [data.segments, calc.segResults, calc.criticalSegmentIds]);
@@ -1271,339 +1484,815 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                 chimney={chimneyNode}
                 totalFlow_m3h={calc.totalFlow_m3h}
                 dp_tot_ventilatore={calc.dp_tot_ventilatore}
-                selectedSegmentId={selectedTreeSegmentId}
-                onSelectSegment={id => setSelectedTreeSegmentId(id === selectedTreeSegmentId ? null : id)}
+                selectedSegmentId={selectedSegmentUid}
+                onSelectSegment={ref => {
+                  const found = data.segments.find(s => (s.uid && s.uid === ref) || s.id === ref);
+                  if (found) setSelectedSegmentUid(found.uid);
+                }}
                 fanPower_kW={calc.taglia_IEC_effettiva}
               />
             </div>
           </div>
 
-          {/* Elenco Tratti Condotta */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <div className="flex items-center justify-between mb-5 pb-3 border-b border-slate-100 flex-wrap gap-3">
-              <div>
-                <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
-                  <span className="p-1.5 bg-cyan-100 text-cyan-600 rounded-lg"><Wind className="w-4 h-4" /></span>
-                  Configurazione Tratti Condotta ({data.segments.length} tratti)
-                </h3>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Modifica i parametri di ciascun condotto e definisci la gerarchia di confluenza
-                </p>
-              </div>
-              <button
-                onClick={addSegment}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Aggiungi Tratto</span>
-              </button>
-            </div>
+          {/* Elenco e Gestione Tratti Condotta (Master-Detail Focus) */}
+          {(() => {
+            const activeSegment = (selectedSegmentUid && data.segments.find(s => s.uid === selectedSegmentUid))
+              ? data.segments.find(s => s.uid === selectedSegmentUid)!
+              : data.segments[0] || null;
+            const activeIndex = activeSegment ? data.segments.findIndex(s => s.uid === activeSegment.uid) : -1;
+            const prevSegment = activeIndex > 0 ? data.segments[activeIndex - 1] : null;
+            const nextSegment = activeIndex >= 0 && activeIndex < data.segments.length - 1 ? data.segments[activeIndex + 1] : null;
 
-            <div className="space-y-5">
-              {data.segments.map((seg) => {
-                const segRes = calc.segResults.find(r => r.seg.id === seg.id);
-                const isCritical = calc.criticalSegmentIds.has(seg.id);
-                const isSelectedInTree = selectedTreeSegmentId === seg.id;
-                const velocity = segRes?.res.v_ms || 0;
-                
-                const vOk = velocity >= 10 && velocity <= 18;
-                const vWarn = (velocity >= 6 && velocity < 10) || (velocity > 18 && velocity <= 22);
-                const vBad = (velocity > 0 && velocity < 6) || velocity > 22;
+            function renderSegmentCard(seg: AeraulicSegment, isSingleFocus = false) {
+              const segUid = seg.uid || seg.id;
+              const segRes = calc.segResults.find(r => (r.seg.uid && seg.uid) ? r.seg.uid === seg.uid : r.seg.id === seg.id);
+              const isCritical = (seg.uid && calc.criticalSegmentIds.has(seg.uid)) || calc.criticalSegmentIds.has(seg.id);
+              const isSelectedInTree = (seg.uid && selectedSegmentUid === seg.uid) || selectedSegmentUid === seg.id;
+              const velocity = segRes?.res.v_ms || 0;
+              
+              const vOk = velocity >= 10 && velocity <= 18;
+              const vWarn = (velocity >= 6 && velocity < 10) || (velocity > 18 && velocity <= 22);
+              const vBad = (velocity > 0 && velocity < 6) || velocity > 22;
 
-                const safeAccessories: DuctAccessories = seg.accessories || defaultAccessories();
+              const safeAccessories: DuctAccessories = seg.accessories || defaultAccessories();
+              const isDuplicateId = data.segments.filter(s => s.id.trim().toUpperCase() === seg.id.trim().toUpperCase()).length > 1;
 
-                return (
-                  <div
-                    key={seg.uid || seg.id}
-                    id={`segment-card-${seg.id}`}
-                    className={`border rounded-2xl p-5 transition-all ${
-                      isSelectedInTree
-                        ? 'border-cyan-500 bg-cyan-50/40 shadow-md ring-2 ring-cyan-400'
-                        : isCritical
-                        ? 'border-amber-300 bg-amber-50/20 shadow-sm ring-1 ring-amber-300/60'
-                        : 'border-slate-200 bg-white hover:border-slate-300'
-                    }`}
-                  >
-                    {/* Intestazione del Tratto */}
-                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 flex-wrap gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <span className="px-3 py-1 bg-slate-800 text-white font-black text-xs rounded-lg tracking-wide shadow-sm">
-                          {seg.id}
+              return (
+                <div
+                  key={segUid}
+                  id={`segment-card-${seg.id}`}
+                  className={`border rounded-2xl p-5 transition-all ${
+                    isSelectedInTree || isSingleFocus
+                      ? 'border-cyan-500 bg-white shadow-md ring-2 ring-cyan-400/30'
+                      : isCritical
+                      ? 'border-amber-300 bg-amber-50/20 shadow-sm ring-1 ring-amber-300/60'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
+                >
+                  {/* Intestazione del Tratto */}
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 flex-wrap gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <span className="px-3 py-1 bg-slate-800 text-white font-black text-xs rounded-lg tracking-wide shadow-sm">
+                        {seg.id}
+                      </span>
+                      <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md border ${
+                        seg.type === 'source' ? 'bg-cyan-50 text-cyan-800 border-cyan-200' : 'bg-indigo-50 text-indigo-800 border-indigo-200'
+                      }`}>
+                        {seg.type === 'source' ? '📍 Bocchetta di Captazione' : '🔀 Collettore di Confluenza'}
+                      </span>
+                      {isCritical && (
+                        <span className="px-2.5 py-0.5 bg-amber-100 text-amber-900 font-black text-[10px] rounded-md border border-amber-300 flex items-center gap-1 shadow-sm">
+                          <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
+                          PIÙ SFAVOREVOLE
                         </span>
-                        {isCritical && (
-                          <span className="px-2.5 py-1 bg-amber-100 text-amber-900 font-black text-[10px] rounded-lg border border-amber-300 flex items-center gap-1 shadow-sm">
-                            <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-500" />
-                            PIÙ SFAVOREVOLE
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {segRes && segRes.flow_m3h > 0 && (
+                        <div className="flex items-center gap-2 mr-2">
+                          <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 ${
+                            vOk ? 'bg-emerald-100 text-emerald-800' :
+                            vWarn ? 'bg-amber-100 text-amber-800' :
+                            vBad ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            v = {formatNumber(velocity, 2)} m/s
                           </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        {segRes && segRes.flow_m3h > 0 && (
-                          <div className="flex items-center gap-2 mr-2">
-                            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 ${
-                              vOk ? 'bg-emerald-100 text-emerald-800' :
-                              vWarn ? 'bg-amber-100 text-amber-800' :
-                              vBad ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-600'
-                            }`}>
-                              v = {formatNumber(velocity, 2)} m/s
-                            </span>
-                            <span className="text-[11px] font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200">
-                              ΔP = {formatNumber(segRes.res.dp_tot_Pa, 1)} Pa
-                            </span>
-                          </div>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => duplicateSegment(seg.id)}
-                          title="Duplica questo tratto (clona geometria, accessori e confluenza)"
-                          className="w-7 h-7 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-700 flex items-center justify-center transition-colors cursor-pointer"
-                        >
-                          <Copy className="w-3.5 h-3.5" />
-                        </button>
-
-                        {data.segments.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeSegment(seg.id)}
-                            title="Elimina questo tratto"
-                            className="w-7 h-7 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* SELETTORE RUOLO FUNZIONALE: Bocchetta vs Collettore */}
-                    <div className="mb-4">
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">
-                        Ruolo Funzionale del Tratto:
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => updSegment(seg.id, 'type', 'source')}
-                          className={`flex items-start gap-2.5 p-3 rounded-xl border text-left cursor-pointer transition-all ${
-                            seg.type === 'source'
-                              ? 'bg-cyan-50/90 border-cyan-500 ring-2 ring-cyan-400/25 text-cyan-950 shadow-sm'
-                              : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
-                          }`}
-                        >
-                          <div className={`p-1.5 rounded-lg flex-shrink-0 ${
-                            seg.type === 'source' ? 'bg-cyan-600 text-white shadow-sm' : 'bg-white text-slate-400 border border-slate-200'
-                          }`}>
-                            <Wind className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <p className="text-xs font-black leading-tight">📍 Bocchetta di Captazione (Inizio Ramo)</p>
-                            <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
-                              Punto iniziale dove si aspira l'aria. Inserisci la portata di processo Q [m³/h] da estrarre.
-                            </p>
-                          </div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => updSegment(seg.id, 'type', 'junction')}
-                          className={`flex items-start gap-2.5 p-3 rounded-xl border text-left cursor-pointer transition-all ${
-                            seg.type === 'junction'
-                              ? 'bg-indigo-50/90 border-indigo-500 ring-2 ring-indigo-400/25 text-indigo-950 shadow-sm'
-                              : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
-                          }`}
-                        >
-                          <div className={`p-1.5 rounded-lg flex-shrink-0 ${
-                            seg.type === 'junction' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-400 border border-slate-200'
-                          }`}>
-                            <GitFork className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <p className="text-xs font-black leading-tight">🔀 Collettore di Confluenza (Unione Rami)</p>
-                            <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
-                              Condotto che raccoglie l'aria da altri rami a monte. La portata viene calcolata sommando i rami affluenti.
-                            </p>
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Griglia Campi Principali */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3.5">
-                      {/* ID Tratto */}
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Codice ID</label>
-                        <input
-                          type="text"
-                          value={seg.id}
-                          onChange={e => updSegmentId(seg.id, e.target.value)}
-                          placeholder="es. L1"
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-cyan-500"
-                        />
-                      </div>
-
-                      {/* Nome descrittivo */}
-                      <div className="lg:col-span-2">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Nome / Descrizione</label>
-                        <input
-                          type="text"
-                          value={seg.name}
-                          onChange={e => updSegment(seg.id, 'name', e.target.value)}
-                          placeholder="es. Aspirazione Bottale 1"
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-cyan-500"
-                        />
-                      </div>
-
-                      {/* Gestione Portata / Confluenza */}
-                      {seg.type === 'source' ? (
-                        <div>
-                          <ItalianNumberInput
-                            label="Portata aspirata Q"
-                            value={seg.Q_custom_m3h}
-                            onChange={raw => updSegment(seg.id, 'Q_custom_m3h', raw)}
-                            placeholder="es. 4.000"
-                            unit="m³/h"
-                          />
-                        </div>
-                      ) : (
-                        <div>
-                          <label className="block text-[10px] font-bold text-indigo-700 uppercase tracking-wide mb-1">Portata a Monte</label>
-                          <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2 text-xs font-bold text-indigo-900">
-                            {formatNumber(segRes?.flow_m3h || 0, 0)} m³/h
-                          </div>
+                          <span className="text-[11px] font-bold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg border border-slate-200">
+                            ΔP = {formatNumber(segRes.res.dp_tot_Pa, 1)} Pa
+                          </span>
                         </div>
                       )}
 
-                      {/* Confluisce in (Destinazione a Valle) */}
-                      <div className="lg:col-span-2">
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">
-                          Dove scarica l'aria questo condotto?
-                        </label>
-                        <select
-                          value={seg.confluisceInId}
-                          onChange={e => updSegment(seg.id, 'confluisceInId', e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-cyan-500"
-                        >
-                          <option value="">🏁 Tratto Finale ➔ Verso Ventilatore / Trattamento</option>
-                          {data.segments
-                            .filter(other => other.id !== seg.id)
-                            .map(other => (
-                              <option key={other.id} value={other.id}>
-                                ↳ Confluisce nel Collettore {other.id} {other.name ? `(${other.name})` : ''}
-                              </option>
-                            ))
-                          }
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Parametri Geometrici Condotta */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mt-3 pt-3 border-t border-slate-100">
-                      <div>
-                        <ItalianNumberInput
-                          label="Diametro interno Ø"
-                          value={seg.D_mm}
-                          onChange={raw => updSegment(seg.id, 'D_mm', raw)}
-                          placeholder="es. 250"
-                          unit="mm"
-                        />
-                      </div>
-
-                      <div>
-                        <ItalianNumberInput
-                          label="Lunghezza lineare L"
-                          value={seg.L_m}
-                          onChange={raw => updSegment(seg.id, 'L_m', raw)}
-                          placeholder="es. 15"
-                          unit="m"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Materiale</label>
-                        <select
-                          value={seg.material}
-                          onChange={e => updSegment(seg.id, 'material', e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-cyan-500"
-                        >
-                          {Object.keys(FAN_ROUGHNESS).map(m => <option key={m} value={m}>{m}</option>)}
-                        </select>
-                      </div>
-
-                      <div>
-                        <ItalianNumberInput
-                          label="Scabrezza parete ε"
-                          value={seg.roughness_mm}
-                          onChange={raw => updSegment(seg.id, 'roughness_mm', raw)}
-                          placeholder="es. 0,02"
-                          unit="mm"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Accessori e Pezzi Speciali (Sempre visibili di default con toggle) */}
-                    <div className="mt-3 pt-2 border-t border-slate-100">
-                      <div className="flex items-center justify-between mb-2">
+                      {seg.type === 'junction' && (
                         <button
                           type="button"
-                          onClick={() => toggleAccessoryCollapse(seg.id)}
-                          className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-cyan-700 cursor-pointer select-none"
+                          onClick={() => addBranchToCollector(seg.id)}
+                          title={`Aggiungi nuova bocchetta che confluisce direttamente in ${seg.id}`}
+                          className="flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-lg border border-indigo-200 transition-colors cursor-pointer"
                         >
-                          {collapsedAccessoryIds[seg.id] ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronUp className="w-3.5 h-3.5 text-cyan-600" />}
-                          <span>Accessori & Raccordi di Linea (Gomiti, Biforcazioni, Riduzioni...)</span>
+                          <Plus className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Aggiungi Ramo</span>
                         </button>
+                      )}
 
-                        {segRes && segRes.res.L_eq_tot_m > 0 ? (
-                          <span className="text-[10px] font-bold text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-md border border-cyan-200">
-                            Leq tot = {formatNumber(segRes.res.L_eq_tot_m, 1)} m (ΔP = {formatNumber(segRes.res.dp_conc_Pa, 1)} Pa)
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-slate-400">Nessun accessorio (Leq = 0 m)</span>
+
+                      <button
+                        type="button"
+                        onClick={() => duplicateSegment(segUid)}
+                        title="Duplica questo tratto (clona geometria, accessori e confluenza)"
+                        className="w-7 h-7 rounded-lg bg-cyan-50 hover:bg-cyan-100 text-cyan-700 flex items-center justify-center transition-colors cursor-pointer"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+
+                      {data.segments.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeSegment(segUid)}
+                          title="Elimina questo tratto"
+                          className="w-7 h-7 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* SELETTORE RUOLO FUNZIONALE: Bocchetta vs Collettore */}
+                  <div className="mb-4">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5">
+                      Ruolo Funzionale del Tratto:
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => updSegment(segUid, 'type', 'source')}
+                        className={`flex items-start gap-2.5 p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                          seg.type === 'source'
+                            ? 'bg-cyan-50/90 border-cyan-500 ring-2 ring-cyan-400/25 text-cyan-950 shadow-sm'
+                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        <div className={`p-1.5 rounded-lg flex-shrink-0 ${
+                          seg.type === 'source' ? 'bg-cyan-600 text-white shadow-sm' : 'bg-white text-slate-400 border border-slate-200'
+                        }`}>
+                          <Wind className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black leading-tight">📍 Bocchetta di Captazione (Inizio Ramo)</p>
+                          <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                            Punto iniziale dove si aspira l'aria. Inserisci la portata di processo Q [m³/h] da estrarre.
+                          </p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => updSegment(segUid, 'type', 'junction')}
+                        className={`flex items-start gap-2.5 p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                          seg.type === 'junction'
+                            ? 'bg-indigo-50/90 border-indigo-500 ring-2 ring-indigo-400/25 text-indigo-950 shadow-sm'
+                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        <div className={`p-1.5 rounded-lg flex-shrink-0 ${
+                          seg.type === 'junction' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white text-slate-400 border border-slate-200'
+                        }`}>
+                          <GitFork className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black leading-tight">🔀 Collettore di Confluenza (Unione Rami)</p>
+                          <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                            Condotto che raccoglie l'aria da altri rami a monte. La portata viene calcolata sommando i rami affluenti.
+                          </p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Griglia Campi Principali */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3.5">
+                    {/* ID Tratto */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide">Codice tratta</label>
+                        {isDuplicateId && (
+                          <span className="text-[9px] font-black text-amber-600 uppercase tracking-tight">⚠️ Duplicato</span>
                         )}
                       </div>
+                      <input
+                        type="text"
+                        value={seg.id}
+                        onChange={e => updSegmentId(segUid, e.target.value)}
+                        placeholder="es. L1"
+                        className={`w-full bg-white border rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none transition-colors ${
+                          isDuplicateId ? 'border-amber-400 focus:border-amber-500 bg-amber-50/30 ring-1 ring-amber-300' : 'border-slate-200 focus:border-cyan-500'
+                        }`}
+                      />
+                    </div>
 
-                      {!collapsedAccessoryIds[seg.id] && (
-                        <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Quantità pezzi speciali montati:</p>
-                          <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2">
-                            {[
-                              { field: 'n_gomiti90_R15' as const, label: 'Gomito 90° R1.5' },
-                              { field: 'n_gomiti90_R2'  as const, label: 'Gomito 90° R2' },
-                              { field: 'n_gomiti45'     as const, label: 'Gomito 45°' },
-                              { field: 'n_bif_principale' as const, label: 'Bif. princ.' },
-                              { field: 'n_bif_laterale' as const, label: 'Bif. lat.' },
-                              { field: 'n_rid_exp'      as const, label: 'Rid. espans.' },
-                              { field: 'n_rid_cont'     as const, label: 'Rid. contr.' },
-                              { field: 'n_valvole'      as const, label: 'Valvole' },
-                              { field: 'n_ingresso'     as const, label: 'Ingressi' },
-                              { field: 'n_uscita'       as const, label: 'Uscite' },
-                            ].map(({ field, label }) => {
-                              const val = safeAccessories[field] || 0;
+                    {/* Utenza / Macchinario Collegato (Opzionale) */}
+                    <div className="lg:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                        Utenza / Macchinario Collegato <span className="text-slate-400 font-normal lowercase">(opzionale)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={seg.name || ''}
+                        onChange={e => updSegment(segUid, 'name', e.target.value)}
+                        placeholder="es. Bottale B1, Cappa 1..."
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
 
-                              return (
-                                <div key={field}>
-                                  <label className="block text-[9px] font-bold text-slate-500 mb-0.5 truncate" title={label}>{label}</label>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    step="1"
-                                    value={val === 0 ? '' : val}
-                                    onChange={e => updSegmentAccessory(seg.id, field, parseInt(e.target.value) || 0)}
-                                    placeholder="0"
-                                    className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-center font-bold text-slate-800 focus:outline-none focus:border-cyan-500"
-                                  />
-                                </div>
-                              );
-                            })}
+                    {/* Gestione Portata / Confluenza */}
+                    {seg.type === 'source' ? (
+                      <div>
+                        <ItalianNumberInput
+                          label="Portata aspirata Q"
+                          value={seg.Q_custom_m3h}
+                          onChange={raw => updSegment(segUid, 'Q_custom_m3h', raw)}
+                          placeholder="es. 4.000"
+                          unit="m³/h"
+                        />
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-[10px] font-bold text-indigo-700 uppercase tracking-wide mb-1">Portata a Monte</label>
+                        <div className="bg-indigo-50 border border-indigo-200 rounded-xl px-3 py-2 text-xs font-bold text-indigo-900">
+                          {formatNumber(segRes?.flow_m3h || 0, 0)} m³/h
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Confluisce in (Destinazione a Valle) */}
+                    <div className="lg:col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">
+                        Dove scarica l'aria questo condotto?
+                      </label>
+                      {(() => {
+                        const currentTarget = data.segments.find(s => (s.uid && s.uid === seg.confluisceInId) || s.id === seg.confluisceInId);
+                        const selectedVal = currentTarget ? (currentTarget.uid || currentTarget.id) : (seg.confluisceInId || '');
+
+                        // Mostra solo Collettori ('junction'), escludendo se stesso e rami che formerebbero cicli
+                        const availableCollectors = data.segments.filter(other => {
+                          const isSelf = (other.uid && seg.uid) ? other.uid === seg.uid : other.id === seg.id;
+                          if (isSelf) return false;
+                          const isCurrent = currentTarget ? (other.uid === currentTarget.uid || other.id === currentTarget.id) : false;
+                          const isCollector = other.type === 'junction' || isCurrent;
+                          if (!isCollector) return false;
+                          if (wouldCreateCycle(seg.uid || seg.id, other.uid || other.id, data.segments)) return false;
+                          return true;
+                        });
+
+                        return (
+                          <select
+                            value={selectedVal}
+                            onChange={e => updSegment(segUid, 'confluisceInId', e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-cyan-500"
+                          >
+                            <option value="">🏁 Tratto Finale ➔ Verso Ventilatore / Trattamento</option>
+                            {availableCollectors.length === 0 ? (
+                              <option value="" disabled className="text-slate-400">
+                                (Nessun altro collettore presente nella rete)
+                              </option>
+                            ) : (
+                              availableCollectors.map(other => {
+                                const optVal = other.uid || other.id;
+                                return (
+                                  <option key={optVal} value={optVal}>
+                                    ↳ Confluisce nel Collettore {other.id} {other.name ? `(${other.name})` : ''}
+                                  </option>
+                                );
+                              })
+                            )}
+                          </select>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Parametri Geometrici Condotta */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mt-3 pt-3 border-t border-slate-100">
+                    <div>
+                      <ItalianNumberInput
+                        label="Diametro interno Ø"
+                        value={seg.D_mm}
+                        onChange={raw => updSegment(segUid, 'D_mm', raw)}
+                        placeholder="es. 250"
+                        unit="mm"
+                      />
+                    </div>
+
+                    <div>
+                      <ItalianNumberInput
+                        label="Lunghezza lineare L"
+                        value={seg.L_m}
+                        onChange={raw => updSegment(segUid, 'L_m', raw)}
+                        placeholder="es. 15"
+                        unit="m"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Materiale</label>
+                      <select
+                        value={seg.material}
+                        onChange={e => updSegment(segUid, 'material', e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-cyan-500"
+                      >
+                        {Object.keys(FAN_ROUGHNESS).map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <ItalianNumberInput
+                        label="Scabrezza parete ε"
+                        value={seg.roughness_mm}
+                        onChange={raw => updSegment(segUid, 'roughness_mm', raw)}
+                        placeholder="es. 0,02"
+                        unit="mm"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Accessori e Pezzi Speciali */}
+                  <div className="mt-3 pt-2 border-t border-slate-100">
+                    <div className="flex items-center justify-between mb-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleAccessoryCollapse(segUid)}
+                        className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-cyan-700 cursor-pointer select-none"
+                      >
+                        {collapsedAccessoryIds[segUid] ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronUp className="w-3.5 h-3.5 text-cyan-600" />}
+                        <span>Accessori & Raccordi di Linea (Gomiti, Biforcazioni, Riduzioni...)</span>
+                      </button>
+
+                      {segRes && segRes.res.L_eq_tot_m > 0 ? (
+                        <span className="text-[10px] font-bold text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-md border border-cyan-200">
+                          Leq tot = {formatNumber(segRes.res.L_eq_tot_m, 1)} m (ΔP = {formatNumber(segRes.res.dp_conc_Pa, 1)} Pa)
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400">Nessun accessorio (Leq = 0 m)</span>
+                      )}
+                    </div>
+
+                    {!collapsedAccessoryIds[segUid] && (
+                      <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1.5">Quantità pezzi speciali montati:</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2">
+                          {[
+                            { field: 'n_gomiti90_R15' as const, label: 'Gomito 90° R1.5' },
+                            { field: 'n_gomiti90_R2'  as const, label: 'Gomito 90° R2' },
+                            { field: 'n_gomiti45'     as const, label: 'Gomito 45°' },
+                            { field: 'n_bif_principale' as const, label: 'Bif. princ.' },
+                            { field: 'n_bif_laterale' as const, label: 'Bif. lat.' },
+                            { field: 'n_rid_exp'      as const, label: 'Rid. espans.' },
+                            { field: 'n_rid_cont'     as const, label: 'Rid. contr.' },
+                            { field: 'n_valvole'      as const, label: 'Valvole' },
+                            { field: 'n_ingresso'     as const, label: 'Ingressi' },
+                            { field: 'n_uscita'       as const, label: 'Uscite' },
+                          ].map(({ field, label }) => {
+                            const val = safeAccessories[field] || 0;
+
+                            return (
+                              <div key={field}>
+                                <label className="block text-[9px] font-bold text-slate-500 mb-0.5 truncate" title={label}>{label}</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={val === 0 ? '' : val}
+                                  onChange={e => updSegmentAccessory(segUid, field, parseInt(e.target.value) || 0)}
+                                  placeholder="0"
+                                  className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs text-center font-bold text-slate-800 focus:outline-none focus:border-cyan-500"
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6">
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 flex-wrap gap-3">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 flex items-center gap-2">
+                      <span className="p-1.5 bg-cyan-100 text-cyan-600 rounded-lg"><Wind className="w-4 h-4" /></span>
+                      Configurazione Tratti Condotta ({data.segments.length} tratti)
+                    </h3>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Modifica i parametri del condotto selezionato o usa la navigazione rapida tra rami
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Toggle Vista: Focalizzata vs Tutte le Tratte */}
+                    <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setSegmentsViewMode('focused')}
+                        className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                          segmentsViewMode === 'focused' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Tratta Attiva
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSegmentsViewMode('all')}
+                        className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                          segmentsViewMode === 'all' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        Tutte le Tratte ({data.segments.length})
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={addSegment}
+                      className="flex items-center gap-1.5 px-3.5 py-2 bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Aggiungi Tratto</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Navigatore Rapido a Pillole (attivo in modalità focalizzata) */}
+                {segmentsViewMode === 'focused' && data.segments.length > 0 && (
+                  <div className="mb-4 pb-3 border-b border-slate-100 flex items-center gap-2 justify-between flex-wrap">
+                    <div
+                      className="flex items-center gap-2 overflow-x-auto pb-2 pt-7 max-w-full scrollbar-thin"
+                      onDragOver={e => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                      }}
+                      onDrop={e => {
+                        e.preventDefault();
+                        if (draggedSegmentIndex !== null && dropTarget) {
+                          dropSegmentAt(draggedSegmentIndex, dropTarget.index, dropTarget.position);
+                        }
+                        setDraggedSegmentIndex(null);
+                        setDropTarget(null);
+                      }}
+                    >
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mr-1 select-none whitespace-nowrap">
+                        Tratta:
+                      </span>
+                      {data.segments.map((s, idx) => {
+                        const isAct = activeSegment ? (s.uid === activeSegment.uid) : false;
+                        const isCrit = (s.uid && calc.criticalSegmentIds.has(s.uid)) || calc.criticalSegmentIds.has(s.id);
+                        const isDragging = draggedSegmentIndex === idx;
+
+                        const isNoOp = draggedSegmentIndex === null || draggedSegmentIndex === idx;
+                        const showBeforeIndicator = dropTarget?.index === idx && dropTarget?.position === 'before' && !isNoOp;
+                        const showAfterIndicator = dropTarget?.index === idx && dropTarget?.position === 'after' && !isNoOp;
+
+                        return (
+                          <div
+                            key={s.uid || s.id}
+                            className="relative flex items-center shrink-0"
+                          >
+                            {/* Indicatore visivo PRIMA della pillola (absolute: nessun layout shift) */}
+                            {showBeforeIndicator && (
+                              <div className="absolute -left-1.5 top-0 bottom-0 w-1 bg-cyan-500 rounded-full shadow-lg shadow-cyan-500/50 z-30 pointer-events-none animate-pulse">
+                                <div className="absolute -top-1 -left-1 w-3 h-3 bg-cyan-500 rounded-full" />
+                                <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-cyan-500 rounded-full" />
+                                <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-cyan-700 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow whitespace-nowrap">
+                                  Prima di {s.id}
+                                </span>
+                              </div>
+                            )}
+
+                            <button
+                              type="button"
+                              draggable
+                              onDragStart={e => {
+                                e.dataTransfer.setData('text/plain', String(idx));
+                                e.dataTransfer.effectAllowed = 'move';
+                                setDraggedSegmentIndex(idx);
+                              }}
+                              onDragOver={e => {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'move';
+                                if (draggedSegmentIndex === null) return;
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const isLeftHalf = (e.clientX - rect.left) < rect.width / 2;
+                                const target = computeDropTarget(draggedSegmentIndex, idx, isLeftHalf);
+                                if (target && (!dropTarget || dropTarget.index !== target.index || dropTarget.position !== target.position)) {
+                                  setDropTarget(target);
+                                }
+                              }}
+                              onDrop={e => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (draggedSegmentIndex !== null) {
+                                  const rect = e.currentTarget.getBoundingClientRect();
+                                  const isLeftHalf = (e.clientX - rect.left) < rect.width / 2;
+                                  const target = computeDropTarget(draggedSegmentIndex, idx, isLeftHalf) || dropTarget;
+                                  if (target) {
+                                    dropSegmentAt(draggedSegmentIndex, target.index, target.position);
+                                  }
+                                }
+                                setDraggedSegmentIndex(null);
+                                setDropTarget(null);
+                              }}
+                              onDragEnd={() => {
+                                setDraggedSegmentIndex(null);
+                                setDropTarget(null);
+                              }}
+                              onClick={() => setSelectedSegmentUid(s.uid)}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-grab active:cursor-grabbing whitespace-nowrap select-none ${
+                                isDragging ? 'opacity-30 scale-95 ring-2 ring-dashed ring-cyan-400' : ''
+                              } ${
+                                isAct
+                                  ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/20 ring-2 ring-cyan-500 scale-105'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                              } ${
+                                showBeforeIndicator || showAfterIndicator ? 'ring-2 ring-cyan-400' : ''
+                              }`}
+                            >
+                              <GripVertical className={`w-3.5 h-3.5 -ml-1 text-slate-400 group-hover:text-slate-600 transition-colors ${
+                                isAct ? 'text-cyan-200 group-hover:text-white' : ''
+                              }`} />
+                              <span className="font-black">{s.id}</span>
+                              <span className={`text-[9px] px-1 py-0.2 rounded font-semibold ${
+                                isAct ? 'bg-cyan-700 text-cyan-100' : 'bg-slate-200 text-slate-600'
+                              }`}>
+                                {s.type === 'source' ? 'Bocchetta' : 'Collettore'}
+                              </span>
+                              {isCrit && <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>}
+                            </button>
+
+                            {/* Indicatore visivo DOPO la pillola (absolute: nessun layout shift) */}
+                            {showAfterIndicator && (
+                              <div className="absolute -right-1.5 top-0 bottom-0 w-1 bg-cyan-500 rounded-full shadow-lg shadow-cyan-500/50 z-30 pointer-events-none animate-pulse">
+                                <div className="absolute -top-1 -left-1 w-3 h-3 bg-cyan-500 rounded-full" />
+                                <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-cyan-500 rounded-full" />
+                                <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-cyan-700 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow whitespace-nowrap">
+                                  Dopo {s.id}
+                                </span>
+                              </div>
+                            )}
                           </div>
+                        );
+                      })}
+
+                      {/* Drop Zone finale per posizionare in fondo */}
+                      {draggedSegmentIndex !== null && (
+                        <div
+                          onDragOver={e => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                            if (draggedSegmentIndex === data.segments.length - 1) return;
+                            if (!dropTarget || dropTarget.index !== data.segments.length - 1 || dropTarget.position !== 'after') {
+                              setDropTarget({ index: data.segments.length - 1, position: 'after' });
+                            }
+                          }}
+                          onDrop={e => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (draggedSegmentIndex !== null && draggedSegmentIndex !== data.segments.length - 1) {
+                              dropSegmentAt(draggedSegmentIndex, data.segments.length - 1, 'after');
+                            }
+                            setDraggedSegmentIndex(null);
+                            setDropTarget(null);
+                          }}
+                          className={`px-3 py-1.5 rounded-xl border-2 border-dashed transition-all flex items-center gap-1 text-xs font-bold whitespace-nowrap cursor-pointer select-none shrink-0 ${
+                            dropTarget?.index === data.segments.length - 1 && dropTarget?.position === 'after'
+                              ? 'border-cyan-500 bg-cyan-100 text-cyan-800 scale-105 shadow-md ring-2 ring-cyan-400'
+                              : 'border-slate-300 bg-slate-50 text-slate-400 hover:border-slate-400'
+                          }`}
+                        >
+                          <span>+ In fondo</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1 ml-auto">
+                      <button
+                        type="button"
+                        disabled={!prevSegment}
+                        onClick={() => prevSegment && setSelectedSegmentUid(prevSegment.uid)}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed text-xs font-bold flex items-center gap-1 cursor-pointer"
+                        title={prevSegment ? `Vai a ${prevSegment.id}` : 'Nessuna tratta precedente'}
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Prec.</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!nextSegment}
+                        onClick={() => nextSegment && setSelectedSegmentUid(nextSegment.uid)}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed text-xs font-bold flex items-center gap-1 cursor-pointer"
+                        title={nextSegment ? `Vai a ${nextSegment.id}` : 'Nessuna tratta successiva'}
+                      >
+                        <span className="hidden sm:inline">Succ.</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Visualizzazione delle Tratte */}
+                {data.segments.length === 0 ? (
+                  <div className="py-12 text-center text-slate-400 border border-dashed border-slate-200 rounded-2xl">
+                    <Wind className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                    <p className="text-xs font-semibold mb-3">Nessuna tratta condotta presente nell'impianto.</p>
+                    <button
+                      onClick={addSegment}
+                      className="px-4 py-2 bg-cyan-600 text-white font-bold text-xs rounded-xl hover:bg-cyan-700 transition-all cursor-pointer"
+                    >
+                      Aggiungi Prima Tratta
+                    </button>
+                  </div>
+                ) : segmentsViewMode === 'focused' ? (
+                  <div>
+                    {activeSegment && renderSegmentCard(activeSegment, true)}
+
+                    {/* Vista d'Insieme a Tabella Collassabile */}
+                    <div className="mt-5 border border-slate-200 rounded-2xl overflow-hidden bg-slate-50/50">
+                      <div
+                        onClick={() => setShowOverviewTable(!showOverviewTable)}
+                        className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-100/70 transition-colors select-none"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 shadow-sm">
+                            <Layers className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-black text-slate-800">
+                              Vista d'Insieme di Tutte le Tratte ({data.segments.length} condotte)
+                            </h4>
+                            <p className="text-[10px] text-slate-500">
+                              Tabella riepilogativa dell'intero impianto con navigazione e modifica con un clic
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-bold text-cyan-700 bg-cyan-50 border border-cyan-200 px-2.5 py-1 rounded-lg">
+                            {showOverviewTable ? 'Nascondi Tabella' : 'Mostra Tabella'}
+                          </span>
+                          {showOverviewTable ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+                        </div>
+                      </div>
+
+                      {showOverviewTable && (
+                        <div className="p-4 pt-0 overflow-x-auto">
+                          <table className="w-full text-left text-xs bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                            <thead className="bg-slate-100/80 text-slate-700 text-[10px] uppercase font-black border-b border-slate-200">
+                              <tr>
+                                <th className="p-2.5">ID</th>
+                                <th className="p-2.5">Ruolo</th>
+                                <th className="p-2.5">Utenza</th>
+                                <th className="p-2.5">Confluenza</th>
+                                <th className="p-2.5">Q [m³/h]</th>
+                                <th className="p-2.5">Ø [mm]</th>
+                                <th className="p-2.5">L [m]</th>
+                                <th className="p-2.5">v [m/s]</th>
+                                <th className="p-2.5">ΔP [Pa]</th>
+                                <th className="p-2.5 text-right">Azioni</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {data.segments.map((seg, sIdx) => {
+                                const isAct = activeSegment ? (seg.uid === activeSegment.uid) : false;
+                                const res = calc.segResults.find(r => (r.seg.uid && seg.uid) ? r.seg.uid === seg.uid : r.seg.id === seg.id);
+                                const vel = res?.res.v_ms || 0;
+                                const vOk = vel >= 10 && vel <= 18;
+                                const isRowDragging = draggedSegmentIndex === sIdx;
+                                const isNoOpRow = draggedSegmentIndex === null || draggedSegmentIndex === sIdx;
+                                const isRowBefore = dropTarget?.index === sIdx && dropTarget?.position === 'before' && !isNoOpRow;
+                                const isRowAfter = dropTarget?.index === sIdx && dropTarget?.position === 'after' && !isNoOpRow;
+
+                                return (
+                                  <tr
+                                    key={seg.uid || seg.id}
+                                    draggable
+                                    onDragStart={e => {
+                                      setDraggedSegmentIndex(sIdx);
+                                      e.dataTransfer.setData('text/plain', String(sIdx));
+                                      e.dataTransfer.effectAllowed = 'move';
+                                    }}
+                                    onDragOver={e => {
+                                      e.preventDefault();
+                                      e.dataTransfer.dropEffect = 'move';
+                                      if (draggedSegmentIndex === null) return;
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      const isTopHalf = (e.clientY - rect.top) < rect.height / 2;
+                                      const target = computeDropTarget(draggedSegmentIndex, sIdx, isTopHalf);
+                                      if (target && (!dropTarget || dropTarget.index !== target.index || dropTarget.position !== target.position)) {
+                                        setDropTarget(target);
+                                      }
+                                    }}
+                                    onDrop={e => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      if (draggedSegmentIndex !== null) {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        const isTopHalf = (e.clientY - rect.top) < rect.height / 2;
+                                        const target = computeDropTarget(draggedSegmentIndex, sIdx, isTopHalf) || dropTarget;
+                                        if (target) {
+                                          dropSegmentAt(draggedSegmentIndex, target.index, target.position);
+                                        }
+                                      }
+                                      setDraggedSegmentIndex(null);
+                                      setDropTarget(null);
+                                    }}
+                                    onDragEnd={() => {
+                                      setDraggedSegmentIndex(null);
+                                      setDropTarget(null);
+                                    }}
+                                    onClick={() => setSelectedSegmentUid(seg.uid)}
+                                    className={`cursor-pointer transition-colors ${
+                                      isRowDragging ? 'opacity-25 bg-slate-100' : ''
+                                    } ${
+                                      isRowBefore ? 'border-t-4 border-t-cyan-500 bg-cyan-50/70' : ''
+                                    } ${
+                                      isRowAfter ? 'border-b-4 border-b-cyan-500 bg-cyan-50/70' : ''
+                                    } ${
+                                      isAct ? 'bg-cyan-50/70 font-semibold' : 'hover:bg-slate-50'
+                                    }`}
+                                  >
+                                    <td className="p-2.5 flex items-center gap-1.5">
+                                      <GripVertical className="w-3.5 h-3.5 text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing" />
+                                      <span className={`px-2 py-0.5 rounded font-black text-xs ${
+                                        isAct ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-white'
+                                      }`}>
+                                        {seg.id}
+                                      </span>
+                                    </td>
+                                    <td className="p-2.5">
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                        seg.type === 'source' ? 'bg-cyan-100 text-cyan-800' : 'bg-indigo-100 text-indigo-800'
+                                      }`}>
+                                        {seg.type === 'source' ? 'Bocchetta' : 'Collettore'}
+                                      </span>
+                                    </td>
+                                    <td className="p-2.5 text-slate-600 font-medium">{seg.name || '—'}</td>
+                                    <td className="p-2.5 font-bold text-slate-700 whitespace-nowrap">
+                                      {(() => {
+                                        const target = data.segments.find(s => (s.uid && s.uid === seg.confluisceInId) || s.id === seg.confluisceInId);
+                                        return target ? `➔ ${target.id}` : (seg.confluisceInId ? `➔ ${seg.confluisceInId}` : '➔ Ventilatore');
+                                      })()}
+                                    </td>
+                                    <td className="p-2.5 font-bold text-slate-900">{formatNumber(res?.flow_m3h || 0, 0)}</td>
+                                    <td className="p-2.5 text-slate-700">{seg.D_mm ? `Ø ${seg.D_mm}` : '—'}</td>
+                                    <td className="p-2.5 text-slate-700">{seg.L_m ? `${seg.L_m} m` : '—'}</td>
+                                    <td className="p-2.5">
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                        vOk ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                      }`}>
+                                        {formatNumber(vel, 1)}
+                                      </span>
+                                    </td>
+                                    <td className="p-2.5 font-bold text-amber-900">{formatNumber(res?.res.dp_tot_Pa || 0, 1)}</td>
+                                    <td className="p-2.5 text-right space-x-1 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                      {data.segments.length > 1 && (
+                                        <>
+                                          <button
+                                            type="button"
+                                            disabled={sIdx === 0}
+                                            onClick={() => dropSegmentAt(sIdx, sIdx - 1, 'before')}
+                                            title="Sposta su"
+                                            className="p-1 hover:bg-slate-200 disabled:opacity-25 disabled:cursor-not-allowed text-slate-600 rounded transition-colors cursor-pointer"
+                                          >
+                                            <ArrowUp className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={sIdx === data.segments.length - 1}
+                                            onClick={() => dropSegmentAt(sIdx, sIdx + 1, 'after')}
+                                            title="Sposta giù"
+                                            className="p-1 hover:bg-slate-200 disabled:opacity-25 disabled:cursor-not-allowed text-slate-600 rounded transition-colors cursor-pointer"
+                                          >
+                                            <ArrowDown className="w-3.5 h-3.5" />
+                                          </button>
+                                        </>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => duplicateSegment(seg.uid || seg.id)}
+                                        title="Duplica"
+                                        className="p-1 hover:bg-cyan-100 text-cyan-700 rounded transition-colors cursor-pointer"
+                                      >
+                                        <Copy className="w-3.5 h-3.5" />
+                                      </button>
+                                      {data.segments.length > 1 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => removeSegment(seg.uid || seg.id)}
+                                          title="Elimina"
+                                          className="p-1 hover:bg-red-100 text-red-600 rounded transition-colors cursor-pointer"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
                         </div>
                       )}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
+                ) : (
+                  <div className="space-y-5">
+                    {data.segments.map(seg => renderSegmentCard(seg, false))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Componenti Speciali di Trattamento Fumi (Scrubber, Separatori, Filtri) */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -1653,12 +2342,36 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2">
                             {specRes && (
                               <span className="text-[11px] font-bold bg-indigo-100 text-indigo-800 px-2.5 py-1 rounded-lg border border-indigo-200">
                                 ΔP = {formatNumber(specRes.res.dp_tot_Pa, 1)} Pa
                               </span>
                             )}
+
+                            {data.specials.length > 1 && (
+                              <div className="flex items-center bg-white border border-indigo-200 rounded-lg p-0.5 shadow-sm">
+                                <button
+                                  type="button"
+                                  disabled={idx === 0}
+                                  onClick={() => moveSpecial(idx, 'up')}
+                                  title="Sposta a monte nel flusso dell'aria"
+                                  className="p-1 rounded hover:bg-indigo-50 disabled:opacity-30 disabled:cursor-not-allowed text-indigo-700 transition-colors cursor-pointer"
+                                >
+                                  <ChevronUp className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={idx === data.specials.length - 1}
+                                  onClick={() => moveSpecial(idx, 'down')}
+                                  title="Sposta a valle nel flusso dell'aria"
+                                  className="p-1 rounded hover:bg-indigo-50 disabled:opacity-30 disabled:cursor-not-allowed text-indigo-700 transition-colors cursor-pointer"
+                                >
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+
                             <button
                               onClick={() => removeSpecial(sp.id)}
                               className="w-7 h-7 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center cursor-pointer transition-colors"
@@ -2380,17 +3093,27 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                     </div>
                   </div>
 
-                  {/* Selettore Manuale Taglia Installata */}
+                  {/* Selettore Manuale Taglia Installata (Standard IEC vs Personalizzato/Targa) */}
                   <div className="lg:col-span-2 border border-slate-200 rounded-2xl p-5 bg-slate-50/50 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center justify-between mb-3">
                         <label className="text-xs font-black text-slate-800 uppercase tracking-wide">
                           Motore Commerciale Effettivamente Installato
                         </label>
-                        {data.global.taglia_IEC_installata && (
+                        {(data.global.taglia_IEC_installata !== null || data.global.motore_tipo_scelta === 'custom') && (
                           <button
                             type="button"
-                            onClick={() => updGlobal('taglia_IEC_installata', null)}
+                            onClick={() => {
+                              setData(prev => ({
+                                ...prev,
+                                global: {
+                                  ...prev.global,
+                                  motore_tipo_scelta: 'standard',
+                                  taglia_IEC_installata: null,
+                                  motore_custom_kW: '',
+                                },
+                              }));
+                            }}
                             className="text-[11px] font-bold text-cyan-600 hover:underline cursor-pointer"
                           >
                             Ripristina suggerito
@@ -2398,33 +3121,87 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                         )}
                       </div>
 
-                      <p className="text-[11px] text-slate-500 mb-3">
-                        Puoi confermare la taglia suggerita oppure selezionare una taglia commerciale superiore adottata in cantiere (es. 5,5 kW per forti margini futuri).
-                      </p>
+                      {/* Switch di modalità: Standard IEC vs Personalizzato da Targa */}
+                      <div className="flex items-center gap-1.5 bg-slate-200/70 p-1 rounded-xl mb-3 max-w-md">
+                        <button
+                          type="button"
+                          onClick={() => updGlobal('motore_tipo_scelta', 'standard')}
+                          className={`flex-1 py-1 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            (data.global.motore_tipo_scelta || 'standard') === 'standard'
+                              ? 'bg-white text-slate-800 shadow-sm'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Standard IEC (Normalizzato)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updGlobal('motore_tipo_scelta', 'custom')}
+                          className={`flex-1 py-1 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            data.global.motore_tipo_scelta === 'custom'
+                              ? 'bg-white text-cyan-800 shadow-sm'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          ⚙️ Personalizzato / Da Targa
+                        </button>
+                      </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <select
-                            value={data.global.taglia_IEC_installata ?? calc.taglia_IEC_consigliata}
-                            onChange={e => updGlobal('taglia_IEC_installata', parseFloat(e.target.value) || null)}
-                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-cyan-500 cursor-pointer"
-                          >
-                            {TAGLIE_MOTORI_IEC.map(kw => (
-                              <option key={kw} value={kw}>
-                                Motore IEC: {kw} kW {kw === calc.taglia_IEC_consigliata ? '(Suggerito)' : ''}
-                              </option>
-                            ))}
-                          </select>
+                          {(data.global.motore_tipo_scelta || 'standard') === 'standard' ? (
+                            <div>
+                              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                Taglia a Catalogo IEC
+                              </label>
+                              <select
+                                value={data.global.taglia_IEC_installata ?? calc.taglia_IEC_consigliata}
+                                onChange={e => updGlobal('taglia_IEC_installata', parseFloat(e.target.value) || null)}
+                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-cyan-500 cursor-pointer"
+                              >
+                                {TAGLIE_MOTORI_IEC.map(kw => (
+                                  <option key={kw} value={kw}>
+                                    Motore IEC: {kw} kW {kw === calc.taglia_IEC_consigliata ? '(Suggerito)' : ''}
+                                  </option>
+                                ))}
+                              </select>
+                              <p className="text-[10px] text-slate-400 mt-1">
+                                Serie unificata IEC 60072-1 / CEI EN 60034-30-1
+                              </p>
+                            </div>
+                          ) : (
+                            <div>
+                              <ItalianNumberInput
+                                label="Potenza Nominale da Targa [kW]"
+                                value={data.global.motore_custom_kW || ''}
+                                onChange={val => updGlobal('motore_custom_kW', val)}
+                                unit="kW"
+                                placeholder="es. 3,7 o 0,18"
+                              />
+                              <p className="text-[10px] text-slate-500 mt-1 leading-tight">
+                                Motori NEMA (es. 5 HP = 3,7 kW), Dahlander, motori EC o fuori standard
+                              </p>
+                            </div>
+                          )}
                         </div>
 
-                        <div className="bg-white border border-slate-200 rounded-xl p-3">
-                          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">Coefficiente di Sicurezza Effettivo</p>
-                          <p className="text-base font-black text-slate-800 mt-0.5">
-                            {formatNumber(calc.coeff_sicurezza_effettivo, 2)}×{' '}
-                            <span className="text-[10px] font-medium text-slate-500">
-                              (rispetto a {formatNumber(calc.P_singolo_teorica_kW, 3)} kW teorici)
-                            </span>
-                          </p>
+                        <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
+                          <div>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wide">
+                              Coefficiente di Sicurezza Effettivo
+                            </p>
+                            <p className={`text-base font-black mt-0.5 ${calc.coeff_sicurezza_effettivo < 1 ? 'text-rose-600' : 'text-slate-800'}`}>
+                              {formatNumber(calc.coeff_sicurezza_effettivo, 2)}×{' '}
+                              <span className="text-[10px] font-medium text-slate-500">
+                                (rispetto a {formatNumber(calc.P_singolo_teorica_kW, 3)} kW teorici)
+                              </span>
+                            </p>
+                          </div>
+                          {calc.coeff_sicurezza_effettivo < 1 && (
+                            <p className="text-[10px] font-bold text-rose-600 mt-1">
+                              ⚠️ Attenzione: taglia inferiore alla potenza teorica dell'aria!
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -2549,17 +3326,21 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                   <th className="py-1.5 px-2 text-right font-bold">ΔP distr. [Pa]</th>
                   <th className="py-1.5 px-2 text-right font-bold">ΔP conc. [Pa]</th>
                   <th className="py-1.5 px-2 text-right font-bold">ΔP tot [Pa]</th>
-                  <th className="py-1.5 px-2 text-center font-bold">Sfavorito</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {calc.segResults.map(({ seg, flow_m3h, res }) => {
                   const isCrit = calc.criticalSegmentIds.has(seg.id);
                   return (
-                    <tr key={seg.id} className={isCrit ? 'bg-amber-50/50 font-semibold' : ''}>
+                    <tr key={seg.uid || seg.id} className={isCrit ? 'bg-amber-50/50 font-semibold' : ''}>
                       <td className="py-1.5 px-2">{seg.id}</td>
                       <td className="py-1.5 px-2">{seg.name || '—'}</td>
-                      <td className="py-1.5 px-2 whitespace-nowrap">{seg.confluisceInId ? `➔ ${seg.confluisceInId}` : '➔ Ventilatore'}</td>
+                      <td className="py-1.5 px-2 whitespace-nowrap">
+                        {(() => {
+                          const target = data.segments.find(s => (s.uid && s.uid === seg.confluisceInId) || s.id === seg.confluisceInId);
+                          return target ? `➔ ${target.id}` : (seg.confluisceInId ? `➔ ${seg.confluisceInId}` : '➔ Ventilatore');
+                        })()}
+                      </td>
                       <td className="py-1.5 px-2 text-right">{formatNumber(flow_m3h, 0)}</td>
                       <td className="py-1.5 px-2 text-right">{seg.D_mm}</td>
                       <td className="py-1.5 px-2 text-right">{seg.L_m}</td>
@@ -2567,7 +3348,6 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                       <td className="py-1.5 px-2 text-right">{formatNumber(res.dp_dist_Pa, 1)}</td>
                       <td className="py-1.5 px-2 text-right">{formatNumber(res.dp_conc_Pa, 1)}</td>
                       <td className="py-1.5 px-2 text-right font-bold">{formatNumber(res.dp_tot_Pa, 1)}</td>
-                      <td className="py-1.5 px-2 text-center">{isCrit ? 'SÌ' : '—'}</td>
                     </tr>
                   );
                 })}
@@ -2661,8 +3441,8 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
             </table>
           </PrintSection>
 
-          {/* Sezione: Dimensionamento Ventilatore & Motore IEC (a tutta larghezza) */}
-          <PrintSection title={`${calc.specResults.length > 0 ? '6.' : '5.'} Dimensionamento Ventilatore & Motore IEC`}>
+          {/* Sezione: Dimensionamento Ventilatore & Motore Elettrico (a tutta larghezza) */}
+          <PrintSection title={`${calc.specResults.length > 0 ? '6.' : '5.'} Dimensionamento Ventilatore & Motore Elettrico`}>
             <table className="w-full text-[11px] border-collapse">
               <tbody>
                 <tr className="border-b border-slate-200">
@@ -2690,7 +3470,7 @@ export function ToolAspiratore({ projectData, setProjectData, setAppMode }: Tool
                 <tr className="bg-slate-900 text-white font-bold">
                   <td className="py-2 px-2">Motore Commerciale Adottato (per vent.)</td>
                   <td className="py-2 px-2 text-right text-sm">
-                    {calc.taglia_IEC_effettiva} kW (K_sic = {formatNumber(calc.coeff_sicurezza_effettivo, 2)}×)
+                    {calc.taglia_IEC_effettiva} kW {calc.isCustomMotor ? '(Da Targa / Speciale)' : '(Norm. IEC)'} (K_sic = {formatNumber(calc.coeff_sicurezza_effettivo, 2)}×)
                   </td>
                 </tr>
               </tbody>
